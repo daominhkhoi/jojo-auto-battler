@@ -13,6 +13,15 @@ socket.on('connect', () => {
 
 socket.on('match_found', (data) => {
     STATE.roomId = data.room;
+
+    // RESET MÁU VỀ 100
+    STATE.playerLP = 100;
+    STATE.botLP = 100;
+    const pText = document.getElementById('playerLpText');
+    const bText = document.getElementById('botLpText');
+    if (pText) pText.innerText = 100;
+    if (bText) bText.innerText = 100;
+
     showNotification(`Match found with ${data.opponentName}!`);
 
     const readyBtn = document.getElementById('readyBtn');
@@ -53,8 +62,25 @@ socket.on('match_locked', () => {
     showNotification("Both ready! 10s to inspect opponent!");
 });
 
+let combatTimerInterval;
+
 socket.on('combat_start', () => {
     showNotification("FIGHT!");
+
+    // --- KHỞI ĐỘNG ĐỒNG HỒ 30 GIÂY ---
+    let timeLeft = 30;
+    const timerText = document.getElementById('timerText');
+    if (timerText) timerText.innerText = timeLeft;
+
+    clearInterval(combatTimerInterval); // Xóa bộ đếm cũ nếu có
+    combatTimerInterval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft >= 0 && timerText) {
+            timerText.innerText = timeLeft;
+        } else {
+            clearInterval(combatTimerInterval);
+        }
+    }, 1000); // Mỗi giây giảm 1
 });
 
 socket.on('sync_tick', (data) => {
@@ -63,7 +89,10 @@ socket.on('sync_tick', (data) => {
     });
 });
 
+// Nhớ dừng đồng hồ nếu trận đấu kết thúc sớm (trước 30s)
 socket.on('combat_end', () => {
+    clearInterval(combatTimerInterval); // Dừng đồng hồ
+
     import('./combat.js').then(module => {
         module.handleCombatEnd();
     });

@@ -12,11 +12,22 @@ export const CONFIG = {
     BENCH_START_Y: 780        // Vị trí bắt đầu hàng chờ (6 hàng sân đấu * 130px)
 };
 
+
 export const STATE = {
-    roomId: null, playerId: null, playerGold: 20, playerLevel: 1, currentXp: 0,
-    xpToNextLevel: 2, champions: [], activeProjectiles: [], isCombatPhase: false,
-    playerLP: 50, botLP: 50, currentRound: 1
+    roomId: null,
+    playerId: null,
+    playerGold: 20,
+    playerLevel: 1,
+    currentXp: 0,
+    xpToNextLevel: 2,
+    champions: [],
+    activeProjectiles: [],
+    isCombatPhase: false,
+    playerLP: 100, 
+    botLP: 100,   
+    currentRound: 1
 };
+
 
 export { CHAMPION_POOL };
 

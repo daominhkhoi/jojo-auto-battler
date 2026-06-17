@@ -25,16 +25,15 @@ export function buyXp() {
         updateGold(-STATE.levelCost);
 
         STATE.playerLevel++;
-        STATE.playerLP += 10;
-        STATE.levelCost *= 2;
+        STATE.levelCost *= 2; // Nhân đôi giá tiền nâng cấp lần sau
 
+        // Cập nhật giao diện (Chỉ cập nhật Level, KHÔNG chạm vào LP)
         document.getElementById('levelText').innerText = STATE.playerLevel;
-        document.getElementById('playerLpText').innerText = STATE.playerLP;
         document.getElementById('buyXpBtn').innerText = `Level Up (${STATE.levelCost} 🪙)`;
 
         updateUnitCount();
 
-        showNotification(`Level ${STATE.playerLevel} Reached! +1 Slot & +10 LP 💖`);
+        showNotification(`Level ${STATE.playerLevel} Reached! +1 Slot 💖`);
     } else {
         showNotification(`Need ${STATE.levelCost} gold to level up!`);
     }
@@ -50,11 +49,11 @@ function checkAndMerge(champName, starLevel) {
         const upgraded = targets[0];
         upgraded.star += 1;
 
-        upgraded.max_hp = Math.round(upgraded.max_hp * 1.5);
+        upgraded.max_hp = Math.round(upgraded.max_hp * 3);
         upgraded.hp = upgraded.max_hp;
-        upgraded.attack = Math.round(upgraded.attack * 1.5);
-        upgraded.attack_range = parseFloat((upgraded.attack_range * 1.2).toFixed(1));
-        upgraded.max_mana = Math.round(upgraded.max_mana * 0.8);
+        upgraded.attack = Math.round(upgraded.attack * 3);
+        upgraded.attack_range = parseFloat((upgraded.attack_range * 1.1).toFixed(1));
+        upgraded.max_mana = Math.round(upgraded.max_mana * 0.5);
         upgraded.mana = 0;
 
         STATE.champions.push(upgraded);

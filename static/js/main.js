@@ -148,7 +148,7 @@ canvas.addEventListener('contextmenu', (e) => {
         sellChampion(clickedChamp);
         // Reset bảng thông tin về rỗng sau khi bán thẻ
         hoveredChamp = null;
-        showCardInfo(null);
+        showDisplayInfo(null);
     }
 });
 
@@ -156,7 +156,7 @@ canvas.addEventListener('contextmenu', (e) => {
 canvas.addEventListener('mouseleave', () => {
     if (!isDragging) {
         hoveredChamp = null;
-        showCardInfo(null);
+        showDisplayInfo(null);
     }
 });
 

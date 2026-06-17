@@ -136,29 +136,51 @@ export function syncTickData(data) {
 }
 
 export function handleCombatEnd() {
-    const myTeamAlive = STATE.champions.some(c => c.team === 'Team1' && c.targetY < 6 && c.is_alive);
-    handleRoundResult(myTeamAlive);
+    const myTeam = STATE.champions.filter(c => c.team === 'Team1' && c.targetY < 6 && c.is_alive);
+    const enemyTeam = STATE.champions.filter(c => c.team === 'Team2' && c.targetY < 6 && c.is_alive);
+
+    let playerWon = false;
+    let isDraw = false;
+
+    // LUẬT 30 GIÂY: Phân định thắng thua bằng số lượng tàn quân
+    if (myTeam.length > enemyTeam.length) {
+        playerWon = true;
+    } else if (myTeam.length < enemyTeam.length) {
+        playerWon = false;
+    } else {
+        // Nếu số quân bằng nhau -> Đếm xem phe nào tổng máu còn nhiều hơn
+        const myHp = myTeam.reduce((sum, c) => sum + c.hp, 0);
+        const enemyHp = enemyTeam.reduce((sum, c) => sum + c.hp, 0);
+        if (myHp > enemyHp) playerWon = true;
+        else if (myHp < enemyHp) playerWon = false;
+        else isDraw = true; // Hòa hoàn toàn
+    }
+
+    handleRoundResult(playerWon, isDraw, myTeam, enemyTeam);
 }
 
-function handleRoundResult(playerWon) {
-    const survivors = STATE.champions.filter(c => (playerWon ? c.team === 'Team1' : c.team === 'Team2') && c.is_alive && c.hp > 0);
-
-    // --- TÍNH TOÁN SÁT THƯƠNG MỚI ---
-    let damage = 0;
-    survivors.forEach(c => {
-        const template = CHAMPION_POOL.find(t => t.name === c.name) || {};
-        const baseCost = template.cost || 1;
-        // Công thức: Giá gốc * 3^(Số sao - 1)
-        const copies = Math.pow(3, (c.star || 1) - 1);
-        damage += baseCost * copies;
-    });
-
-    if (!playerWon) {
-        STATE.playerLP -= damage;
-        showNotification(`Defeat! You lost ${damage} LP`);
+function handleRoundResult(playerWon, isDraw, myTeam, enemyTeam) {
+    if (isDraw) {
+        showNotification("TIME UP! IT'S A DRAW! No LP lost.");
     } else {
-        STATE.botLP -= damage;
-        showNotification(`Victory! Opponent lost ${damage} LP`);
+        const survivors = playerWon ? myTeam : enemyTeam;
+        let damage = 0;
+
+        survivors.forEach(c => {
+            const template = CHAMPION_POOL.find(t => t.name === c.name) || {};
+            const baseCost = template.cost || 1;
+            const copies = Math.pow(3, (c.star || 1) - 1);
+            damage += baseCost * copies;
+        });
+
+        // Trừ máu trực tiếp vào lượng LP hiện tại (Không có lệnh hồi máu nào ở đây cả)
+        if (!playerWon) {
+            STATE.playerLP -= damage;
+            showNotification(`Defeat! You lost ${damage} LP`);
+        } else {
+            STATE.botLP -= damage;
+            showNotification(`Victory! Opponent lost ${damage} LP`);
+        }
     }
 
     updateLpUI();
@@ -170,21 +192,25 @@ function handleRoundResult(playerWon) {
     const readyBtn = document.getElementById('readyBtn');
     const findBtn = document.getElementById('findMatchBtn');
 
+    // --- KIỂM TRA ĐIỀU KIỆN KẾT THÚC TRẬN ĐẤU (LP VỀ 0) ---
     if (STATE.playerLP <= 0 || STATE.botLP <= 0) {
+        // Máy ai có STATE.playerLP <= 0 sẽ hiện YOU LOST, máy còn lại sẽ hiện YOU WON!
         const resultMsg = STATE.playerLP <= 0 ? "YOU LOST!" : "YOU WON!";
         showNotification(`GAME OVER. ${resultMsg}`);
 
+        // Khóa nút Ready lại không cho đấu tiếp vòng mới nữa
         if (readyBtn) readyBtn.style.display = 'none';
+
+        // Hiện nút cho phép bấm để quay ra hàng chờ tìm trận mới
         if (findBtn) {
             findBtn.style.display = 'inline-block';
             findBtn.innerText = "FIND NEW MATCH";
             findBtn.disabled = false;
         }
     } else {
+        // Nếu cả 2 vẫn còn LP thì mới nhảy sang vòng tiếp theo và phát vàng
         STATE.currentRound++;
         updateRoundUI();
-
-        // --- CƠ CHẾ VÀNG MỚI: Vòng x 10 ---
         const income = 10 * STATE.currentRound;
         updateGold(income);
         showNotification(`Round ${STATE.currentRound}: Received ${income} gold`);

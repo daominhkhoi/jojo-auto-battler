@@ -27,8 +27,19 @@ def handle_find_match(data):
     player_name = data.get('name', 'Unknown')
     
     global waiting_players
-    # Lọc bỏ nếu người này spam nút tìm trận
     waiting_players = [p for p in waiting_players if p['sid'] != player_id]
+
+    # DỌN PHÒNG CŨ: Chống lỗi "Người thắng tìm trận mới mà người thua không biết"
+    rooms_to_delete = []
+    for room_name, game in games.items():
+        if game['player1'] == player_id or game['player2'] == player_id:
+            leave_room(room_name, sid=player_id)
+            other = game['player2'] if game['player1'] == player_id else game['player1']
+            socketio.emit('opponent_disconnected', to=other)
+            rooms_to_delete.append(room_name)
+    for r in rooms_to_delete:
+        del games[r]
+
     waiting_players.append({'sid': player_id, 'name': player_name})
     print(f"🔍 {player_name} đang tìm trận...")
 
@@ -40,14 +51,13 @@ def handle_find_match(data):
         games[room_name] = {
             'player1': p1['sid'], 'p1_name': p1['name'],
             'player2': p2['sid'], 'p2_name': p2['name'],
-            'board_state': [], 'ready_count': 0, 'p1_lp': 50, 'p2_lp': 50
+            'board_state': [], 'ready_count': 0, 
+            'p1_lp': 100, 'p2_lp': 100 # SỬA THÀNH 100 LP
         }
         
-        # (Đoạn code trong hàm handle_find_match)
         join_room(room_name, sid=p1['sid'])
         join_room(room_name, sid=p2['sid'])
         
-        # SỬA LẠI 2 DÒNG NÀY: Phải gửi kèm theo cái 'room' để trình duyệt biết đường mà gửi lệnh Ready lên
         socketio.emit('match_found', {'room': room_name, 'opponentName': p2['name']}, to=p1['sid'])
         socketio.emit('match_found', {'room': room_name, 'opponentName': p1['name']}, to=p2['sid'])
 
@@ -156,6 +166,8 @@ def run_game_loop(room_name):
     game = games.get(room_name)
     if not game: return
     
+    tick_count = 0 # Thêm bộ đếm thời gian
+
     while True:
         # Tick Rate: 0.1 giây / Lần quét để Tốc đánh được mượt mà
         socketio.sleep(0.1) 
@@ -223,9 +235,9 @@ def run_game_loop(room_name):
         team1_alive = any(c.team == 'Team1' and c.is_alive for c in game['board_state'])
         team2_alive = any(c.team == 'Team2' and c.is_alive for c in game['board_state'])
         
-        if not team1_alive or not team2_alive:
-            game['ready_count'] = 0 # Trả lại nút Sẵn sàng cho ván sau
-            game['board_state'] = [] # Dọn xác bàn cờ cũ để không bị lỗi bất tử ván sau
+        if not team1_alive or not team2_alive or tick_count >= 300:
+            game['ready_count'] = 0 
+            game['board_state'] = [] 
             socketio.emit('combat_end', to=room_name)
             break
 

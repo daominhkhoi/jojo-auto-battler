@@ -1,4 +1,4 @@
-// renderer.js
+// static/js/renderer.js
 import { CONFIG, STATE, IMAGE_CACHE, getCanvasCoords } from './globals.js';
 
 export function renderBoard(ctx, canvas) {
@@ -53,8 +53,7 @@ export function renderBoard(ctx, canvas) {
         ctx.lineWidth = champ.targetY >= 6 ? 2 : 3.5;
         ctx.strokeRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
 
-        ctx.fillStyle = '#ffd700'; ctx.font = '13px Arial'; ctx.textAlign = 'center';
-        ctx.fillText('⭐'.repeat(champ.star), pX + currentSize.w / 2, pY - 6);
+        // (Đã xóa đoạn vẽ sao ở đây để dời xuống Top Layer)
 
         // Thanh Máu / Mana (Chống tràn viền)
         const barY = pY + currentSize.h - 11;
@@ -123,7 +122,6 @@ export function renderBoard(ctx, canvas) {
         ctx.restore();
     });
 
-    // 4. VỤ NỔ IMPACT KHI TRÚNG ĐÍCH
     // 4. VỤ NỔ IMPACT KHI TRÚNG ĐÍCH HOẶC TUNG SKILL
     if (STATE.hitEffects) {
         STATE.hitEffects.forEach(hit => {
@@ -178,4 +176,28 @@ export function renderBoard(ctx, canvas) {
             ctx.restore();
         });
     }
-}
+
+    // 5. LỚP TRÊN CÙNG (TOP LAYER): VẼ SỐ SAO
+    // Nằm ở cuối cùng để không bị bất kỳ thẻ bài hay đạn đạo nào che lấp
+    STATE.champions.forEach(champ => {
+        if (!champ.is_alive && champ.hp <= 0) return;
+
+        // Cho phép vẽ từ 1 sao trở lên (Lúc nãy mình lỡ giấu mất thẻ 1 sao 😅)
+        const starCount = champ.star || 1;
+        const currentSize = getCanvasCoords(champ.targetX, champ.targetY);
+
+        ctx.save();
+        // Ép các chỉ số môi trường về chuẩn để sao không bị mờ hay ám màu của vụ nổ
+        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = '#f1c40f'; // Màu vàng lấp lánh
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+
+        // Vẽ số sao lên đỉnh đầu của thẻ bài (đứng im tuyệt đối, đè lên mọi layer)
+        ctx.fillText('⭐'.repeat(starCount), champ.pixelX + currentSize.w / 2, champ.pixelY - 6);
+
+        ctx.restore();
+    });
+} // <--- Dấu đóng ngoặc của hàm renderBoard
