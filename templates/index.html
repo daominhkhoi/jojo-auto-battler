@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Minh Khoi - Auto Battler</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=1.1">
+</head>
+<body>
+    <div class="fullscreen-wrapper">
+        <div class="top-bar">
+            <h2>AUTO BATTLER</h2>
+            <div id="notification-area"></div>
+
+            <div class="player-info">
+                <input type="text" id="playerNameInput" class="name-input" placeholder="Enter Name" value="Player1">
+
+                <span class="gold-display">Gold: <span id="goldText">20</span> 🪙</span>
+                <span class="level-display">Lv: <span id="levelText">1</span></span>
+                <span class="unit-display">Units: <span id="unitText">0/1</span></span>
+                <span class="round-display">Round: <span id="roundText">1</span>/10</span>
+                <span class="lp-display">Player: <span id="playerLpText">50</span> | Enemy: <span id="botLpText">50</span></span>
+            </div>
+
+            <div class="controls">
+                <button id="findMatchBtn">FIND MATCH</button>
+                <button id="readyBtn" style="display: none; background-color: #2ecc71; color: white;">READY</button>
+                <button id="buyXpBtn" class="action-btn">Level Up (5 🪙)</button>
+                <button id="rollBtn" class="action-btn">Refresh (2 🪙)</button>
+            </div>
+        </div>
+
+        <div class="game-layout">
+            <div id="infoPanel" class="side-panel">
+                <div class="info-placeholder">Hover over a card or synergy to view details</div>
+            </div>
+
+            <canvas id="gameBoard" width="540" height="870"></canvas>
+
+            <div id="synergyPanel" class="side-panel">
+                <h3 class="panel-title">SYNERGIES</h3>
+                <div id="synergyList">
+                    <div class="info-placeholder">Deploy units to activate synergies</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-bar" id="bottomBar" style="display: none;">
+            <div class="shop-container" id="shopContainer"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

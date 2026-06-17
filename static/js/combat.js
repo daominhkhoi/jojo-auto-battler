@@ -1,0 +1,226 @@
+// static/js/combat.js
+import { CONFIG, STATE, getCanvasCoords, CHAMPION_POOL } from './globals.js';
+import { updateGold, refreshShop } from './shop.js';
+import { showNotification } from './notifications.js';
+
+export function updatePhysics() {
+    if (!STATE.hitEffects) STATE.hitEffects = [];
+
+    STATE.champions.forEach(champ => {
+        const targetCoords = getCanvasCoords(champ.targetX, champ.targetY);
+
+        if (champ.pixelX === undefined) champ.pixelX = targetCoords.x;
+        if (champ.pixelY === undefined) champ.pixelY = targetCoords.y;
+
+        champ.pixelX += (targetCoords.x - champ.pixelX) * 0.12;
+        champ.pixelY += (targetCoords.y - champ.pixelY) * 0.12;
+
+        if (champ.shakeTimer > 0) champ.shakeTimer--;
+    });
+
+    for (let i = STATE.activeProjectiles.length - 1; i >= 0; i--) {
+        const proj = STATE.activeProjectiles[i];
+
+        if (proj.type === 'melee') {
+            proj.lifeTime--;
+            if (proj.lifeTime === 8) {
+                const target = STATE.champions.find(c => c.id === proj.targetId);
+                if (target) target.shakeTimer = 12;
+                STATE.hitEffects.push({ x: proj.targetX, y: proj.targetY, lifeTime: 8, maxLife: 8 });
+            }
+            if (proj.lifeTime <= 0) STATE.activeProjectiles.splice(i, 1);
+        } else {
+            const dx = proj.targetX - proj.x;
+            const dy = proj.targetY - proj.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist < proj.speed) {
+                const target = STATE.champions.find(c => c.id === proj.targetId);
+                if (target) target.shakeTimer = 12;
+
+                STATE.hitEffects.push({ x: proj.targetX, y: proj.targetY, lifeTime: 12, maxLife: 12 });
+                STATE.activeProjectiles.splice(i, 1);
+            } else {
+                proj.x += (dx / dist) * proj.speed;
+                proj.y += (dy / dist) * proj.speed;
+            }
+        }
+    }
+
+    for (let i = STATE.hitEffects.length - 1; i >= 0; i--) {
+        STATE.hitEffects[i].lifeTime--;
+        if (STATE.hitEffects[i].lifeTime <= 0) STATE.hitEffects.splice(i, 1);
+    }
+}
+
+export function syncTickData(data) {
+    if (data.opponent_lp !== undefined) {
+        STATE.botLP = data.opponent_lp;
+        updateLpUI();
+    }
+
+    data.champions.forEach(serverChamp => {
+        let localChamp = STATE.champions.find(c => c.id === serverChamp.id);
+
+        if (localChamp) {
+            localChamp.targetX = serverChamp.x;
+            localChamp.targetY = serverChamp.y;
+            localChamp.hp = serverChamp.hp;
+            localChamp.mana = serverChamp.mana;
+            localChamp.is_alive = serverChamp.is_alive;
+        } else {
+            const template = CHAMPION_POOL.find(t => t.name === serverChamp.name) || {};
+
+            STATE.champions.push({
+                id: serverChamp.id,
+                name: serverChamp.name,
+                team: "Team2",
+                star: serverChamp.star || 1,
+                targetX: serverChamp.x,
+                targetY: serverChamp.y,
+                hp: serverChamp.hp,
+                max_hp: serverChamp.max_hp,
+                mana: serverChamp.mana,
+                max_mana: serverChamp.max_mana,
+                attack_range: template.attack_range || 1,
+                is_alive: serverChamp.is_alive,
+                shakeTimer: 0
+            });
+        }
+    });
+
+    if (!STATE.hitEffects) STATE.hitEffects = [];
+
+    data.events.forEach(event => {
+        // NẾU LÀ KỸ NĂNG (TUNG CHIÊU MẠNH)
+        if (event.type === 'skill') {
+            const caster = STATE.champions.find(c => c.id === event.casterId);
+            const target = STATE.champions.find(c => c.id === event.targetId);
+            if (!caster) return;
+
+            // Nếu là buff/heal thì mục tiêu là chính nó
+            const targetChamp = target || caster;
+            const tarSize = getCanvasCoords(targetChamp.targetX, targetChamp.targetY);
+
+            STATE.hitEffects.push({
+                x: targetChamp.pixelX + tarSize.w / 2,
+                y: targetChamp.pixelY + tarSize.h / 2,
+                lifeTime: 30, maxLife: 30,
+                effectType: event.skill_type // Gắn loại Skill để Canvas biết vẽ màu gì
+            });
+
+            // Nếu là dame thì địch rung bần bật
+            if (event.skill_type === 'damage' && target) target.shakeTimer = 30;
+
+        }
+        // NẾU CHỈ LÀ ĐÁNH THƯỜNG / BẮN ĐẠN
+        else if (event.type === 'attack') {
+            const attacker = STATE.champions.find(c => c.id === event.attackerId);
+            const target = STATE.champions.find(c => c.id === event.targetId);
+            if (!attacker || !target || !attacker.is_alive) return;
+
+            const attSize = getCanvasCoords(attacker.targetX, attacker.targetY);
+            const tarSize = getCanvasCoords(target.targetX, target.targetY);
+            const isRanged = attacker.attack_range > 1.5;
+
+            STATE.activeProjectiles.push({
+                x: attacker.pixelX + attSize.w / 2, y: attacker.pixelY + attSize.h / 2,
+                targetX: target.pixelX + tarSize.w / 2, targetY: target.pixelY + tarSize.h / 2,
+                targetId: event.targetId,
+                type: isRanged ? 'projectile' : 'melee',
+                speed: isRanged ? 16 : 0,
+                lifeTime: isRanged ? 0 : 15
+            });
+        }
+    });
+}
+
+export function handleCombatEnd() {
+    const myTeamAlive = STATE.champions.some(c => c.team === 'Team1' && c.targetY < 6 && c.is_alive);
+    handleRoundResult(myTeamAlive);
+}
+
+function handleRoundResult(playerWon) {
+    const survivors = STATE.champions.filter(c => (playerWon ? c.team === 'Team1' : c.team === 'Team2') && c.is_alive && c.hp > 0);
+
+    // --- TÍNH TOÁN SÁT THƯƠNG MỚI ---
+    let damage = 0;
+    survivors.forEach(c => {
+        const template = CHAMPION_POOL.find(t => t.name === c.name) || {};
+        const baseCost = template.cost || 1;
+        // Công thức: Giá gốc * 3^(Số sao - 1)
+        const copies = Math.pow(3, (c.star || 1) - 1);
+        damage += baseCost * copies;
+    });
+
+    if (!playerWon) {
+        STATE.playerLP -= damage;
+        showNotification(`Defeat! You lost ${damage} LP`);
+    } else {
+        STATE.botLP -= damage;
+        showNotification(`Victory! Opponent lost ${damage} LP`);
+    }
+
+    updateLpUI();
+    resetBoardForNextRound();
+    refreshShop();
+    showNotification("Shop refreshed!");
+    STATE.isCombatPhase = false;
+
+    const readyBtn = document.getElementById('readyBtn');
+    const findBtn = document.getElementById('findMatchBtn');
+
+    if (STATE.playerLP <= 0 || STATE.botLP <= 0) {
+        const resultMsg = STATE.playerLP <= 0 ? "YOU LOST!" : "YOU WON!";
+        showNotification(`GAME OVER. ${resultMsg}`);
+
+        if (readyBtn) readyBtn.style.display = 'none';
+        if (findBtn) {
+            findBtn.style.display = 'inline-block';
+            findBtn.innerText = "FIND NEW MATCH";
+            findBtn.disabled = false;
+        }
+    } else {
+        STATE.currentRound++;
+        updateRoundUI();
+
+        // --- CƠ CHẾ VÀNG MỚI: Vòng x 10 ---
+        const income = 10 * STATE.currentRound;
+        updateGold(income);
+        showNotification(`Round ${STATE.currentRound}: Received ${income} gold`);
+
+        if (findBtn) findBtn.style.display = 'none';
+        if (readyBtn) {
+            readyBtn.style.display = 'inline-block';
+            readyBtn.innerText = "READY";
+            readyBtn.style.backgroundColor = "#2ecc71";
+            readyBtn.disabled = false;
+        }
+    }
+}
+
+function resetBoardForNextRound() {
+    STATE.champions = STATE.champions.filter(c => c.team === 'Team1');
+    STATE.champions.forEach(champ => {
+        champ.hp = champ.max_hp; champ.mana = 0; champ.is_alive = true;
+        if (champ.originalX !== undefined && champ.originalY !== undefined) {
+            champ.targetX = champ.originalX; champ.targetY = champ.originalY;
+        }
+        champ.shakeTimer = 0;
+    });
+    STATE.activeProjectiles = [];
+}
+
+export function updateRoundUI() {
+    const roundText = document.getElementById('roundText');
+    if (roundText) roundText.innerText = STATE.currentRound;
+}
+
+export function updateLpUI() {
+    const playerText = document.getElementById('playerLpText');
+    const botText = document.getElementById('botLpText');
+    if (playerText && botText) {
+        playerText.innerText = STATE.playerLP;
+        botText.innerText = STATE.botLP;
+    }
+}
