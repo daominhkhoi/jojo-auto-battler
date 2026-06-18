@@ -173,25 +173,15 @@ export function handleCombatEnd() {
 
 function handleRoundResult(playerWon, isDraw, myTeam, enemyTeam) {
     if (isDraw) {
-        showNotification("TIME UP! IT'S A DRAW! No LP lost.");
+        showNotification("TIME UP! IT'S A DRAW! No points awarded.");
     } else {
-        const survivors = playerWon ? myTeam : enemyTeam;
-        let damage = 0;
-
-        survivors.forEach(c => {
-            const template = CHAMPION_POOL.find(t => t.name === c.name) || {};
-            const baseCost = template.cost || 1;
-            const copies = Math.pow(3, (c.star || 1) - 1);
-            damage += baseCost * copies;
-        });
-
-        // Trừ máu trực tiếp vào lượng LP hiện tại (Không có lệnh hồi máu nào ở đây cả)
-        if (!playerWon) {
-            STATE.playerLP -= damage;
-            showNotification(`Defeat! You lost ${damage} LP`);
+        // --- CỘNG 1 ĐIỂM CHO PHE CHIẾN THẮNG ---
+        if (playerWon) {
+            STATE.playerLP += 1;
+            showNotification(`Victory! You won this round!`);
         } else {
-            STATE.botLP -= damage;
-            showNotification(`Victory! Opponent lost ${damage} LP`);
+            STATE.botLP += 1;
+            showNotification(`Defeat! Opponent won this round!`);
         }
     }
 
@@ -204,13 +194,13 @@ function handleRoundResult(playerWon, isDraw, myTeam, enemyTeam) {
     const readyBtn = document.getElementById('readyBtn');
     const findBtn = document.getElementById('findMatchBtn');
 
-    // --- KIỂM TRA ĐIỀU KIỆN KẾT THÚC TRẬN ĐẤU (LP VỀ 0) ---
-    if (STATE.playerLP <= 0 || STATE.botLP <= 0) {
-        // Máy ai có STATE.playerLP <= 0 sẽ hiện YOU LOST, máy còn lại sẽ hiện YOU WON!
-        const resultMsg = STATE.playerLP <= 0 ? "YOU LOST!" : "YOU WON!";
+    // --- KIỂM TRA ĐIỀU KIỆN KẾT THÚC TRẬN ĐẤU (AI CHẠM 5 ĐIỂM TRƯỚC LÀ THẮNG) ---
+    if (STATE.playerLP >= 5 || STATE.botLP >= 5) {
+        // Đã có người đạt 5 trận thắng
+        const resultMsg = STATE.playerLP >= 5 ? "YOU WON THE MATCH! 🏆" : "YOU LOST THE MATCH! 💀";
         showNotification(`GAME OVER. ${resultMsg}`);
 
-        // Khóa nút Ready lại không cho đấu tiếp vòng mới nữa
+        // Khóa nút Ready lại không cho đánh tiếp
         if (readyBtn) readyBtn.style.display = 'none';
 
         // Hiện nút cho phép bấm để quay ra hàng chờ tìm trận mới
@@ -220,7 +210,7 @@ function handleRoundResult(playerWon, isDraw, myTeam, enemyTeam) {
             findBtn.disabled = false;
         }
     } else {
-        // Nếu cả 2 vẫn còn LP thì mới nhảy sang vòng tiếp theo và phát vàng
+        // Nếu chưa ai đạt 5 điểm thì tiếp tục vòng mới
         STATE.currentRound++;
         updateRoundUI();
         const income = 10 * STATE.currentRound;
@@ -266,7 +256,8 @@ export function updateLpUI() {
     const playerText = document.getElementById('playerLpText');
     const botText = document.getElementById('botLpText');
     if (playerText && botText) {
-        playerText.innerText = STATE.playerLP;
-        botText.innerText = STATE.botLP;
+        // Hiển thị dạng "Điểm hiện tại / 5"
+        playerText.innerText = `${STATE.playerLP}/5`;
+        botText.innerText = `${STATE.botLP}/5`;
     }
 }

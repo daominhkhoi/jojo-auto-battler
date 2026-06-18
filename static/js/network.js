@@ -14,13 +14,13 @@ socket.on('connect', () => {
 socket.on('match_found', (data) => {
     STATE.roomId = data.room;
 
-    // RESET MÁU VỀ 100
-    STATE.playerLP = 100;
-    STATE.botLP = 100;
+    // --- CHUYỂN TỪ MÁU (LP) SANG ĐIỂM THẮNG (WINS), BẮT ĐẦU TỪ 0 ---
+    STATE.playerLP = 0;
+    STATE.botLP = 0;
     const pText = document.getElementById('playerLpText');
     const bText = document.getElementById('botLpText');
-    if (pText) pText.innerText = 100;
-    if (bText) bText.innerText = 100;
+    if (pText) pText.innerText = "0/5"; // Hiện điểm số chạm 5
+    if (bText) bText.innerText = "0/5";
 
     showNotification(`Match found with ${data.opponentName}!`);
 
