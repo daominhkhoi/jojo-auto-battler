@@ -1,4 +1,4 @@
-// main.js
+// static/js/main.js
 import { CONFIG, STATE, getCanvasCoords } from './globals.js';
 import { buyXp, refreshShop, updateGold, updateUnitCount, sellChampion, showDisplayInfo } from './shop.js';
 import { renderBoard } from './renderer.js';
@@ -9,35 +9,38 @@ import { findMatch, declareReady } from './network.js';
 const canvas = document.getElementById('gameBoard');
 const ctx = canvas.getContext('2d');
 
-// --- ĐĂNG KÝ SỰ KIỆN GIAO DIỆN ---
+// ==========================================
+// ĐĂNG KÝ SỰ KIỆN GIAO DIỆN (UI BUTTONS)
+// ==========================================
 document.getElementById('buyXpBtn').addEventListener('click', buyXp);
 document.getElementById('findMatchBtn').addEventListener('click', findMatch);
 document.getElementById('readyBtn').addEventListener('click', declareReady);
 
 document.getElementById('rollBtn').addEventListener('click', () => {
     if (STATE.isCombatPhase) {
-        showNotification("Không thể đổi tướng khi đang chiến đấu!");
+        showNotification("Cannot roll during combat!");
         return;
     }
     if (STATE.playerGold >= 2) {
         updateGold(-2);
         refreshShop();
     } else {
-        showNotification("Không đủ vàng!");
+        showNotification("Not enough gold!");
     }
 });
 
-// --- HỆ THỐNG KÉO THẢ THẺ BÀI & HOVER ---
+// ==========================================
+// HỆ THỐNG KÉO THẢ THẺ BÀI & HOVER
+// ==========================================
 let isDragging = false;
 let draggedChamp = null;
 let originalX = null;
 let originalY = null;
 let hoveredChamp = null; // Biến lưu vết thẻ đang được trỏ chuột
 
-// Thay thế hàm cũ bằng hàm này
+// Hàm tính tọa độ chuột chuẩn xác khi Canvas bị thu phóng bằng CSS
 function getMousePos(evt) {
     const rect = canvas.getBoundingClientRect();
-    // Tính toán tỷ lệ chênh lệch giữa hiển thị CSS và kích thước thật của Game
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
@@ -47,6 +50,7 @@ function getMousePos(evt) {
     };
 }
 
+// 1. SỰ KIỆN NHẤN CHUỘT XUỐNG (Bắt đầu kéo)
 canvas.addEventListener('mousedown', (e) => {
     if (STATE.isCombatPhase) return;
     const mP = getMousePos(e);
@@ -63,11 +67,12 @@ canvas.addEventListener('mousedown', (e) => {
     });
 });
 
+// 2. SỰ KIỆN DI CHUYỂN CHUỘT (Kéo thẻ & Xem thông tin)
 canvas.addEventListener('mousemove', (e) => {
     const mP = getMousePos(e);
 
     if (isDragging && draggedChamp) {
-        // Logic khi đang kéo thẻ: cập nhật tọa độ pixel theo chuột
+        // Cập nhật tọa độ thẻ di chuyển theo con trỏ chuột
         const size = getCanvasCoords(draggedChamp.targetX, draggedChamp.targetY);
         draggedChamp.pixelX = mP.x - size.w / 2;
         draggedChamp.pixelY = mP.y - size.h / 2;
@@ -75,7 +80,7 @@ canvas.addEventListener('mousemove', (e) => {
         // --- LOGIC HOVER KHI RẢNH TAY ---
         let foundHover = null;
 
-        // Quét ngược mảng để ưu tiên chọn thẻ nằm trên cùng nếu lỡ đè nhau
+        // Quét ngược mảng để ưu tiên chọn thẻ nằm trên cùng nếu bị đè
         for (let i = STATE.champions.length - 1; i >= 0; i--) {
             const champ = STATE.champions[i];
             const size = getCanvasCoords(champ.targetX, champ.targetY);
@@ -86,7 +91,7 @@ canvas.addEventListener('mousemove', (e) => {
             }
         }
 
-        // Chỉ cập nhật DOM nếu chuột trỏ sang một mục tiêu mới (giảm tải giật lag)
+        // Cập nhật DOM hiển thị InfoPanel
         if (foundHover !== hoveredChamp) {
             hoveredChamp = foundHover;
             showDisplayInfo('champ', hoveredChamp);
@@ -94,6 +99,7 @@ canvas.addEventListener('mousemove', (e) => {
     }
 });
 
+// 3. SỰ KIỆN NHẢ CHUỘT (Thả thẻ xuống ô)
 canvas.addEventListener('mouseup', (e) => {
     if (isDragging && draggedChamp) {
         const mP = getMousePos(e);
@@ -103,7 +109,8 @@ canvas.addEventListener('mouseup', (e) => {
             // Thả trên sân đấu
             gridX = Math.max(0, Math.min(CONFIG.BOARD_COLS - 1, Math.floor(mP.x / CONFIG.BOARD_CELL_WIDTH)));
             gridY = Math.max(0, Math.min(CONFIG.BOARD_ROWS - 1, Math.floor(mP.y / CONFIG.BOARD_CELL_HEIGHT)));
-            if (gridY < 3) gridY = 3; // Chặn không cho đặt sang vùng sân địch (Y = 0, 1, 2)
+            // Chặn không cho đặt sang vùng sân địch (Y = 0, 1, 2)
+            if (gridY < 3) gridY = 3;
         } else {
             // Thả xuống hàng chờ
             gridX = Math.max(0, Math.min(CONFIG.BENCH_SLOTS - 1, Math.floor(mP.x / CONFIG.BENCH_CELL_WIDTH)));
@@ -120,30 +127,40 @@ canvas.addEventListener('mouseup', (e) => {
             occupied.targetY = originalY;
         }
 
+        // Kiểm tra giới hạn quân số khi kéo thẻ từ hàng chờ lên sân
         if (gridY < 6 && originalY === 6) {
-            // Kiểm tra giới hạn quân số khi kéo thẻ từ hàng chờ lên sân
             const currentOnBoard = STATE.champions.filter(c => c.targetY < 6 && c !== draggedChamp).length;
             if (currentOnBoard >= STATE.playerLevel) {
-                showNotification("Đã đạt giới hạn quân số!");
-                gridX = originalX; gridY = originalY;
+                showNotification("Board limit reached! Level up to deploy more.");
+                gridX = originalX;
+                gridY = originalY;
             }
         }
 
-        draggedChamp.targetX = gridX; draggedChamp.targetY = gridY;
-        draggedChamp.originalX = gridX; draggedChamp.originalY = gridY;
+        // Chốt tọa độ lưới
+        draggedChamp.targetX = gridX;
+        draggedChamp.targetY = gridY;
+        draggedChamp.originalX = gridX;
+        draggedChamp.originalY = gridY;
 
-        isDragging = false; draggedChamp = null; updateUnitCount();
+        isDragging = false;
+        draggedChamp = null;
+        updateUnitCount();
     }
 });
 
+// 4. SỰ KIỆN CLICK CHUỘT PHẢI (Bán tướng)
 canvas.addEventListener('contextmenu', (e) => {
-    e.preventDefault(); if (STATE.isCombatPhase) return;
+    e.preventDefault();
+    if (STATE.isCombatPhase) return;
+
     const mP = getMousePos(e);
     const clickedChamp = STATE.champions.find(champ => {
         const size = getCanvasCoords(champ.targetX, champ.targetY);
         return mP.x >= champ.pixelX && mP.x <= champ.pixelX + size.w &&
             mP.y >= champ.pixelY && mP.y <= champ.pixelY + size.h;
     });
+
     if (clickedChamp) {
         sellChampion(clickedChamp);
         // Reset bảng thông tin về rỗng sau khi bán thẻ
@@ -152,7 +169,7 @@ canvas.addEventListener('contextmenu', (e) => {
     }
 });
 
-// Xóa trắng bảng thông tin khi chuột rời hẳn khỏi Canvas bàn cờ
+// 5. MẤT HOVER KHI CHUỘT RỜI CANVAS
 canvas.addEventListener('mouseleave', () => {
     if (!isDragging) {
         hoveredChamp = null;
@@ -160,6 +177,9 @@ canvas.addEventListener('mouseleave', () => {
     }
 });
 
+// ==========================================
+// VÒNG LẶP RENDER (GAME LOOP)
+// ==========================================
 function animationLoop() {
     updatePhysics();
     renderBoard(ctx, canvas);

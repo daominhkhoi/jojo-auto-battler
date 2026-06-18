@@ -267,11 +267,27 @@ export function showDisplayInfo(type, data) {
                     skillDesc = `Instantly restores <b>${s.power.toLocaleString()}</b> HP to itself.`;
                     break;
                 case 'regen':
-                    skillDesc = `Regenerates <b>${s.power.toLocaleString()}</b> HP per tick for <b>${s.duration}s</b>.`;
+                    skillDesc = `Regenerates <b>${s.power.toLocaleString()}</b> HP per second for <b>${s.duration}s</b>.`;
                     break;
                 case 'buff_atk':
                     skillDesc = `Empowers itself with <b>+${s.power.toLocaleString()}</b> Attack for <b>${s.duration}s</b>.`;
                     break;
+                case 'dot':
+                    skillDesc = `Infects target, dealing <b>${s.power.toLocaleString()}</b> Damage per second for <b>${s.duration}s</b>.`; break;
+                case 'aoe_heal':
+                    skillDesc = `Heals allies within <b>${s.radius}</b> radius for <b>${s.power.toLocaleString()}</b> HP.`; break;
+                case 'aoe_dot':
+                    skillDesc = `Creates a toxic zone (Radius <b>${s.radius}</b>), enemies take <b>${s.power.toLocaleString()}</b> DMG/s for <b>${s.duration}s</b>.`; break;
+                case 'speed_buff':
+                    skillDesc = `Gains <b>+${s.power}%</b> Attack Speed for <b>${s.duration}s</b>.`; break;
+                case 'swap':
+                    skillDesc = `Teleports and swaps positions with the target instantly.`; break;
+                case 'clone':
+                    skillDesc = `Creates a Shadow Clone with <b>${s.percent * 100}%</b> of original stats.`; break;
+                case 'mana_lock':
+                    skillDesc = `Silences ALL enemies, stopping Mana gain for <b>${s.duration}s</b>.`; break;
+                case 'stun':
+                    skillDesc = `Stuns the target, disabling attacks and movement for <b>${s.duration}s</b>.`; break;
                 default:
                     skillDesc = 'Casts a mysterious ability.';
             }

@@ -23,22 +23,19 @@ export function renderBoard(ctx, canvas) {
         ctx.strokeRect(x, CONFIG.BENCH_START_Y, CONFIG.BENCH_CELL_WIDTH, CONFIG.BENCH_CELL_HEIGHT);
     }
 
-    // 2. VẼ THẺ BÀI VÀ XỬ LÝ ĐỘ RUNG (SHAKE)
+    // 2. VẼ LỚP THẺ BÀI (DƯỚI CÙNG)
     STATE.champions.forEach(champ => {
         if (!champ.is_alive && champ.hp <= 0) return;
 
         const currentSize = getCanvasCoords(champ.targetX, champ.targetY);
 
-        // CÔNG THỨC RUNG: Càng nhiều shakeTimer thì giật càng mạnh
-        let shakeX = 0;
-        let shakeY = 0;
+        let shakeX = 0; let shakeY = 0;
         if (champ.shakeTimer > 0) {
-            const intensity = champ.shakeTimer * 0.8; // Biên độ rung giật
+            const intensity = champ.shakeTimer * 0.8;
             shakeX = (Math.random() - 0.5) * 2 * intensity;
             shakeY = (Math.random() - 0.5) * 2 * intensity;
         }
 
-        // Tọa độ thực tế của lá bài sau khi đã cộng thêm lực rung
         const pX = champ.pixelX + shakeX;
         const pY = champ.pixelY + shakeY;
 
@@ -53,9 +50,7 @@ export function renderBoard(ctx, canvas) {
         ctx.lineWidth = champ.targetY >= 6 ? 2 : 3.5;
         ctx.strokeRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
 
-        // (Đã xóa đoạn vẽ sao ở đây để dời xuống Top Layer)
-
-        // Thanh Máu / Mana (Chống tràn viền)
+        // Thanh Máu / Mana
         const barY = pY + currentSize.h - 11;
         const barW = currentSize.w - 8;
         const hpP = Math.max(0, Math.min(1, champ.hp / champ.max_hp));
@@ -63,8 +58,79 @@ export function renderBoard(ctx, canvas) {
         ctx.fillStyle = '#00ff00'; ctx.fillRect(pX + 4, barY, barW * hpP, 3.5);
 
         const mnP = Math.max(0, Math.min(1, (champ.mana || 0) / champ.max_mana));
+
+        // Nhận diện Mana Lock đổi màu thanh năng lượng
+        const isManaLocked = (champ.buffs && champ.buffs.includes('mana_lock'));
         ctx.fillStyle = '#444'; ctx.fillRect(pX + 4, barY + 4.5, barW, 3.5);
-        ctx.fillStyle = '#00aaff'; ctx.fillRect(pX + 4, barY + 4.5, barW * mnP, 3.5);
+        ctx.fillStyle = isManaLocked ? '#7f8c8d' : '#00aaff';
+        ctx.fillRect(pX + 4, barY + 4.5, barW * mnP, 3.5);
+    });
+
+    // 2.5 LỚP HIỆU ỨNG BUFF/DEBUFF (ĐÈ LÊN MẶT LÁ BÀI)
+    STATE.champions.forEach(champ => {
+        if (!champ.is_alive && champ.hp <= 0) return;
+
+        const activeBuffs = champ.buffs || [];
+        if (activeBuffs.length === 0) return;
+
+        const currentSize = getCanvasCoords(champ.targetX, champ.targetY);
+        const timeNow = Date.now() / 1000;
+
+        let shakeX = 0; let shakeY = 0;
+        if (champ.shakeTimer > 0) {
+            const intensity = champ.shakeTimer * 0.8;
+            shakeX = (Math.random() - 0.5) * 2 * intensity;
+            shakeY = (Math.random() - 0.5) * 2 * intensity;
+        }
+        const pX = champ.pixelX + shakeX;
+        const pY = champ.pixelY + shakeY;
+        const centerX = pX + currentSize.w / 2;
+        const centerY = pY + currentSize.h / 2;
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // 1. Dính Độc (Đầu lâu báo hiệu bị độc)
+        if (activeBuffs.includes('aoe_dot') || activeBuffs.includes('dot')) {
+            ctx.font = '24px Arial';
+            ctx.fillText('☠️', centerX, pY - 20);
+        }
+
+        // 2. Buff Tốc Đánh (Chiếc cánh xanh dương TO)
+        if (activeBuffs.includes('speed_buff')) {
+            ctx.font = '32px Arial';
+            ctx.fillText('🪽', pX - 5, centerY);
+        }
+
+        // 3. Buff Sức Mạnh (Cây kiếm TO)
+        if (activeBuffs.includes('buff_atk')) {
+            ctx.font = '32px Arial';
+            ctx.fillText('⚔️', pX + currentSize.w + 5, centerY);
+        }
+
+        // 4. Stun (Choáng - Ngôi sao quay vòng)
+        if (activeBuffs.includes('stun')) {
+            ctx.translate(centerX, pY - 15);
+            for (let i = 0; i < 3; i++) {
+                const angle = (timeNow * 4) + (i * Math.PI * 2 / 3);
+                const starX = Math.cos(angle) * 35;
+                const starY = Math.sin(angle) * 12;
+
+                ctx.fillStyle = '#f1c40f';
+                ctx.font = '20px Arial';
+                ctx.fillText('⭐', starX, starY);
+            }
+            ctx.translate(-centerX, -(pY - 15));
+        }
+
+        // 5. Khóa Mana (Sợi xích đen đè giữa card)
+        if (activeBuffs.includes('mana_lock')) {
+            ctx.font = '40px Arial';
+            ctx.fillText('⛓️', centerX, centerY);
+        }
+
+        ctx.restore();
     });
 
     // 3. VẼ NẮM ĐẤM VÀ ĐẠN BAY
@@ -78,27 +144,22 @@ export function renderBoard(ctx, canvas) {
         ctx.rotate(angle);
 
         if (proj.type === 'melee') {
-            // HIỆU ỨNG NẮM ĐẤM ĐỘNG NĂNG
-            // Dùng sóng Sine để mô phỏng tay vươn ra (1.0) và rút về (0.0) cực kì mượt
             const progress = 1 - (proj.lifeTime / 15);
-            const punchDist = Math.sin(progress * Math.PI) * 45; // Vươn ra tối đa 45px
+            const punchDist = Math.sin(progress * Math.PI) * 45;
 
-            ctx.translate(15 + punchDist, 0); // Đẩy nắm đấm vươn về phía trước
+            ctx.translate(15 + punchDist, 0);
 
-            // Cánh tay nối từ lá bài
             ctx.fillStyle = '#d35400';
             ctx.fillRect(-25, -6, 25, 12);
 
-            // Khối Nắm Đấm chính
             ctx.beginPath();
             ctx.arc(0, 0, 14, 0, Math.PI * 2);
-            ctx.fillStyle = '#f39c12'; // Màu găng tay cam chói
+            ctx.fillStyle = '#f39c12';
             ctx.fill();
             ctx.lineWidth = 2;
             ctx.strokeStyle = '#fff';
             ctx.stroke();
 
-            // 3 Đốt ngón tay bằng sắt
             ctx.fillStyle = '#fff';
             for (let i = 0; i < 3; i++) {
                 ctx.beginPath();
@@ -107,7 +168,6 @@ export function renderBoard(ctx, canvas) {
             }
 
         } else {
-            // Đạn năng lượng Xạ thủ (Giữ nguyên)
             ctx.shadowBlur = 15;
             ctx.shadowColor = '#00ffff';
 
@@ -122,7 +182,7 @@ export function renderBoard(ctx, canvas) {
         ctx.restore();
     });
 
-    // 4. VỤ NỔ IMPACT KHI TRÚNG ĐÍCH HOẶC TUNG SKILL
+    // 4. VỤ NỔ IMPACT KHI TRÚNG ĐÍCH HOẶC TUNG SKILL VÀ VÙNG CỐ ĐỊNH TRÊN SÂN
     if (STATE.hitEffects) {
         STATE.hitEffects.forEach(hit => {
             ctx.save();
@@ -130,47 +190,77 @@ export function renderBoard(ctx, canvas) {
             const progress = 1 - (hit.lifeTime / hit.maxLife);
             ctx.globalAlpha = hit.lifeTime / hit.maxLife;
 
-            // A. HIỆU ỨNG ĐÁNH THƯỜNG (Không có effectType)
-            if (!hit.effectType) {
+            // A. Đánh thường (Chém X)
+            if (!hit.effectType || hit.effectType === 'damage') {
+                const sz = 15 + progress * 20;
                 ctx.beginPath();
-                ctx.arc(0, 0, 10 + progress * 30, 0, Math.PI * 2);
-                ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 4 * (1 - progress); ctx.stroke();
+                ctx.moveTo(-sz, -sz); ctx.lineTo(sz, sz);
+                ctx.moveTo(sz, -sz); ctx.lineTo(-sz, sz);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${1 - progress})`;
+                ctx.lineWidth = 6 * (1 - progress);
+                ctx.stroke();
 
-                const sparkSize = 25 * progress;
-                ctx.beginPath();
-                ctx.moveTo(-sparkSize, 0); ctx.lineTo(sparkSize, 0);
-                ctx.moveTo(0, -sparkSize); ctx.lineTo(0, sparkSize);
-                ctx.moveTo(-sparkSize * 0.7, -sparkSize * 0.7); ctx.lineTo(sparkSize * 0.7, sparkSize * 0.7);
-                ctx.moveTo(-sparkSize * 0.7, sparkSize * 0.7); ctx.lineTo(sparkSize * 0.7, -sparkSize * 0.7);
-                ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 3; ctx.stroke();
+                ctx.beginPath(); ctx.arc(0, 0, sz / 2, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(231, 76, 60, ${1 - progress})`; ctx.fill();
             }
-            // B. HIỆU ỨNG TUNG KỸ NĂNG (SKILLS)
+            // B. Hiệu ứng Tung Kỹ năng & Vùng Cố định
             else {
-                if (hit.effectType === 'damage') {
-                    // Cột sáng tím/đỏ nổ tung siêu to
-                    ctx.beginPath(); ctx.arc(0, 0, 20 + progress * 70, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(155, 89, 182, 0.6)'; ctx.fill();
-                    ctx.strokeStyle = '#8e44ad'; ctx.lineWidth = 6; ctx.stroke();
-                }
-                else if (hit.effectType === 'heal' || hit.effectType === 'regen') {
-                    // Dấu thập phân xanh lá bay lên không trung
+                if (hit.effectType === 'heal' || hit.effectType === 'regen') {
                     ctx.translate(0, -progress * 50);
                     ctx.fillStyle = '#2ecc71';
                     ctx.fillRect(-6, -18, 12, 36); ctx.fillRect(-18, -6, 36, 12);
-
-                    // Vòng bảo hộ Aura xanh
                     ctx.beginPath(); ctx.arc(0, 0, 40, 0, Math.PI * 2);
                     ctx.strokeStyle = 'rgba(46, 204, 113, 0.5)'; ctx.lineWidth = 5; ctx.stroke();
                 }
-                else if (hit.effectType === 'buff_atk') {
-                    // Lửa bốc lên hừng hực (Màu vàng/cam)
+                else if (hit.effectType === 'buff_atk' || hit.effectType === 'speed_buff') {
                     ctx.beginPath(); ctx.arc(0, 0, 45, 0, Math.PI * 2);
                     ctx.fillStyle = 'rgba(241, 196, 15, 0.4)'; ctx.fill();
-
-                    // Vẽ tia lửa điện
                     ctx.beginPath();
                     ctx.moveTo(-25, 25); ctx.lineTo(0, -50); ctx.lineTo(25, 25);
                     ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 4; ctx.stroke();
+                }
+
+                // --- VÙNG ĐỘC CỐ ĐỊNH (AoE DoT) ---
+                else if (hit.effectType === 'aoe_dot' || hit.effectType === 'dot') {
+                    // Giữ kích thước cố định, mờ dần ở 30 frame cuối
+                    const alpha = hit.lifeTime < 30 ? (hit.lifeTime / 30) * 0.5 : 0.5;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 110, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(142, 68, 173, ${alpha})`;
+                    ctx.fill();
+                    ctx.strokeStyle = `rgba(39, 174, 96, ${alpha})`;
+                    ctx.lineWidth = 4; ctx.stroke();
+
+                    const t = Date.now() / 150;
+                    for (let j = 0; j < 5; j++) {
+                        const bx = Math.cos(t + j * 1.5) * (40 + j * 8);
+                        const by = Math.sin(t + j * 2.2) * (40 + j * 8);
+                        ctx.beginPath();
+                        ctx.arc(bx, by, 6, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgba(46, 204, 113, ${alpha + 0.3})`;
+                        ctx.fill();
+                    }
+                }
+                // --- VÙNG HỒI MÁU CỐ ĐỊNH (AoE Heal) ---
+                else if (hit.effectType === 'aoe_heal') {
+                    const alpha = hit.lifeTime < 30 ? (hit.lifeTime / 30) * 0.3 : 0.3;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 110, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(46, 204, 113, ${alpha})`; ctx.fill();
+                    ctx.strokeStyle = `rgba(46, 204, 113, ${alpha + 0.3})`; ctx.lineWidth = 4; ctx.stroke();
+
+                    const dropY = (Date.now() % 1000) / 1000 * -60;
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha + 0.5})`;
+                    ctx.font = 'bold 24px Arial';
+                    ctx.fillText('+', -8, dropY);
+                }
+                // --- VÙNG KHÓA MANA KHỔNG LỒ (Mana Lock) ---
+                else if (hit.effectType === 'mana_lock') {
+                    const alpha = hit.lifeTime < 30 ? (hit.lifeTime / 30) * 0.5 : 0.5;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 150, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(44, 62, 80, ${alpha})`; ctx.lineWidth = 8; ctx.stroke();
+                    ctx.fillStyle = `rgba(0, 0, 0, ${alpha * 0.2})`; ctx.fill();
                 }
             }
             ctx.restore();
@@ -178,26 +268,21 @@ export function renderBoard(ctx, canvas) {
     }
 
     // 5. LỚP TRÊN CÙNG (TOP LAYER): VẼ SỐ SAO
-    // Nằm ở cuối cùng để không bị bất kỳ thẻ bài hay đạn đạo nào che lấp
     STATE.champions.forEach(champ => {
         if (!champ.is_alive && champ.hp <= 0) return;
 
-        // Cho phép vẽ từ 1 sao trở lên (Lúc nãy mình lỡ giấu mất thẻ 1 sao 😅)
         const starCount = champ.star || 1;
         const currentSize = getCanvasCoords(champ.targetX, champ.targetY);
 
         ctx.save();
-        // Ép các chỉ số môi trường về chuẩn để sao không bị mờ hay ám màu của vụ nổ
         ctx.globalAlpha = 1.0;
         ctx.shadowBlur = 0;
 
-        ctx.fillStyle = '#f1c40f'; // Màu vàng lấp lánh
+        ctx.fillStyle = '#f1c40f';
         ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'center';
 
-        // Vẽ số sao lên đỉnh đầu của thẻ bài (đứng im tuyệt đối, đè lên mọi layer)
         ctx.fillText('⭐'.repeat(starCount), champ.pixelX + currentSize.w / 2, champ.pixelY - 6);
-
         ctx.restore();
     });
-} // <--- Dấu đóng ngoặc của hàm renderBoard
+}

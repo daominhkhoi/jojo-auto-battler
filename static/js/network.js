@@ -67,22 +67,29 @@ let combatTimerInterval;
 socket.on('combat_start', () => {
     showNotification("FIGHT!");
 
-    // --- KHỞI ĐỘNG ĐỒNG HỒ 30 GIÂY ---
     let timeLeft = 30;
     const timerText = document.getElementById('timerText');
     if (timerText) timerText.innerText = timeLeft;
 
-    clearInterval(combatTimerInterval); // Xóa bộ đếm cũ nếu có
+    clearInterval(combatTimerInterval);
     combatTimerInterval = setInterval(() => {
         timeLeft--;
+
         if (timeLeft >= 0 && timerText) {
             timerText.innerText = timeLeft;
-        } else {
-            clearInterval(combatTimerInterval);
         }
-    }, 1000); // Mỗi giây giảm 1
+
+        // KÍCH HOẠT KHẨN CẤP: Khi đồng hồ chạm 0, chủ động dừng trận đấu ngay
+        if (timeLeft <= 0) {
+            clearInterval(combatTimerInterval);
+            import('./combat.js').then(module => {
+                module.handleCombatEnd();
+            });
+        }
+    }, 1000);
 });
 
+// Chuyển toàn bộ dữ liệu (Bao gồm Buffs và Events) sang cho combat.js xử lý
 socket.on('sync_tick', (data) => {
     import('./combat.js').then(module => {
         module.syncTickData(data);
@@ -91,8 +98,7 @@ socket.on('sync_tick', (data) => {
 
 // Nhớ dừng đồng hồ nếu trận đấu kết thúc sớm (trước 30s)
 socket.on('combat_end', () => {
-    clearInterval(combatTimerInterval); // Dừng đồng hồ
-
+    clearInterval(combatTimerInterval);
     import('./combat.js').then(module => {
         module.handleCombatEnd();
     });
@@ -155,7 +161,7 @@ export function declareReady() {
     else if (traitCounts["Team Bucciarati"] >= 4) globalHpBuff += 35000;
     else if (traitCounts["Team Bucciarati"] >= 2) globalHpBuff += 15000;
 
-    // ĐÃ BỔ SUNG: Artifact (Bảo vật) buff máu cho CẢ ĐỘI
+    // Artifact (Bảo vật) buff máu cho CẢ ĐỘI
     if (traitCounts["Artifact"] >= 1) globalHpBuff += 5000;
 
     const boardChamps = boardChampsRaw.map(c => {
@@ -193,7 +199,6 @@ export function declareReady() {
                 finalAttack += 5000;
             }
 
-            // ĐÃ BỔ SUNG: Requiem (Sức mạnh thần thánh)
             if (template.traits.includes("Requiem")) {
                 if (traitCounts["Requiem"] >= 2) {
                     finalHp += 50000;

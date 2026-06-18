@@ -68,6 +68,7 @@ export function syncTickData(data) {
             localChamp.hp = serverChamp.hp;
             localChamp.mana = serverChamp.mana;
             localChamp.is_alive = serverChamp.is_alive;
+            localChamp.buffs = serverChamp.buffs || [];
         } else {
             const template = CHAMPION_POOL.find(t => t.name === serverChamp.name) || {};
 
@@ -93,6 +94,7 @@ export function syncTickData(data) {
 
     data.events.forEach(event => {
         // NẾU LÀ KỸ NĂNG (TUNG CHIÊU MẠNH)
+        // NẾU LÀ KỸ NĂNG (TUNG CHIÊU MẠNH)
         if (event.type === 'skill') {
             const caster = STATE.champions.find(c => c.id === event.casterId);
             const target = STATE.champions.find(c => c.id === event.targetId);
@@ -102,10 +104,17 @@ export function syncTickData(data) {
             const targetChamp = target || caster;
             const tarSize = getCanvasCoords(targetChamp.targetX, targetChamp.targetY);
 
+            // --- KIỂM TRA: NẾU LÀ SKILL VÙNG THÌ CHO TỒN TẠI LÂU HƠN (~4 GIÂY) ---
+            let fxLife = 30; // Mặc định 0.5s cho sát thương nổ
+            if (['aoe_dot', 'aoe_heal', 'mana_lock'].includes(event.skill_type)) {
+                fxLife = 240; // Đóng đinh vùng này trên mặt đất trong 240 ticks (4s)
+            }
+
             STATE.hitEffects.push({
                 x: targetChamp.pixelX + tarSize.w / 2,
                 y: targetChamp.pixelY + tarSize.h / 2,
-                lifeTime: 30, maxLife: 30,
+                lifeTime: fxLife,
+                maxLife: fxLife,
                 effectType: event.skill_type // Gắn loại Skill để Canvas biết vẽ màu gì
             });
 
@@ -136,24 +145,27 @@ export function syncTickData(data) {
 }
 
 export function handleCombatEnd() {
+    // CHỐT CHẶN BẢO VỆ: Nếu trận đấu đã kết thúc rồi (isCombatPhase = false) thì thoát ngay, không tính toán lại
+    if (!STATE.isCombatPhase) return;
+
     const myTeam = STATE.champions.filter(c => c.team === 'Team1' && c.targetY < 6 && c.is_alive);
     const enemyTeam = STATE.champions.filter(c => c.team === 'Team2' && c.targetY < 6 && c.is_alive);
 
     let playerWon = false;
     let isDraw = false;
 
-    // LUẬT 30 GIÂY: Phân định thắng thua bằng số lượng tàn quân
+    // Phân định thắng thua theo số lượng tàn quân
     if (myTeam.length > enemyTeam.length) {
         playerWon = true;
     } else if (myTeam.length < enemyTeam.length) {
         playerWon = false;
     } else {
-        // Nếu số quân bằng nhau -> Đếm xem phe nào tổng máu còn nhiều hơn
+        // Nếu số lượng quân bằng nhau -> Đếm tổng lượng máu còn lại của các quân trên sân
         const myHp = myTeam.reduce((sum, c) => sum + c.hp, 0);
         const enemyHp = enemyTeam.reduce((sum, c) => sum + c.hp, 0);
         if (myHp > enemyHp) playerWon = true;
         else if (myHp < enemyHp) playerWon = false;
-        else isDraw = true; // Hòa hoàn toàn
+        else isDraw = true; // Hòa tuyệt đối khi cả số quân lẫn tổng máu bằng khít nhau
     }
 
     handleRoundResult(playerWon, isDraw, myTeam, enemyTeam);
@@ -235,6 +247,9 @@ function resetBoardForNextRound() {
         champ.shakeTimer = 0;
     });
     STATE.activeProjectiles = [];
+
+    // ---> BỔ SUNG DÒNG NÀY ĐỂ QUÉT SẠCH VỤ NỔ, VÙNG ĐỘC TRÊN SÂN KHI HẾT TRẬN <---
+    STATE.hitEffects = [];
 }
 
 export function updateRoundUI() {
