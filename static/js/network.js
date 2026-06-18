@@ -67,7 +67,7 @@ let combatTimerInterval;
 socket.on('combat_start', () => {
     showNotification("FIGHT!");
 
-    let timeLeft = 30;
+    let timeLeft = 60;
     const timerText = document.getElementById('timerText');
     if (timerText) timerText.innerText = timeLeft;
 
