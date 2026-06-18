@@ -67,25 +67,19 @@ let combatTimerInterval;
 socket.on('combat_start', () => {
     showNotification("FIGHT!");
 
-    let timeLeft = 60;
+    let timeElapsed = 0; // Đổi từ đếm lùi 30 sang đếm tiến từ 0
     const timerText = document.getElementById('timerText');
-    if (timerText) timerText.innerText = timeLeft;
+    if (timerText) timerText.innerText = timeElapsed;
 
     clearInterval(combatTimerInterval);
     combatTimerInterval = setInterval(() => {
-        timeLeft--;
+        timeElapsed++;
 
-        if (timeLeft >= 0 && timerText) {
-            timerText.innerText = timeLeft;
+        if (timerText) {
+            timerText.innerText = timeElapsed;
         }
 
-        // KÍCH HOẠT KHẨN CẤP: Khi đồng hồ chạm 0, chủ động dừng trận đấu ngay
-        if (timeLeft <= 0) {
-            clearInterval(combatTimerInterval);
-            import('./combat.js').then(module => {
-                module.handleCombatEnd();
-            });
-        }
+        // Đã xóa hoàn toàn đoạn if (timeLeft <= 0) tự động gọi handleCombatEnd()
     }, 1000);
 });
 

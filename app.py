@@ -233,10 +233,8 @@ def run_game_loop(room_name):
 
         team1_alive = any(c.team == 'Team1' and c.is_alive for c in game['board_state'])
         team2_alive = any(c.team == 'Team2' and c.is_alive for c in game['board_state'])
-        
-        elapsed_time = time.time() - start_time
 
-        if not team1_alive or not team2_alive or elapsed_time >= 30.0:
+        if not team1_alive or not team2_alive:
             game['ready_count'] = 0
             game['board_state'] = []
             socketio.emit('combat_end', to=room_name)
