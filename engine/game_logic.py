@@ -43,76 +43,103 @@ class Champion:
         if not self.is_alive or self.is_stunned: return None
         
         s_type = self.skill.get('type', 'damage')
-        # Sát thương/Hồi máu scale theo Sao, nhưng thời gian và bán kính thì giữ nguyên
-        s_power = self.skill.get('power', 0) * self.star if 'power' in self.skill else 0
-        s_duration = self.skill.get('duration', 0)
-        s_radius = self.skill.get('radius', 1.5)
-        s_percent = self.skill.get('percent', 0.5) # Dùng cho clone (ví dụ 0.5 = 50% chỉ số)
         
+        # --- CHẶN CLONE ĐẺ THÊM CLONE (CHỐNG TREO MÁY) ---
+        if s_type == 'clone' and getattr(self, 'is_clone', False):
+            s_type = 'damage'
+            self.skill['power'] = self.attack * 2
+        
+        # === CƠ CHẾ NÂNG CẤP KỸ NĂNG THEO SAO ===
+        # 1. Sát thương / Hồi máu (x1, x2, x3 theo Cấp Sao)
+        s_power = self.skill.get('power', 0) * self.star if 'power' in self.skill else 0
+        
+        # 2. Thời gian hiệu ứng (Tăng 50% mỗi Cấp Sao: x1, x1.5, x2)
+        base_duration = self.skill.get('duration', 0)
+        s_duration = base_duration * (1 + (self.star - 1) * 0.5)
+        
+        # 3. Sức mạnh Phân Thân (Tăng 20% chỉ số mỗi Cấp Sao)
+        base_percent = self.skill.get('percent', 0.5)
+        s_percent = base_percent + (self.star - 1) * 0.2
+        
+        # Bán kính (Radius) giữ nguyên để tránh Vùng Phép to tràn ra ngoài bản đồ
+        s_radius = self.skill.get('radius', 1.5)
+        
+        # Mặc định targetId là kẻ địch
         event = {'type': 'skill', 'skill_type': s_type, 'casterId': self.id, 'targetId': target.id if target else self.id}
         
         # 1. Burst Damage
         if s_type == 'damage' and target:
             target.hp -= s_power
             if target.hp <= 0: target.is_alive = False; target.hp = 0
-        
-        # 2. Heal Tức thời
+            
+        # 2. Heal Tức thời (TỰ ĐỘNG TÌM ĐỒNG MINH THẤP MÁU NHẤT)
         elif s_type == 'heal':
-            self.hp = min(self.max_hp, self.hp + s_power)
-        
-        # 3. Regen (Hồi máu bản thân theo thời gian)
+            lowest_hp_ally = min([c for c in board_state if c.team == self.team and c.is_alive], key=lambda c: c.hp/c.max_hp, default=self)
+            lowest_hp_ally.hp = min(lowest_hp_ally.max_hp, lowest_hp_ally.hp + s_power)
+            event['targetId'] = lowest_hp_ally.id # Đổi tâm điểm về đồng minh này
+            
+        # 3. Regen (Hồi máu bản thân)
         elif s_type == 'regen':
             self.active_buffs.append({'type': 'regen', 'power': s_power, 'duration': s_duration})
+            event['targetId'] = self.id # Đổi tâm điểm về bản thân
             
         # 4. Buff ATK
         elif s_type == 'buff_atk':
             self.attack += s_power
             self.active_buffs.append({'type': 'buff_atk', 'power': s_power, 'duration': s_duration})
+            event['targetId'] = self.id
             
         # 5. DoT (Độc/Cháy một mục tiêu)
         elif s_type == 'dot' and target:
             target.active_buffs.append({'type': 'dot', 'power': s_power, 'duration': s_duration})
             
-        # 6. AoE Heal (Hồi máu đồng minh trong bán kính)
+        # 6. AoE Heal (VÒNG HỒI MÁU THÔNG MINH)
         elif s_type == 'aoe_heal':
+            # Tìm đồng minh đang hấp hối nhất
+            lowest_hp_ally = min([c for c in board_state if c.team == self.team and c.is_alive], key=lambda c: c.hp/c.max_hp, default=self)
+            event['targetId'] = lowest_hp_ally.id # Quăng vòng sáng màu xanh vào chỗ người này
+            
             for c in board_state:
-                if c.team == self.team and c.is_alive and calculate_distance(self.x, self.y, c.x, c.y) <= s_radius:
+                # CHỈ QUÉT ĐỒNG MINH (c.team == self.team) đang đứng trong vòng sáng đó
+                if c.team == self.team and c.is_alive and calculate_distance(lowest_hp_ally.x, lowest_hp_ally.y, c.x, c.y) <= s_radius:
                     c.hp = min(c.max_hp, c.hp + s_power)
                     
-        # 7. AoE DoT (Thả độc dính toàn bộ địch xung quanh mục tiêu)
+        # 7. AoE DoT (Thả độc dính toàn bộ địch)
         elif s_type == 'aoe_dot' and target:
             for c in board_state:
                 if c.team != self.team and c.is_alive and calculate_distance(target.x, target.y, c.x, c.y) <= s_radius:
                     c.active_buffs.append({'type': 'aoe_dot', 'power': s_power, 'duration': s_duration})
                     
-        # 8. Speed Buff (Tăng tốc đánh)
+        # 8. Speed Buff
         elif s_type == 'speed_buff':
             old_speed = self.speed
-            self.speed *= (1 + s_power / 100.0) # VD: power 50 = tăng 50% tốc đánh
+            self.speed *= (1 + s_power / 100.0)
             self.active_buffs.append({'type': 'speed_buff', 'power': old_speed, 'duration': s_duration})
+            event['targetId'] = self.id
             
-        # 9. Swap (Hoán đổi vị trí với địch)
+        # 9. Swap
         elif s_type == 'swap' and target:
             self.x, target.x = target.x, self.x
             self.y, target.y = target.y, self.y
             
-        # 10. Clone (Phân thân)
+        # 10. Clone
         elif s_type == 'clone':
             clone_id = f"{self.id}_clone_{int(time.time()*1000)}"
             clone = Champion(clone_id, self.name, self.team, self.x + 0.5, self.y + 0.5, 
                              self.max_hp * s_percent, self.attack * s_percent, self.attack_range, 
-                             self.speed, self.max_mana, self.star)
-            # Khóa năng lượng clone để tránh gọi đệ liên hoàn đơ máy
-            clone.is_mana_locked = True 
+                             self.speed, self.max_mana, self.star,
+                             skill=self.skill)
+            clone.is_clone = True 
             board_state.append(clone)
+            event['targetId'] = self.id # Bóng xuất hiện cạnh bản thân
             
-        # 11. Global Mana Lock (Cấm dùng chiêu toàn bản đồ địch)
+        # 11. Mana Lock
         elif s_type == 'mana_lock':
             for c in board_state:
                 if c.team != self.team and c.is_alive:
                     c.active_buffs.append({'type': 'mana_lock', 'duration': s_duration})
                     
-        # 12. Stun (Làm choáng mục tiêu)
+        # 12. Stun
         elif s_type == 'stun' and target:
             target.active_buffs.append({'type': 'stun', 'duration': s_duration})
 

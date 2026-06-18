@@ -25,9 +25,8 @@ export function buyXp() {
         updateGold(-STATE.levelCost);
 
         STATE.playerLevel++;
-        STATE.levelCost *= 2; // Nhân đôi giá tiền nâng cấp lần sau
+        STATE.levelCost *= 2;
 
-        // Cập nhật giao diện (Chỉ cập nhật Level, KHÔNG chạm vào LP)
         document.getElementById('levelText').innerText = STATE.playerLevel;
         document.getElementById('buyXpBtn').innerText = `Level Up (${STATE.levelCost} 🪙)`;
 
@@ -95,23 +94,19 @@ export function buyChampion(champTemplate, cardElement) {
 }
 
 function rollChampion() {
-    const roll = Math.random() * 100; // Quay số từ 0 đến 100
+    const roll = Math.random() * 100;
     let targetCost = 1;
 
-    // Tỷ lệ xuất hiện: 5 Vàng (5%), 4 Vàng (10%), 3 Vàng (20%), 2 Vàng (30%), 1 Vàng (35%)
     if (roll < 5) targetCost = 5;
-    else if (roll < 15) targetCost = 4; // 5 + 10
-    else if (roll < 35) targetCost = 3; // 15 + 20
-    else if (roll < 65) targetCost = 2; // 35 + 30
-    else targetCost = 1; // 65 + 35 = 100
+    else if (roll < 15) targetCost = 4;
+    else if (roll < 35) targetCost = 3;
+    else if (roll < 65) targetCost = 2;
+    else targetCost = 1;
 
-    // Lọc ra rổ tướng có đúng số Vàng vừa quay được
     const pool = CHAMPION_POOL.filter(c => c.cost === targetCost);
 
-    // Nếu rổ trống (Lỗi do quên add tướng), trả về đại 1 con bất kỳ
     if (pool.length === 0) return CHAMPION_POOL[Math.floor(Math.random() * CHAMPION_POOL.length)];
 
-    // Rút ngẫu nhiên 1 lá trong rổ đó
     return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -121,7 +116,6 @@ export function refreshShop() {
 
     container.innerHTML = '';
     for (let i = 0; i < 5; i++) {
-        // GỌI HÀM GACHA Ở ĐÂY THAY VÌ RANDOM BÌNH THƯỜNG
         const randomChamp = rollChampion();
 
         const card = document.createElement('div');
@@ -139,18 +133,15 @@ export function refreshShop() {
 export function sellChampion(champ) {
     const index = STATE.champions.indexOf(champ);
     if (index > -1) {
-        // Tìm thông tin gốc của tướng để lấy giá (Cost)
         const template = CHAMPION_POOL.find(t => t.name === champ.name) || {};
         const baseCost = template.cost || 1;
 
-        // --- TÍNH GIÁ BÁN MỚI ---
         const copies = Math.pow(3, (champ.star || 1) - 1);
         const sellPrice = baseCost * copies;
 
         updateGold(sellPrice);
         STATE.champions.splice(index, 1);
 
-        // Hiện thông báo bán lấy bao nhiêu vàng
         showNotification(`Sold [${champ.name} ${'⭐'.repeat(champ.star)}] for ${sellPrice} 🪙.`);
         updateUnitCount();
     }
@@ -251,48 +242,49 @@ export function showDisplayInfo(type, data) {
         const traitsHTML = template.traits ? `<p>🔮 Traits: <b>${template.traits.join(', ')}</b></p>` : '';
         const imgSrc = template.img || '';
 
-        // --- BỘ DỊCH KỸ NĂNG (SKILL TRANSLATOR) ---
+        // --- CẬP NHẬT: TÍNH TOÁN SKILL DỰA THEO SỐ SAO (STAR LEVEL) ---
+        const currentStar = data.star || 1;
+
         let skillHTML = '';
         if (template.skill) {
             const s = template.skill;
             let skillName = s.type.toUpperCase();
             let skillDesc = '';
 
-            // Dịch thông số thành câu miêu tả
+            // Công thức nhân y hệt như trên Server game_logic.py
+            const scaledPower = (s.power || 0) * currentStar;
+            const scaledDuration = (s.duration || 0) * (1 + (currentStar - 1) * 0.5);
+            const scaledPercent = (s.percent || 0.5) + (currentStar - 1) * 0.2;
+
             switch (s.type) {
                 case 'damage':
-                    skillDesc = `Deals <b>${s.power.toLocaleString()}</b> burst damage to the target.`;
-                    break;
+                    skillDesc = `Deals <b>${scaledPower.toLocaleString()}</b> burst damage to the target.`; break;
                 case 'heal':
-                    skillDesc = `Instantly restores <b>${s.power.toLocaleString()}</b> HP to itself.`;
-                    break;
+                    skillDesc = `Instantly restores <b>${scaledPower.toLocaleString()}</b> HP to itself.`; break;
                 case 'regen':
-                    skillDesc = `Regenerates <b>${s.power.toLocaleString()}</b> HP per second for <b>${s.duration}s</b>.`;
-                    break;
+                    skillDesc = `Regenerates <b>${scaledPower.toLocaleString()}</b> HP per second for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'buff_atk':
-                    skillDesc = `Empowers itself with <b>+${s.power.toLocaleString()}</b> Attack for <b>${s.duration}s</b>.`;
-                    break;
+                    skillDesc = `Empowers itself with <b>+${scaledPower.toLocaleString()}</b> Attack for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'dot':
-                    skillDesc = `Infects target, dealing <b>${s.power.toLocaleString()}</b> Damage per second for <b>${s.duration}s</b>.`; break;
+                    skillDesc = `Infects target, dealing <b>${scaledPower.toLocaleString()}</b> Damage per second for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'aoe_heal':
-                    skillDesc = `Heals allies within <b>${s.radius}</b> radius for <b>${s.power.toLocaleString()}</b> HP.`; break;
+                    skillDesc = `Heals allies within <b>${s.radius}</b> radius for <b>${scaledPower.toLocaleString()}</b> HP.`; break;
                 case 'aoe_dot':
-                    skillDesc = `Creates a toxic zone (Radius <b>${s.radius}</b>), enemies take <b>${s.power.toLocaleString()}</b> DMG/s for <b>${s.duration}s</b>.`; break;
+                    skillDesc = `Creates a toxic zone (Radius <b>${s.radius}</b>), enemies take <b>${scaledPower.toLocaleString()}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'speed_buff':
-                    skillDesc = `Gains <b>+${s.power}%</b> Attack Speed for <b>${s.duration}s</b>.`; break;
+                    skillDesc = `Gains <b>+${scaledPower.toLocaleString()}%</b> Attack Speed for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'swap':
                     skillDesc = `Teleports and swaps positions with the target instantly.`; break;
                 case 'clone':
-                    skillDesc = `Creates a Shadow Clone with <b>${s.percent * 100}%</b> of original stats.`; break;
+                    skillDesc = `Creates a Shadow Clone with <b>${Math.round(scaledPercent * 100)}%</b> of original stats.`; break;
                 case 'mana_lock':
-                    skillDesc = `Silences ALL enemies, stopping Mana gain for <b>${s.duration}s</b>.`; break;
+                    skillDesc = `Silences ALL enemies, stopping Mana gain for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'stun':
-                    skillDesc = `Stuns the target, disabling attacks and movement for <b>${s.duration}s</b>.`; break;
+                    skillDesc = `Stuns the target, disabling attacks and movement for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 default:
                     skillDesc = 'Casts a mysterious ability.';
             }
 
-            // Gói vào một khung HTML nền tím cực ngầu
             skillHTML = `
                 <div style="background: rgba(142, 68, 173, 0.2); border-left: 4px solid #9b59b6; padding: 10px; margin: 10px 0; border-radius: 4px;">
                     <p style="margin: 0; color: #e8daef; font-size: 15px; text-shadow: 1px 1px 2px black;">✨ <b>SKILL: ${skillName}</b></p>
@@ -302,7 +294,7 @@ export function showDisplayInfo(type, data) {
         }
 
         panel.innerHTML = `
-            <h3 class="panel-title">${data.name} ${'⭐'.repeat(data.star || 1)}</h3>
+            <h3 class="panel-title">${data.name} ${'⭐'.repeat(currentStar)}</h3>
             ${imgSrc ? `<img src="${imgSrc}" style="width:100%; height:300px; object-fit:cover; border-radius:8px; border:2px solid #f39c12; margin-bottom:10px;">` : ''}
             <div class="card-stats">
                 ${traitsHTML}

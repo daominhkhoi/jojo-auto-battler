@@ -144,33 +144,82 @@ export function syncTickData(data) {
     });
 }
 
-export function handleCombatEnd() {
-    // CHỐT CHẶN BẢO VỆ: Nếu trận đấu đã kết thúc rồi (isCombatPhase = false) thì thoát ngay, không tính toán lại
+export function handleCombatEnd(serverResult) {
     if (!STATE.isCombatPhase) return;
 
-    const myTeam = STATE.champions.filter(c => c.team === 'Team1' && c.targetY < 6 && c.is_alive);
-    const enemyTeam = STATE.champions.filter(c => c.team === 'Team2' && c.targetY < 6 && c.is_alive);
-
-    let playerWon = false;
-    let isDraw = false;
-
-    // Phân định thắng thua theo số lượng tàn quân
-    if (myTeam.length > enemyTeam.length) {
-        playerWon = true;
-    } else if (myTeam.length < enemyTeam.length) {
-        playerWon = false;
-    } else {
-        // Nếu số lượng quân bằng nhau -> Đếm tổng lượng máu còn lại của các quân trên sân
-        const myHp = myTeam.reduce((sum, c) => sum + c.hp, 0);
-        const enemyHp = enemyTeam.reduce((sum, c) => sum + c.hp, 0);
-        if (myHp > enemyHp) playerWon = true;
-        else if (myHp < enemyHp) playerWon = false;
-        else isDraw = true; // Hòa tuyệt đối khi cả số quân lẫn tổng máu bằng khít nhau
+    // --- 1. DÙNG KẾT QUẢ TỪ TRỌNG TÀI SERVER ĐỂ PHÂN ĐỊNH ---
+    if (serverResult === 'draw') {
+        showNotification("TIME UP! IT'S A DRAW! No points awarded.");
+    } else if (serverResult === 'win') {
+        STATE.playerLP += 1;
+        showNotification("Victory! You won this round!");
+    } else if (serverResult === 'loss') {
+        STATE.botLP += 1;
+        showNotification("Defeat! Opponent won this round!");
     }
 
-    handleRoundResult(playerWon, isDraw, myTeam, enemyTeam);
-}
+    updateLpUI();
+    resetBoardForNextRound();
+    refreshShop();
+    STATE.isCombatPhase = false;
 
+    const readyBtn = document.getElementById('readyBtn');
+    const findBtn = document.getElementById('findMatchBtn');
+
+    // --- 2. KIỂM TRA ĐIỀU KIỆN CHẠM MỐC 5 ĐIỂM ---
+    if (STATE.playerLP >= 5 || STATE.botLP >= 5) {
+        const isWinner = STATE.playerLP >= 5;
+        const resultMsg = isWinner ? "🏆 YOU WON THE MATCH! 🏆" : "💀 YOU LOST THE MATCH! 💀";
+
+        // TẠO MÀN HÌNH GAME OVER ĐEN MỜ ĐÈ LÊN TOÀN BỘ TRÒ CHƠI
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0'; overlay.style.left = '0';
+        overlay.style.width = '100vw'; overlay.style.height = '100vh';
+        overlay.style.backgroundColor = 'rgba(0,0,0,0.85)'; // Nền đen mờ 85%
+        overlay.style.color = isWinner ? '#f1c40f' : '#e74c3c';
+        overlay.style.display = 'flex';
+        overlay.style.flexDirection = 'column';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.zIndex = '9999'; // Đảm bảo đè lên mọi thứ
+
+        overlay.innerHTML = `
+            <h1 style="font-size: 70px; margin-bottom: 20px; text-shadow: 0 0 20px ${isWinner ? '#f1c40f' : '#e74c3c'};">${resultMsg}</h1>
+            <p style="font-size: 30px; color: white; margin-bottom: 50px;">Final Score: <span style="color:#2ecc71">${STATE.playerLP}</span> - <span style="color:#e74c3c">${STATE.botLP}</span></p>
+            <button id="restartBtn" style="padding: 15px 40px; font-size: 24px; font-weight: bold; cursor: pointer; background: #3498db; color: #fff; border: none; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5);">FIND NEW MATCH</button>
+        `;
+        document.body.appendChild(overlay);
+
+        // Chức năng cho nút chơi ván mới
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            overlay.remove(); // Xóa màn hình đen
+            if (findBtn) {
+                findBtn.style.display = 'inline-block';
+                findBtn.innerText = "FIND MATCH";
+                findBtn.disabled = false;
+            }
+        });
+
+        if (readyBtn) readyBtn.style.display = 'none';
+
+    } else {
+        // --- 3. NẾU CHƯA AI ĐƯỢC 5 ĐIỂM THÌ ĐÁNH TIẾP ---
+        STATE.currentRound++;
+        updateRoundUI();
+        const income = 10 * STATE.currentRound;
+        updateGold(income);
+        showNotification(`Round ${STATE.currentRound}: Received ${income} gold`);
+
+        if (findBtn) findBtn.style.display = 'none';
+        if (readyBtn) {
+            readyBtn.style.display = 'inline-block';
+            readyBtn.innerText = "READY";
+            readyBtn.style.backgroundColor = "#2ecc71";
+            readyBtn.disabled = false;
+        }
+    }
+}
 function handleRoundResult(playerWon, isDraw, myTeam, enemyTeam) {
     if (isDraw) {
         showNotification("TIME UP! IT'S A DRAW! No points awarded.");

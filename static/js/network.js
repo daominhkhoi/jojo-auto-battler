@@ -91,13 +91,13 @@ socket.on('sync_tick', (data) => {
 });
 
 // Nhớ dừng đồng hồ nếu trận đấu kết thúc sớm (trước 30s)
-socket.on('combat_end', () => {
+socket.on('combat_end', (data) => {
     clearInterval(combatTimerInterval);
     import('./combat.js').then(module => {
-        module.handleCombatEnd();
+        // Truyền thẳng phán quyết của Server ('win', 'loss', 'draw') vào hàm
+        module.handleCombatEnd(data ? data.result : 'draw');
     });
 });
-
 // ==========================================
 // CÁC HÀM GỬI LỆNH LÊN SERVER
 // ==========================================
