@@ -240,18 +240,23 @@ function handleRoundResult(playerWon, isDraw, myTeam, enemyTeam) {
 function resetBoardForNextRound() {
     STATE.champions = STATE.champions.filter(c => c.team === 'Team1');
     STATE.champions.forEach(champ => {
-        champ.hp = champ.max_hp; champ.mana = 0; champ.is_alive = true;
+        champ.hp = champ.max_hp;
+        champ.mana = 0;
+        champ.is_alive = true;
+
+        // ---> THÊM DÒNG NÀY ĐỂ DỌN SẠCH CÁNH, KIẾM, ĐẦU LÂU KHI HẾT TRẬN <---
+        champ.buffs = [];
+
         if (champ.originalX !== undefined && champ.originalY !== undefined) {
-            champ.targetX = champ.originalX; champ.targetY = champ.originalY;
+            champ.targetX = champ.originalX;
+            champ.targetY = champ.originalY;
         }
         champ.shakeTimer = 0;
     });
+
     STATE.activeProjectiles = [];
-
-    // ---> BỔ SUNG DÒNG NÀY ĐỂ QUÉT SẠCH VỤ NỔ, VÙNG ĐỘC TRÊN SÂN KHI HẾT TRẬN <---
-    STATE.hitEffects = [];
+    STATE.hitEffects = []; // (Dòng dọn vùng độc ở bước trước vẫn giữ nguyên nhé)
 }
-
 export function updateRoundUI() {
     const roundText = document.getElementById('roundText');
     if (roundText) roundText.innerText = STATE.currentRound;

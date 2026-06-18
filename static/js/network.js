@@ -130,6 +130,19 @@ export function declareReady() {
     }
     STATE.isCombatPhase = true;
 
+    // ---> BẮT ĐẦU ĐOẠN CODE SỬA LỖI TRÙNG ID <---
+    // 0. CẤP TIỀN TỐ ĐỘC QUYỀN CHO NGƯỜI CHƠI NÀY ĐỂ ID KHÔNG BAO GIỜ TRÙNG VỚI ĐỊCH
+    if (!STATE.myPlayerPrefix) {
+        // Tạo một chuỗi ngẫu nhiên (Ví dụ: "p_a1b2c3_")
+        STATE.myPlayerPrefix = "p_" + Math.random().toString(36).substr(2, 6) + "_";
+    }
+    STATE.champions.forEach(c => {
+        // Nếu ID của tướng chưa có tiền tố này thì gắn vào
+        if (!c.id.toString().startsWith(STATE.myPlayerPrefix)) {
+            c.id = STATE.myPlayerPrefix + c.id;
+        }
+    });
+
     // 1. TÍNH TOÁN TỘC / HỆ
     const uniqueChamps = [];
     const countedNames = new Set();
