@@ -25,7 +25,7 @@ export const CHAMPION_POOL = [
         name: "Talking Head", cost: 1, img: IMAGES["Talking Head"],
         hp: 60000, attack: 2000, attack_range: 1, speed: 1.2, max_mana: 60,
         // Lore: Bám vào lưỡi nói dối -> Cấm dùng chiêu (Mana Lock)
-        traits: ["Unita Speciale", "Support"], skill: { type: 'mana_lock', duration: 3.0 }
+        traits: ["Unita Speciale", "Support"], skill: { type: 'mana_lock', duration: 1.0 }
     },
     {
         name: "Rolling Stones", cost: 1, img: IMAGES["Rolling Stones"],
@@ -45,11 +45,11 @@ export const CHAMPION_POOL = [
         name: "Black Sabbath", cost: 2, img: IMAGES["Black Sabbath"],
         hp: 60000, attack: 3500, attack_range: 1.5, speed: 0.7, max_mana: 80,
         // Lore: Kéo linh hồn trong bóng tối -> Khóa mana toàn bản đồ
-        traits: ["Renegade", "Mage"], skill: { type: 'mana_lock', duration: 4.0 }
+        traits: ["Renegade", "Mage"], skill: { type: 'mana_lock', duration: 1.0 }
     },
     {
         name: "Baby Face", cost: 2, img: IMAGES["Baby Face"],
-        hp: 60000, attack: 3000, attack_range: 2, speed: 1.0, max_mana: 70,
+        hp: 60000, attack: 3000, attack_range: 2, speed: 1.0, max_mana: 140,
         // Lore: Sinh ra Homunculus -> Tạo phân thân mang 40% sức mạnh
         traits: ["La Squadra", "Mage"], skill: { type: 'clone', percent: 0.4 }
     },
@@ -69,7 +69,7 @@ export const CHAMPION_POOL = [
     // --- TƯỚNG 3 VÀNG ---
     {
         name: "Moody Blues", cost: 3, img: IMAGES["Moody Blues"],
-        hp: 80000, attack: 4500, attack_range: 1, speed: 0.8, max_mana: 70,
+        hp: 80000, attack: 4500, attack_range: 1, speed: 0.8, max_mana: 140,
         // Lore: Tua lại quá khứ -> Tạo phân thân sao chép 60% chỉ số
         traits: ["Team Bucciarati", "Support"], skill: { type: 'clone', percent: 0.6 }
     },
@@ -83,7 +83,7 @@ export const CHAMPION_POOL = [
         name: "Stand Arrow", cost: 3, img: IMAGES["Stand Arrow"],
         hp: 80000, attack: 1000, attack_range: 5, speed: 0.5, max_mana: 40,
         // Lore: Khai mở tiềm năng -> Hồi máu diện rộng cho đồng minh
-        traits: ["Artifact", "Support"], skill: { type: 'aoe_heal', radius: 1.5, power: 8000 }
+        traits: ["Artifact", "Support"], skill: { type: 'aoe_heal', radius: 1.5, power: 20000 }
     },
 
     // --- TƯỚNG 4 VÀNG ---
@@ -127,7 +127,7 @@ export const CHAMPION_POOL = [
         name: "White Album", cost: 4, img: IMAGES["White Album"],
         hp: 100000, attack: 5500, attack_range: 1, speed: 1.0, max_mana: 80,
         // Lore: Đóng băng tuyệt đối Nhiệt độ âm -> Khóa Mana toàn bản đồ
-        traits: ["La Squadra", "Brawler"], skill: { type: 'mana_lock', duration: 5.0 }
+        traits: ["La Squadra", "Brawler"], skill: { type: 'mana_lock', duration: 2.0 }
     },
     {
         name: "Oasis", cost: 4, img: IMAGES["Oasis"],
@@ -159,7 +159,7 @@ export const CHAMPION_POOL = [
         name: "Gold Experience", cost: 5, img: IMAGES["Gold Experience"],
         hp: 50000, attack: 8000, attack_range: 1, speed: 1.2, max_mana: 100,
         // Lore: Truyền sự sống sinh học -> Bơm máu diện rộng cực khủng
-        traits: ["Team Bucciarati", "Support"], skill: { type: 'aoe_heal', radius: 2.0, power: 20000 }
+        traits: ["Team Bucciarati", "Support"], skill: { type: 'aoe_heal', radius: 2.0, power: 40000 }
     },
     {
         name: "King Crimson", cost: 5, img: IMAGES["King Crimson"],
@@ -171,7 +171,7 @@ export const CHAMPION_POOL = [
         name: "G.E. Requiem", cost: 5, img: IMAGES["G.E. Requiem"],
         hp: 150000, attack: 12000, attack_range: 2, speed: 1.5, max_mana: 120,
         // Lore: Trở về số 0 (Return to Zero) -> Cấm dùng phép cả map 8 GIÂY!
-        traits: ["Team Bucciarati", "Brawler"], skill: { type: 'mana_lock', duration: 8.0 }
+        traits: ["Team Bucciarati", "Brawler"], skill: { type: 'mana_lock', duration: 3.0 }
     },
     {
         name: "Chariot Requiem", cost: 5, img: IMAGES["Chariot Requiem"],
@@ -189,6 +189,6 @@ export const CHAMPION_POOL = [
         name: "Requiem Arrow", cost: 5, img: IMAGES["Requiem Arrow"],
         hp: 150000, attack: 2000, attack_range: 5, speed: 0.5, max_mana: 50,
         // Lore: Thức tỉnh sức mạnh tối thượng -> Hồi sinh lực diện rộng toàn sàn (Radius 3.0)
-        traits: ["Artifact", "Support"], skill: { type: 'aoe_heal', radius: 3.0, power: 35000 }
+        traits: ["Artifact", "Support"], skill: { type: 'aoe_heal', radius: 3.0, power: 50000 }
     }
 ];

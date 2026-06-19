@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quản lý Chỉ số Tướng - Auto Battler</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #ecf0f1;
+            padding: 20px;
+            color: #2c3e50;
+        }
+
+        h1 {
+            text-align: center;
+            color: #34495e;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 12px 24px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+            button:hover {
+                background-color: #2ecc71;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: center;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #34495e;
+            color: white;
+            text-transform: uppercase;
+            font-size: 14px;
+            position: sticky;
+            top: 0;
+        }
+
+        td {
+            font-size: 15px;
+        }
+
+        tr:hover {
+            background-color: #f1c40f;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .cost-1 {
+            color: #bdc3c7;
+            font-weight: bold;
+        }
+
+        .cost-2 {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+
+        .cost-3 {
+            color: #3498db;
+            font-weight: bold;
+        }
+
+        .cost-4 {
+            color: #9b59b6;
+            font-weight: bold;
+        }
+
+        .cost-5 {
+            color: #f1c40f;
+            font-weight: bold;
+            text-shadow: 1px 1px 1px #000;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>📊 BẢNG QUẢN LÝ CHỈ SỐ TƯỚNG</h1>
+
+    <div class="controls">
+        <div>
+            <strong>Tổng số tướng:</strong> <span id="totalChamps" style="color: #e74c3c; font-size: 18px; font-weight: bold;">0</span>
+        </div>
+        <button id="exportBtn">📥 XUẤT FILE EXCEL (.CSV)</button>
+    </div>
+
+    <table id="champTable">
+        <thead>
+            <tr>
+                <th>Tên Tướng</th>
+                <th>Vàng</th>
+                <th>Máu (HP)</th>
+                <th>Sát Thương (ATK)</th>
+                <th>Tầm Đánh</th>
+                <th>Tốc Độ</th>
+                <th>Mana</th>
+                <th>Tộc / Hệ</th>
+                <th>Loại Kỹ Năng</th>
+                <th>Chỉ Số Kỹ Năng</th>
+                <th>Thời Gian (s)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Dữ liệu sẽ được điền tự động bằng JS -->
+        </tbody>
+    </table>
+
+    <script type="module">
+        // Import trực tiếp dữ liệu từ entities.js
+        import { CHAMPION_POOL } from './js/entities.js';
+
+        const tbody = document.querySelector('#champTable tbody');
+        document.getElementById('totalChamps').innerText = CHAMPION_POOL.length;
+
+        // 1. TỰ ĐỘNG VẼ BẢNG DỮ LIỆU
+        CHAMPION_POOL.forEach(champ => {
+            const tr = document.createElement('tr');
+            const skill = champ.skill || {};
+
+            // Xử lý hiển thị thông số kỹ năng cho dễ nhìn
+            let skillPowerDisplay = '';
+            if (skill.power) skillPowerDisplay = skill.power.toLocaleString();
+            else if (skill.percent) skillPowerDisplay = `${skill.percent * 100}%`;
+            else if (skill.radius) skillPowerDisplay = `Bán kính: ${skill.radius}`;
+
+            tr.innerHTML = `
+                <td style="text-align: left; font-weight: bold;">${champ.name}</td>
+                <td class="cost-${champ.cost}">${champ.cost} 🪙</td>
+                <td>${champ.hp.toLocaleString()}</td>
+                <td>${champ.attack.toLocaleString()}</td>
+                <td>${champ.attack_range}</td>
+                <td>${champ.speed}</td>
+                <td>${champ.max_mana}</td>
+                <td style="font-size: 13px;">${(champ.traits || []).join(', ')}</td>
+                <td style="color: #8e44ad; font-weight: bold;">${skill.type.toUpperCase()}</td>
+                <td>${skillPowerDisplay}</td>
+                <td>${skill.duration ? skill.duration + 's' : '-'}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // 2. CHỨC NĂNG XUẤT FILE EXCEL (.CSV) CHUẨN VIỆT NAM
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            // Chuỗi BOM giúp Excel không bị lỗi font Tiếng Việt
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+
+            // ĐỔI SANG DÙNG DẤU CHẤM PHẨY (;) ĐỂ EXCEL TỰ ĐỘNG CHIA CỘT
+            csvContent += "Tên Tướng;Vàng;Máu (HP);Sát Thương (ATK);Tầm Đánh;Tốc Độ;Mana;Tộc / Hệ;Loại Kỹ Năng;Chỉ Số Kỹ Năng;Thời Gian Kỹ Năng\n";
+
+            // Điền từng hàng
+            CHAMPION_POOL.forEach(champ => {
+                const skill = champ.skill || {};
+
+                let skillPower = skill.power || '';
+                if (!skillPower && skill.percent) skillPower = skill.percent;
+
+                const row = [
+                    `"${champ.name}"`,
+                    champ.cost,
+                    champ.hp,
+                    champ.attack,
+                    champ.attack_range,
+                    champ.speed,
+                    champ.max_mana,
+                    `"${(champ.traits || []).join(', ')}"`,
+                    skill.type || '',
+                    skillPower,
+                    skill.duration || ''
+                ];
+                // ÉP nối các giá trị bằng dấu CHẤM PHẨY
+                csvContent += row.join(';') + "\n";
+            });
+
+            // Gói thành file và tự động tải xuống
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "ThongSoTuong_AutoBattler.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    </script>
+</body>
+</html>

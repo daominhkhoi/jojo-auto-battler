@@ -43,6 +43,7 @@
     <Content Include="static\js\renderer.js" />
     <Content Include="static\js\shop.js" />
     <Content Include="static\js\utils.js" />
+    <Content Include="static\manage.html" />
     <Content Include="static\style.css" />
     <Content Include="templates\index.html" />
   </ItemGroup>
