@@ -67,9 +67,9 @@ export const CHAMPION_POOL = [
     },
     {
         name: "Mr. President", cost: 2, img: IMAGES["Mr. President"],
-        hp: 60000, attack: 2000, attack_range: 1, speed: 0.8, max_mana: 150,
+        hp: 60000, attack: 2000, attack_range: 1, speed: 1, max_mana: 150,
         traits: ["Artifact", "Support"],
-        skill: { type: 'aoe_heal', radius: 1.5, power: 4000, duration: 10 }
+        skill: { type: 'aoe_heal', radius: 3, power: 10000, duration: 4 }
     },
 
     // --- TƯỚNG 3 VÀNG ---
@@ -89,7 +89,7 @@ export const CHAMPION_POOL = [
         name: "Stand Arrow", cost: 3, img: IMAGES["Stand Arrow"],
         hp: 80000, attack: 1000, attack_range: 5, speed: 1, max_mana: 150,
         traits: ["Artifact", "Support"],
-        skill: { type: 'aoe_heal', radius: 2.5, power: 5000, duration: 10 }
+        skill: { type: 'aoe_heal', radius: 2, power: 10000, duration: 5 }
     },
 
     // --- TƯỚNG 4 VÀNG ---
