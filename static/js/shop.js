@@ -98,10 +98,10 @@ function rollChampion() {
     const roll = Math.random() * 100;
     let targetCost = 1;
 
-    if (roll < 5) targetCost = 5;
-    else if (roll < 15) targetCost = 4;
-    else if (roll < 35) targetCost = 3;
-    else if (roll < 65) targetCost = 2;
+    if (roll < 10) targetCost = 5;
+    else if (roll < 20) targetCost = 4;
+    else if (roll < 20) targetCost = 3;
+    else if (roll < 30) targetCost = 2;
     else targetCost = 1;
 
     const pool = CHAMPION_POOL.filter(c => c.cost === targetCost);

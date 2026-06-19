@@ -19,7 +19,7 @@ export const CHAMPION_POOL = [
         name: "Little Feet", cost: 1, img: IMAGES["Little Feet"],
         hp: 70000, attack: 1800, attack_range: 3, speed: 1.2, max_mana: 150,
         traits: ["La Squadra", "Assassin"],
-        skill: { type: 'dot', power: 7500, duration: 4.0 }
+        skill: { type: 'dot', power: 5000, duration: 4.0 }
     },
     {
         name: "Talking Head", cost: 1, img: IMAGES["Talking Head"],
@@ -87,7 +87,7 @@ export const CHAMPION_POOL = [
     },
     {
         name: "Stand Arrow", cost: 3, img: IMAGES["Stand Arrow"],
-        hp: 80000, attack: 1000, attack_range: 5, speed: 0.5, max_mana: 150,
+        hp: 80000, attack: 1000, attack_range: 5, speed: 1, max_mana: 150,
         traits: ["Artifact", "Support"],
         skill: { type: 'aoe_heal', radius: 2.5, power: 5000, duration: 10 }
     },
@@ -175,7 +175,7 @@ export const CHAMPION_POOL = [
     // --- TƯỚNG 5 VÀNG ---
     {
         name: "Gold Experience", cost: 5, img: IMAGES["Gold Experience"],
-        hp: 50000, attack: 6000, attack_range: 4, speed: 0.5, max_mana: 150,
+        hp: 50000, attack: 6000, attack_range: 4, speed: 1, max_mana: 150,
         traits: ["Team Bucciarati", "Support"],
         skill: { type: 'aoe_heal', radius: 5, power: 15000, duration: 10 }
     },
@@ -205,7 +205,7 @@ export const CHAMPION_POOL = [
     },
     {
         name: "Requiem Arrow", cost: 5, img: IMAGES["Requiem Arrow"],
-        hp: 150000, attack: 1500, attack_range: 5, speed: 0.5, max_mana: 150,
+        hp: 150000, attack: 1500, attack_range: 5, speed: 1, max_mana: 150,
         traits: ["Artifact", "Support"],
         skill: { type: 'aoe_heal', radius: 10, power: 10000, duration: 15 }
     }
