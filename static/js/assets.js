@@ -36,6 +36,9 @@ export const IMAGES = {
     "True King Crimson": `${GITHUB_BASE_URL}28.jpg?raw=true`,
     "Requiem Arrow": `${GITHUB_BASE_URL}29.jpg?raw=true`,
     "Stand Arrow": `${GITHUB_BASE_URL}30.jpg?raw=true`,
+    "Mr. President": `${GITHUB_BASE_URL}31.jpg?raw=true`,
+    "Clash": `${GITHUB_BASE_URL}32.jpg?raw=true`,
+    "Echoes Act 3": `${GITHUB_BASE_URL}33.jpg?raw=true`,
 
     // Nút, Icon hoặc ảnh nền sau này bạn có thể quản lý luôn ở đây
     "Background": `${GITHUB_BASE_URL}bg_board.png?raw=true`

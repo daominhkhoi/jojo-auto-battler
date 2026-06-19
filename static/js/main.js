@@ -122,9 +122,13 @@ canvas.addEventListener('mouseup', (e) => {
         );
 
         if (occupied) {
-            // Đổi chỗ nếu ô đã có chủ
+            // Đổi chỗ nếu ô đã có chủ (Cập nhật tọa độ di chuyển)
             occupied.targetX = originalX;
             occupied.targetY = originalY;
+            
+            // ---> FIX LỖI: Bắt buộc phải cập nhật cả nhà gốc (original) cho Tướng bị đè <---
+            occupied.originalX = originalX;
+            occupied.originalY = originalY;
         }
 
         // Kiểm tra giới hạn quân số khi kéo thẻ từ hàng chờ lên sân

@@ -225,14 +225,15 @@ export function renderBoard(ctx, canvas) {
                     ctx.beginPath(); ctx.arc(0, 0, 40, 0, Math.PI * 2);
                     ctx.strokeStyle = 'rgba(46, 204, 113, 0.5)'; ctx.lineWidth = 5; ctx.stroke();
                 }
-                else if (hit.effectType === 'buff_atk' || hit.effectType === 'speed_buff') {
-                    ctx.globalAlpha = hit.lifeTime / hit.maxLife;
-                    ctx.beginPath(); ctx.arc(0, 0, 45, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(241, 196, 15, 0.4)'; ctx.fill();
-                    ctx.beginPath();
-                    ctx.moveTo(-25, 25); ctx.lineTo(0, -50); ctx.lineTo(25, 25);
-                    ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 4; ctx.stroke();
-                }
+
+                // else if (hit.effectType === 'buff_atk' || hit.effectType === 'speed_buff') {
+                //     ctx.globalAlpha = hit.lifeTime / hit.maxLife;
+                //     ctx.beginPath(); ctx.arc(0, 0, 45, 0, Math.PI * 2);
+                //     ctx.fillStyle = 'rgba(241, 196, 15, 0.4)'; ctx.fill();
+                //     ctx.beginPath();
+                //     ctx.moveTo(-25, 25); ctx.lineTo(0, -50); ctx.lineTo(25, 25);
+                //     ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 4; ctx.stroke();
+                // }
 
                 // --- 1. VÙNG ĐỘC DIỆN RỘNG (AoE DoT) ---
                 else if (hit.effectType === 'aoe_dot') {
