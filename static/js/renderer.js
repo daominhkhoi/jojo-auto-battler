@@ -97,6 +97,12 @@ export function renderBoard(ctx, canvas) {
             ctx.fillText('☠️', centerX, pY - 20);
         }
 
+        if (activeBuffs.includes('aoe_heal') || activeBuffs.includes('regen')) {
+            const beat = Math.abs(Math.sin(timeNow * 5)) * 5; // Trái tim đập thình thịch
+            ctx.font = `${20 + beat}px Arial`;
+            ctx.fillText('💖', centerX, pY - 45); // Nằm cao hơn đầu lâu 1 xíu để không bị đè
+        }
+
         // 2. Buff Tốc Đánh (Chiếc cánh xanh dương TO)
         if (activeBuffs.includes('speed_buff')) {
             ctx.font = '32px Arial';
@@ -188,10 +194,10 @@ export function renderBoard(ctx, canvas) {
             ctx.save();
             ctx.translate(hit.x, hit.y);
             const progress = 1 - (hit.lifeTime / hit.maxLife);
-            ctx.globalAlpha = hit.lifeTime / hit.maxLife;
 
-            // A. Đánh thường (Chém X)
+            // A. HIỆU ỨNG SÁT THƯƠNG ĐƠN MỤC TIÊU (Dấu X Chém)
             if (!hit.effectType || hit.effectType === 'damage') {
+                ctx.globalAlpha = hit.lifeTime / hit.maxLife;
                 const sz = 15 + progress * 20;
                 ctx.beginPath();
                 ctx.moveTo(-sz, -sz); ctx.lineTo(sz, sz);
@@ -203,9 +209,16 @@ export function renderBoard(ctx, canvas) {
                 ctx.beginPath(); ctx.arc(0, 0, sz / 2, 0, Math.PI * 2);
                 ctx.fillStyle = `rgba(231, 76, 60, ${1 - progress})`; ctx.fill();
             }
-            // B. Hiệu ứng Tung Kỹ năng & Vùng Cố định
+            // B. HIỆU ỨNG CÁC KỸ NĂNG VÙNG (AOE) DỰA THEO ĐÚNG DURATION VÀ RADIUS TRÊN SERVER
             else {
-                if (hit.effectType === 'heal' || hit.effectType === 'regen') {
+                // ĐỔI BÁN KÍNH Ô CỜ THÀNH PIXEL: Ô cờ * Rộng ô cờ
+                const pixelRadius = (hit.radius || 1.5) * CONFIG.BOARD_CELL_WIDTH;
+
+                // Hiệu ứng mờ dần (Fade Out) mượt mà ở 30 frame cuối cùng
+                const currentAlpha = hit.lifeTime < 30 ? (hit.lifeTime / 30) : 1.0;
+
+                if (hit.effectType === 'regen') {
+                    ctx.globalAlpha = hit.lifeTime / hit.maxLife;
                     ctx.translate(0, -progress * 50);
                     ctx.fillStyle = '#2ecc71';
                     ctx.fillRect(-6, -18, 12, 36); ctx.fillRect(-18, -6, 36, 12);
@@ -213,6 +226,7 @@ export function renderBoard(ctx, canvas) {
                     ctx.strokeStyle = 'rgba(46, 204, 113, 0.5)'; ctx.lineWidth = 5; ctx.stroke();
                 }
                 else if (hit.effectType === 'buff_atk' || hit.effectType === 'speed_buff') {
+                    ctx.globalAlpha = hit.lifeTime / hit.maxLife;
                     ctx.beginPath(); ctx.arc(0, 0, 45, 0, Math.PI * 2);
                     ctx.fillStyle = 'rgba(241, 196, 15, 0.4)'; ctx.fill();
                     ctx.beginPath();
@@ -220,52 +234,78 @@ export function renderBoard(ctx, canvas) {
                     ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 4; ctx.stroke();
                 }
 
-                // --- VÙNG ĐỘC CỐ ĐỊNH (AoE DoT) ---
-                else if (hit.effectType === 'aoe_dot' || hit.effectType === 'dot') {
-                    // Giữ kích thước cố định, mờ dần ở 30 frame cuối
-                    const alpha = hit.lifeTime < 30 ? (hit.lifeTime / 30) * 0.5 : 0.5;
+                // --- 1. VÙNG ĐỘC DIỆN RỘNG (AoE DoT) ---
+                else if (hit.effectType === 'aoe_dot') {
+                    ctx.globalAlpha = 1.0;
                     ctx.beginPath();
-                    ctx.arc(0, 0, 110, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(142, 68, 173, ${alpha})`;
+                    ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(142, 68, 173, ${currentAlpha * 0.45})`;
                     ctx.fill();
-                    ctx.strokeStyle = `rgba(39, 174, 96, ${alpha})`;
+                    ctx.strokeStyle = `rgba(39, 174, 96, ${currentAlpha * 0.6})`;
                     ctx.lineWidth = 4; ctx.stroke();
 
+                    // Bong bóng độc văng lách tách ngẫu nhiên tỉ lệ thuận với bán kính
                     const t = Date.now() / 150;
                     for (let j = 0; j < 5; j++) {
-                        const bx = Math.cos(t + j * 1.5) * (40 + j * 8);
-                        const by = Math.sin(t + j * 2.2) * (40 + j * 8);
+                        const bx = Math.cos(t + j * 1.5) * (pixelRadius * 0.6);
+                        const by = Math.sin(t + j * 2.2) * (pixelRadius * 0.6);
                         ctx.beginPath();
                         ctx.arc(bx, by, 6, 0, Math.PI * 2);
-                        ctx.fillStyle = `rgba(46, 204, 113, ${alpha + 0.3})`;
+                        ctx.fillStyle = `rgba(46, 204, 113, ${currentAlpha * 0.7})`;
                         ctx.fill();
                     }
                 }
-                // --- VÙNG HỒI MÁU CỐ ĐỊNH (AoE Heal) ---
-                else if (hit.effectType === 'aoe_heal') {
-                    const alpha = hit.lifeTime < 30 ? (hit.lifeTime / 30) * 0.3 : 0.3;
-                    ctx.beginPath();
-                    ctx.arc(0, 0, 110, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(46, 204, 113, ${alpha})`; ctx.fill();
-                    ctx.strokeStyle = `rgba(46, 204, 113, ${alpha + 0.3})`; ctx.lineWidth = 4; ctx.stroke();
 
-                    const dropY = (Date.now() % 1000) / 1000 * -60;
-                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha + 0.5})`;
-                    ctx.font = 'bold 24px Arial';
-                    ctx.fillText('+', -8, dropY);
-                }
-                // --- VÙNG KHÓA MANA KHỔNG LỒ (Mana Lock) ---
-                else if (hit.effectType === 'mana_lock') {
-                    const alpha = hit.lifeTime < 30 ? (hit.lifeTime / 30) * 0.5 : 0.5;
+                // --- 2. ĐỘC ĐƠN MỤC TIÊU (DoT) ---
+                else if (hit.effectType === 'dot') {
+                    ctx.globalAlpha = 1.0;
                     ctx.beginPath();
-                    ctx.arc(0, 0, 150, 0, Math.PI * 2);
-                    ctx.strokeStyle = `rgba(44, 62, 80, ${alpha})`; ctx.lineWidth = 8; ctx.stroke();
-                    ctx.fillStyle = `rgba(0, 0, 0, ${alpha * 0.2})`; ctx.fill();
+                    // Vẽ một vũng độc nhỏ cố định (35 pixel) ngay dưới chân mục tiêu
+                    ctx.arc(0, 0, 35, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(142, 68, 173, ${currentAlpha * 0.6})`;
+                    ctx.fill();
+
+                    // Thêm 1-2 hạt bong bóng sủi bọt nhỏ li ti
+                    const t = Date.now() / 100;
+                    const bx = Math.cos(t * 2.5) * 15;
+                    const by = Math.sin(t * 3.5) * 15;
+                    ctx.beginPath();
+                    ctx.arc(bx, by, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(46, 204, 113, ${currentAlpha * 0.9})`;
+                    ctx.fill();
+                }
+
+                // --- VÙNG HỒI MÁU CỐ ĐỊNH THEO GIÂY CHUẨN RADIUS & DURATION ---
+                else if (hit.effectType === 'aoe_heal') {
+                    ctx.globalAlpha = 1.0;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(46, 204, 113, ${currentAlpha * 0.35})`; ctx.fill();
+                    ctx.strokeStyle = `rgba(46, 204, 113, ${currentAlpha * 0.65})`; ctx.lineWidth = 4; ctx.stroke();
+
+                    // Dấu cộng hồi phục bay lên liên tục
+                    const dropY = ((Date.now() + hit.lifeTime * 8) % 1000) / 1000 * -60;
+                    ctx.fillStyle = `rgba(255, 255, 255, ${currentAlpha * 0.8})`;
+                    ctx.font = 'bold 20px Arial';
+                    ctx.fillText('+', -5, dropY);
+                }
+
+                // --- VÙNG KHÓA MANA ĐƠN MỤC TIÊU (Mana Lock) ---
+                else if (hit.effectType === 'mana_lock') {
+                    ctx.globalAlpha = 1.0;
+                    ctx.beginPath();
+                    // Thay đổi bán kính thành pixelRadius (ôm theo ô cờ tướng dính chiêu) thay vì canvas.width
+                    ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(44, 62, 80, ${currentAlpha * 0.8})`;
+                    ctx.lineWidth = 6;
+                    ctx.stroke();
+                    ctx.fillStyle = `rgba(0, 0, 0, ${currentAlpha * 0.2})`;
+                    ctx.fill();
                 }
             }
             ctx.restore();
         });
-    }
+    }   
 
     // 5. LỚP TRÊN CÙNG (TOP LAYER): VẼ SỐ SAO
     STATE.champions.forEach(champ => {

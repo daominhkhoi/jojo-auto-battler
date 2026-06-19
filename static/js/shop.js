@@ -32,7 +32,7 @@ export function buyXp() {
 
         updateUnitCount();
 
-        showNotification(`Level ${STATE.playerLevel} Reached! +1 Slot 💖`);
+        showNotification(`Level ${STATE.playerLevel} Reached! +1 Slot`);
     } else {
         showNotification(`Need ${STATE.levelCost} gold to level up!`);
     }
@@ -48,12 +48,13 @@ function checkAndMerge(champName, starLevel) {
         const upgraded = targets[0];
         upgraded.star += 1;
 
-        upgraded.max_hp = Math.round(upgraded.max_hp * 3);
+        upgraded.max_hp = Math.round(upgraded.max_hp * 2.1);
         upgraded.hp = upgraded.max_hp;
-        upgraded.attack = Math.round(upgraded.attack * 3);
+        upgraded.attack = Math.round(upgraded.attack * 2.1);
         upgraded.attack_range = parseFloat((upgraded.attack_range * 1.1).toFixed(1));
-        upgraded.max_mana = Math.round(upgraded.max_mana * 0.5);
+        upgraded.max_mana = Math.round(upgraded.max_mana * 0.75);
         upgraded.mana = 0;
+        upgraded.speed = Math.round(upgraded.speed * 1.25);
 
         STATE.champions.push(upgraded);
         showNotification(`Upgraded! [${champName}] is now ${upgraded.star} ⭐!`);
@@ -244,6 +245,7 @@ export function showDisplayInfo(type, data) {
 
         // --- CẬP NHẬT: TÍNH TOÁN SKILL DỰA THEO SỐ SAO (STAR LEVEL) ---
         const currentStar = data.star || 1;
+        const starFactor = currentStar - 1;
 
         let skillHTML = '';
         if (template.skill) {
@@ -251,10 +253,11 @@ export function showDisplayInfo(type, data) {
             let skillName = s.type.toUpperCase();
             let skillDesc = '';
 
-            // Công thức nhân y hệt như trên Server game_logic.py
-            const scaledPower = (s.power || 0) * currentStar;
-            const scaledDuration = (s.duration || 0) * (1 + (currentStar - 1) * 0.5);
-            const scaledPercent = (s.percent || 0.5) + (currentStar - 1) * 0.2;
+            // Công thức nhân mới y hệt như trên Server
+            const scaledPower = Math.round((s.power || 0) * Math.pow(2.1, starFactor));
+            const scaledDuration = (s.duration || 0) * Math.pow(1.1, starFactor);
+            const scaledRadius = ((s.radius || 1.5) * Math.pow(1.1, starFactor)).toFixed(1);
+            const scaledPercent = (s.percent || 0.5) + (starFactor * 0.15);
 
             switch (s.type) {
                 case 'damage':
@@ -268,17 +271,17 @@ export function showDisplayInfo(type, data) {
                 case 'dot':
                     skillDesc = `Infects target, dealing <b>${scaledPower.toLocaleString()}</b> Damage per second for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'aoe_heal':
-                    skillDesc = `Heals allies within <b>${s.radius}</b> radius for <b>${scaledPower.toLocaleString()}</b> HP.`; break;
+                    skillDesc = `Creates a healing zone (Radius <b>${s.radius}</b>), allies recover <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'aoe_dot':
                     skillDesc = `Creates a toxic zone (Radius <b>${s.radius}</b>), enemies take <b>${scaledPower.toLocaleString()}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'speed_buff':
                     skillDesc = `Gains <b>+${scaledPower.toLocaleString()}%</b> Attack Speed for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'swap':
-                    skillDesc = `Teleports and swaps positions with the target instantly.`; break;
+                    skillDesc = `Teleports, swaps positions with a <b>RANDOM</b> enemy, and deals <b>${scaledPower.toLocaleString()}</b> damage.`; break;
                 case 'clone':
                     skillDesc = `Creates a Shadow Clone with <b>${Math.round(scaledPercent * 100)}%</b> of original stats.`; break;
                 case 'mana_lock':
-                    skillDesc = `Silences ALL enemies, stopping Mana gain for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                    skillDesc = `Silences the <b>TARGET</b>, stopping its Mana gain for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'stun':
                     skillDesc = `Stuns the target, disabling attacks and movement for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 default:

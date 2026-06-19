@@ -55,11 +55,12 @@ def handle_find_match(data=None):
             print("⚠️ Một người chơi đã thoát khi đang ghép trận, bỏ qua cặp này...")
             continue 
 
+        # ĐÃ SỬA MÁU 100 THÀNH ĐIỂM SỐ BẮT ĐẦU TỪ 0
         games[room_name] = {
             'player1': p1['sid'], 'p1_name': p1['name'],
             'player2': p2['sid'], 'p2_name': p2['name'],
             'board_state': [], 'ready_count': 0, 
-            'p1_lp': 100, 'p2_lp': 100 
+            'p1_lp': 0, 'p2_lp': 0 
         }
         
         socketio.emit('match_found', {'room': room_name, 'opponentName': p2['name']}, to=p1['sid'])
@@ -93,7 +94,8 @@ def handle_submit_board(data):
     room_name = data['room']
     player_id = request.sid
     champs_data = data['champions']
-    current_lp = data.get('lp', 50) 
+    # ĐÃ SỬA ĐIỂM MẶC ĐỊNH TỪ 50 VỀ 0
+    current_lp = data.get('lp', 0) 
     
     game = games.get(room_name)
     if not game: return
@@ -124,7 +126,7 @@ def handle_submit_board(data):
     game['ready_count'] += 1
     
     if game['ready_count'] == 2:
-        print(f"🔒 CẢ 2 ĐÃ SẴN SÀNG! Khởi động 10 giây soi đội hình cho {room_name}")
+        print(f"🔒 CẢ 2 ĐÃ SẴN SÀNG! Khởi động 5 giây soi đội hình cho {room_name}")
         socketio.emit('match_locked', room=room_name)
         
         base_champions = [c.to_dict() for c in game['board_state']]
@@ -132,7 +134,7 @@ def handle_submit_board(data):
         socketio.emit('sync_tick', {
             "champions": base_champions, 
             "events": [],
-            "opponent_lp": game.get('p2_lp', 50)
+            "opponent_lp": game.get('p2_lp', 0) # SỬA 50 THÀNH 0
         }, to=game['player1'])
 
         p2_champions = []
@@ -145,17 +147,16 @@ def handle_submit_board(data):
         socketio.emit('sync_tick', {
             "champions": p2_champions, 
             "events": [],
-            "opponent_lp": game.get('p1_lp', 50)
+            "opponent_lp": game.get('p1_lp', 0) # SỬA 50 THÀNH 0
         }, to=game['player2'])
 
         def delay_start():
-            socketio.sleep(10)
+            socketio.sleep(5)
             print(f"🔥 HẾT GIỜ SOI BÀI! BẮT ĐẦU CHIẾN ĐẤU tại {room_name}")
             socketio.emit('combat_start', room=room_name)
             socketio.start_background_task(run_game_loop, room_name)
             
         socketio.start_background_task(delay_start)
-
 
 # ==========================================
 # 3. VÒNG LẶP CHIẾN ĐẤU (TRỌNG TÀI)

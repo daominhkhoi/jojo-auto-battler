@@ -68,7 +68,7 @@ export function syncTickData(data) {
             localChamp.hp = serverChamp.hp;
             localChamp.mana = serverChamp.mana;
             localChamp.is_alive = serverChamp.is_alive;
-            localChamp.buffs = serverChamp.buffs || [];
+            localChamp.buffs = serverChamp.buffs || []; // Đồng bộ mảng bùa lợi liên tục
         } else {
             const template = CHAMPION_POOL.find(t => t.name === serverChamp.name) || {};
 
@@ -85,7 +85,8 @@ export function syncTickData(data) {
                 max_mana: serverChamp.max_mana,
                 attack_range: template.attack_range || 1,
                 is_alive: serverChamp.is_alive,
-                shakeTimer: 0
+                shakeTimer: 0,
+                buffs: serverChamp.buffs || []
             });
         }
     });
@@ -93,21 +94,18 @@ export function syncTickData(data) {
     if (!STATE.hitEffects) STATE.hitEffects = [];
 
     data.events.forEach(event => {
-        // NẾU LÀ KỸ NĂNG (TUNG CHIÊU MẠNH)
-        // NẾU LÀ KỸ NĂNG (TUNG CHIÊU MẠNH)
         if (event.type === 'skill') {
             const caster = STATE.champions.find(c => c.id === event.casterId);
             const target = STATE.champions.find(c => c.id === event.targetId);
             if (!caster) return;
 
-            // Nếu là buff/heal thì mục tiêu là chính nó
             const targetChamp = target || caster;
             const tarSize = getCanvasCoords(targetChamp.targetX, targetChamp.targetY);
 
-            // --- KIỂM TRA: NẾU LÀ SKILL VÙNG THÌ CHO TỒN TẠI LÂU HƠN (~4 GIÂY) ---
-            let fxLife = 30; // Mặc định 0.5s cho sát thương nổ
-            if (['aoe_dot', 'aoe_heal', 'mana_lock'].includes(event.skill_type)) {
-                fxLife = 240; // Đóng đinh vùng này trên mặt đất trong 240 ticks (4s)
+            // TỰ ĐỘNG CHUYỂN GIÂY (DURATION) THÀNH FRAME CANCHÚA (60 FPS)
+            let fxLife = 30; // Mặc định 0.5s cho kỹ năng bộc phá ngay lập tức
+            if (event.duration && event.duration > 0) {
+                fxLife = Math.round(event.duration * 60);
             }
 
             STATE.hitEffects.push({
@@ -115,14 +113,12 @@ export function syncTickData(data) {
                 y: targetChamp.pixelY + tarSize.h / 2,
                 lifeTime: fxLife,
                 maxLife: fxLife,
-                effectType: event.skill_type // Gắn loại Skill để Canvas biết vẽ màu gì
+                effectType: event.skill_type,
+                radius: event.radius || 1.5 // Nhận bán kính ô cờ từ Server gửi xuống
             });
 
-            // Nếu là dame thì địch rung bần bật
             if (event.skill_type === 'damage' && target) target.shakeTimer = 30;
-
         }
-        // NẾU CHỈ LÀ ĐÁNH THƯỜNG / BẮN ĐẠN
         else if (event.type === 'attack') {
             const attacker = STATE.champions.find(c => c.id === event.attackerId);
             const target = STATE.champions.find(c => c.id === event.targetId);
@@ -191,17 +187,19 @@ export function handleCombatEnd(serverResult) {
         `;
         document.body.appendChild(overlay);
 
-        // Chức năng cho nút chơi ván mới
+        // Chức năng cho nút chơi ván mới (Lưu tên -> F5)
         document.getElementById('restartBtn').addEventListener('click', () => {
-            overlay.remove(); // Xóa màn hình đen
-            if (findBtn) {
-                findBtn.style.display = 'inline-block';
-                findBtn.innerText = "FIND MATCH";
-                findBtn.disabled = false;
-            }
-        });
+            // 1. Lấy tên người chơi hiện tại trên ô input
+            const nameInput = document.getElementById('playerNameInput');
+            const currentPlayerName = nameInput && nameInput.value.trim() !== "" ? nameInput.value : "Player1";
 
-        if (readyBtn) readyBtn.style.display = 'none';
+            // 2. Cất tên và trạng thái muốn tự động tìm trận vào bộ nhớ tạm
+            sessionStorage.setItem('savedPlayerName', currentPlayerName);
+            sessionStorage.setItem('autoFindMatch', 'true');
+
+            // 3. F5 Refresh lại trang Web
+            window.location.reload();
+        });
 
     } else {
         // --- 3. NẾU CHƯA AI ĐƯỢC 5 ĐIỂM THÌ ĐÁNH TIẾP ---

@@ -186,6 +186,32 @@ function animationLoop() {
     requestAnimationFrame(animationLoop);
 }
 
+// ==========================================
+// TỰ ĐỘNG KHÔI PHỤC VÀ TÌM TRẬN (SAU KHI F5 TỪ GAME OVER)
+// ==========================================
+window.addEventListener('DOMContentLoaded', () => {
+    // 1. Kiểm tra xem ván trước có để lại lệnh "tự tìm trận" không
+    if (sessionStorage.getItem('autoFindMatch') === 'true') {
+
+        // 2. Lấy tên đã cất ra và gán lại vào ô input
+        const savedName = sessionStorage.getItem('savedPlayerName');
+        const nameInput = document.getElementById('playerNameInput');
+        if (nameInput && savedName) {
+            nameInput.value = savedName;
+        }
+
+        // Xóa thư đi để nếu user tự bấm F5 bằng tay thì nó không tự tìm trận nữa
+        sessionStorage.removeItem('autoFindMatch');
+        sessionStorage.removeItem('savedPlayerName');
+
+        // 3. Tự động giả lập cú Click vào nút FIND MATCH
+        const findBtn = document.getElementById('findMatchBtn');
+        if (findBtn) {
+            findBtn.click();
+        }
+    }
+});
+
 // Khởi chạy game
 refreshShop();
 updateUnitCount();

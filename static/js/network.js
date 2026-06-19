@@ -59,7 +59,7 @@ socket.on('opponent_disconnected', () => {
 });
 
 socket.on('match_locked', () => {
-    showNotification("Both ready! 10s to inspect opponent!");
+    showNotification("Both ready! 5s to inspect opponent!");
 });
 
 let combatTimerInterval;
