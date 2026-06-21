@@ -89,18 +89,29 @@ export function renderBoard(ctx, canvas) {
         ctx.lineWidth = champ.targetY >= 6 ? 2 : 3.5;
         ctx.strokeRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
 
-        // Thanh Máu / Mana
-        const barY = pY + currentSize.h - 11;
+        // Thanh Máu / Mana (Dày hơn và có viền phân biệt đội)
+        const barHeight = 5;
+        const barSpacing = 1;
+        const totalBarHeight = barHeight * 2 + barSpacing;
+        const barY = pY + currentSize.h - totalBarHeight - 4;
         const barW = currentSize.w - 8;
-        const hpP = Math.max(0, Math.min(1, champ.hp / champ.max_hp));
-        ctx.fillStyle = 'red'; ctx.fillRect(pX + 4, barY, barW, 3.5);
-        ctx.fillStyle = '#00ff00'; ctx.fillRect(pX + 4, barY, barW * hpP, 3.5);
+        
+        // Vẽ viền (Border)
+        ctx.strokeStyle = champ.team === 'Team1' ? '#4facfe' : '#ff0844';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(pX + 4 - 1, barY - 1, barW + 2, totalBarHeight + 2);
 
+        // Thanh Máu
+        const hpP = Math.max(0, Math.min(1, champ.hp / champ.max_hp));
+        ctx.fillStyle = 'red'; ctx.fillRect(pX + 4, barY, barW, barHeight);
+        ctx.fillStyle = '#00ff00'; ctx.fillRect(pX + 4, barY, barW * hpP, barHeight);
+
+        // Thanh Mana
         const mnP = Math.max(0, Math.min(1, (champ.mana || 0) / champ.max_mana));
         const isManaLocked = (champ.buffs && champ.buffs.includes('mana_lock'));
-        ctx.fillStyle = '#444'; ctx.fillRect(pX + 4, barY + 4.5, barW, 3.5);
+        ctx.fillStyle = '#444'; ctx.fillRect(pX + 4, barY + barHeight + barSpacing, barW, barHeight);
         ctx.fillStyle = isManaLocked ? '#7f8c8d' : '#00aaff';
-        ctx.fillRect(pX + 4, barY + 4.5, barW * mnP, 3.5);
+        ctx.fillRect(pX + 4, barY + barHeight + barSpacing, barW * mnP, barHeight);
     });
 
     // 2.5 LỚP HIỆU ỨNG BUFF/DEBUFF (ĐÈ LÊN MẶT LÁ BÀI VÀ CÁC HIỆU ỨNG ĐẶC BIỆT)
