@@ -17,7 +17,7 @@ export const CONFIG = {
 export const STATE = {
     roomId: null,
     playerId: null,
-    playerGold: 20,
+    playerGold: 10,
     playerLevel: 1,
     levelCost: 5,
     currentXp: 0,
