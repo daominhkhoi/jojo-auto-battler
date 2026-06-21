@@ -130,7 +130,7 @@ export const TRAITS_INFO = {
         desc: "Pierced by the Stand Arrow.",
         thresholds: [
             { req: 1, effect: "+30.000 Attack" },
-            { req: 2, effect: "+100.000 HP & +100.000 Attack" }
+            { req: 2, effect: "+100.000 HP & +30.000 Attack" }
         ]
     },
 

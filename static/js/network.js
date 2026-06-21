@@ -272,7 +272,7 @@ export function declareReady() {
             }
 
             if (template.traits.includes("Requiem")) {
-                if (traitCounts["Requiem"] >= 2) { finalHp += 100000; finalAttack += 100000; }
+                if (traitCounts["Requiem"] >= 2) { finalHp += 100000; finalAttack += 30000; }
                 else if (traitCounts["Requiem"] >= 1) { finalAttack += 30000; }
             }
 
