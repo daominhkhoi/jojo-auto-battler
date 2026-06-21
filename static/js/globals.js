@@ -38,12 +38,14 @@ export { CHAMPION_POOL };
 export const IMAGE_CACHE = {};
 CHAMPION_POOL.forEach(champ => {
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.src = champ.img;
     IMAGE_CACHE[champ.name] = img;
 });
 
 if (IMAGES["Background"]) {
     const bgImg = new Image();
+    bgImg.crossOrigin = "anonymous";
     bgImg.src = IMAGES["Background"];
     IMAGE_CACHE["Background"] = bgImg;
 }
