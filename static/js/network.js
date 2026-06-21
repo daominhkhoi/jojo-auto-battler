@@ -68,11 +68,11 @@ let prepTimerInterval;
 
 export function startPrepTimer() {
     clearInterval(prepTimerInterval);
-    let timeLeft = 300; // 5 phút
+    let timeLeft = 120; // 2 phút
     const timerDisplay = document.getElementById('timerDisplay');
     if (timerDisplay) {
         timerDisplay.style.display = 'inline-block';
-        timerDisplay.innerText = "05:00";
+        timerDisplay.innerText = "02:00";
     }
 
     prepTimerInterval = setInterval(() => {

@@ -5,7 +5,7 @@ Anubis;1;93750;1800;1.0;0.9;45;Tarot, Bound;buff_atk;8000.0;;4.5;self
 Aqua Necklace;2;131250;2520;1.0;0.9;61;Morioh, Bound;mind_control;;;5.0;enemy_closest
 Atom Heart Father;1;56250;3900;1.5;1.3;76;Morioh, Power Type;stun;;;4.9;enemy_closest
 Atum;2;96250;2520;3.0;1.4;96;Tarot, Utility;stat_steal;21749.0;;5.0;enemy_closest
-Baby Face;1;50000;4200;2.0;1.4;96;La Squadra, Automatic;clone;0.48;;;self
+Baby Face;1;50000;4200;2.0;1.4;120;La Squadra, Automatic;clone;0.48;;;self
 Bad Company;4;120000;8625;5.0;1.1;76;Morioh, Long-Distance;aoe_dot;36822.0;2.5;7.2;area_closest
 Bastet;1;93750;1800;1.0;0.8;45;Tarot, Bound;stun;;;4.3;enemy_furthest
 Beach Boy;3;168750;3300;1.0;1.4;61;La Squadra, Bound;damage;32450.0;;;enemy_closest
@@ -21,7 +21,7 @@ Chariot Requiem;5;180000;13000;1.5;1.1;76;Requiem, Power Type;damage;45318.0;;;e
 Cheap Trick;2;131250;2520;1.0;0.8;61;Morioh, Bound;damage;16360.0;;;enemy_closest
 Dark Blue Moon;2;78750;5460;1.0;1.1;61;Tarot, Power Type;aoe_dot;21229.0;2.0;3.3;area_closest
 Death Thirteen;2;87500;2940;3.0;1.2;144;Tarot, Phenomenon;stun;;;3.1;enemy_random
-Diver Down;3;101250;7150;1.5;1.5;61;Green Dolphin, Power Type;reflect_shield;0.37;;3.5;ally_lowest_hp
+Diver Down;3;101250;7150;1.5;1.5;61;Green Dolphin, Power Type;reflect_shield;0.37;;3.5;self
 Dragon's Dream;2;131250;2520;1.0;0.6;45;Green Dolphin, Bound;damage;46192.0;;;enemy_closest
 Earth Wind and Fire;2;96250;2520;3.0;0.9;96;Morioh, Utility;polymorph;;;5.1;enemy_random
 Ebony Devil;1;50000;4200;2.0;0.9;76;Tarot, Automatic;damage_link;;;4.4;enemy_closest
@@ -48,15 +48,15 @@ Highway Star;2;70000;5880;2.0;1.1;96;Morioh, Automatic;life_tether;10283.0;;2.5;
 Highway to Hell;2;131250;2520;1.0;0.9;45;Green Dolphin, Bound;damage_link;;;3.3;enemy_closest
 Horus;3;168750;3300;1.0;0.9;45;Tarot, Bound;stun;;;2.7;enemy_closest
 Jail House Lock;2;96250;2520;4.0;1.2;115;Green Dolphin, Utility;mana_lock;;;3.3;enemy_random
-Judgement;2;78750;5460;1.0;0.9;76;Tarot, Power Type;clone;0.58;;;self
+Judgement;2;78750;5460;1.0;0.9;120;Tarot, Power Type;clone;0.58;;;self
 Jumpin' Jack Flash;1;62500;2100;4.0;0.6;115;Green Dolphin, Phenomenon;global_slow;;;2.9;all_enemies
 Justice;3;112500;3849;3.0;1.5;115;Tarot, Phenomenon;mind_control;;;2.2;enemy_random
 Killer Queen;4;135000;9750;1.5;0.7;61;Morioh, Power Type;execute;12953.0;;;enemy_lowest_hp
 King Crimson;5;180000;13000;1.5;0.6;76;Unita Speciale, Power Type;evasion;;;4.6;self
-Kiss;3;101250;7150;1.0;1.0;61;Green Dolphin, Power Type;clone;0.66;;;self
+Kiss;3;101250;7150;1.0;1.0;120;Green Dolphin, Power Type;clone;0.66;;;self
 Kraft Work;2;131250;2520;1.0;1.0;61;Morioh, Bound;reflect_shield;0.5;;4.4;self
 Khnum;1;68750;1800;2.0;1.5;96;Tarot, Utility;polymorph;;;2.9;enemy_closest
-Limp Bizkit;2;131250;2520;1.0;1.5;61;Green Dolphin, Bound;submerge;;;4.5;self
+Limp Bizkit;2;131250;2520;1.0;1.5;100;Green Dolphin, Bound;submerge;;;3;self
 Little Feet;1;62500;2100;3.0;0.6;144;La Squadra, Phenomenon;polymorph;;;2.5;enemy_highest_atk
 Love Deluxe;1;93750;1800;1.0;1.0;61;Morioh, Bound;stun;;;2.3;enemy_closest
 Lovers;1;93750;1800;1.0;1.0;45;Tarot, Bound;damage;9666.0;;;enemy_closest
@@ -66,9 +66,9 @@ Man in the Mirror;1;62500;2100;4.0;1.0;144;La Squadra, Phenomenon;banish;;;3.9;e
 Manhattan Transfer;1;50000;3449;4.0;1.2;76;Green Dolphin, Long-Distance;ricochet;9670.0;5.0;;bounce_closest
 Marilyn Manson;1;50000;4200;1.0;1.5;76;Green Dolphin, Automatic;damage;35970.0;;;enemy_closest
 Metallica;4;150000;5250;4.0;0.8;144;La Squadra, Phenomenon;dot;9917.0;;2.5;enemy_closest
-Moody Blues;1;68750;1800;2.0;1.3;115;Bucciarati, Utility;clone;0.21;;;self
+Moody Blues;1;68750;1800;2.0;1.3;120;Bucciarati, Utility;clone;0.21;;;self
 Mr.President;2;96250;2520;4.0;1.4;96;Bucciarati, Utility;aoe_heal;9311.0;3.0;4.0;ally_lowest_hp
-Notorious B.I.G;2;70000;5880;2.0;1.0;76;Unita Speciale, Automatic;revive;;;10.0;self
+Notorious B.I.G;2;70000;5880;2.0;1.0;100;Unita Speciale, Automatic;revive;;;10.0;self
 Oasis;4;135000;9750;1.5;1.0;61;Unita Speciale, Power Type;submerge;;;2.3;self
 Osiris;2;96250;2520;4.0;1.5;96;Tarot, Utility;stat_steal;9279.0;;5.0;enemy_closest
 Pearl Jam;2;96250;2520;2.0;1.1;96;Morioh, Utility;mana_battery;50.0;;5.0;ally_lowest_mana
@@ -82,7 +82,7 @@ Sex Pistols;3;90000;6324;5.0;0.9;96;Bucciarati, Long-Distance;ricochet;9442.0;1.
 Silver Chariot;3;101250;7150;1.5;0.6;61;Stardust, Power Type;speed_buff;34.0;;2.2;self
 Sky High;1;62500;2100;5.0;1.4;144;Green Dolphin, Phenomenon;dot;38575.0;;7.1;enemy_closest
 Soft Machine;2;96250;2520;2.0;1.3;115;Morioh, Utility;stat_steal;12335.0;;5.0;enemy_highest_atk
-Spice Girl;2;78750;5460;1.0;0.6;76;Bucciarati, Power Type;reflect_shield;0.37;;3.4;ally_lowest_hp
+Spice Girl;2;78750;5460;1.0;0.6;76;Bucciarati, Power Type;reflect_shield;0.37;;3.4;self
 Star Platinum;5;180000;13000;1.5;1.7;61;Stardust, Power Type;time_stop;;;2.7;all_except_self
 Sticky Fingers;4;135000;9750;1.0;1.4;76;Bucciarati, Power Type;swap;15000.0;;;enemy_furthest
 Stone Free;3;101250;7150;1.5;1.0;76;Green Dolphin, Power Type;damage;11168.0;;;enemy_closest
