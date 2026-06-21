@@ -101,7 +101,7 @@ The Hand;4;135000;9750;1.5;1.2;76;Morioh, Power Type;pull;47554.0;1.5;;all_enemi
 The Lock;1;68750;1800;4.0;0.6;115;Morioh, Utility;mana_lock;;;3.1;enemy_closest
 The World;5;180000;13000;1.5;1.7;61;Tarot, Power Type;time_stop;;;2.3;all_except_self
 Under World;1;62500;2100;4.0;1.2;115;Green Dolphin, Phenomenon;aoe_dot;20155.0;2.5;3.5;area_closest
-Weather Report;4;150000;5250;4.0;1.0;144;Green Dolphin, Phenomenon;polymorph;;;3.0;all_enemies
+Weather Report;4;150000;5250;4.0;1.0;144;Green Dolphin, Phenomenon;polymorph;;;3.0;enemy_highest_atk
 Wheel of Fortune;2;131250;2520;1.0;1.2;45;Tarot, Bound;buff_atk;9000.0;;5.0;self
 White Album;4;150000;5250;4.0;1.1;144;La Squadra, Phenomenon;reflect_shield;0.43;;3.8;self
 Whitesnake;4;135000;9750;1.5;1.3;76;Green Dolphin, Power Type;stat_steal;17322.0;;5.0;enemy_highest_atk
