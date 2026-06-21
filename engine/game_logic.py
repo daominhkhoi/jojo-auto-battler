@@ -142,7 +142,7 @@ class Champion:
             for c in board_state:
                 if c.id != self.id and c.is_alive:
                     c.active_buffs.append({'type': 'time_stopped', 'duration': s_duration})
-            self.active_buffs.append({'type': 'speed_buff', 'power': self.speed * 2, 'duration': s_duration})
+            self.active_buffs.append({'type': 'speed_buff', 'power': self.speed * 4, 'duration': s_duration})
             
         # 2. BLINK STRIKE (ÁM SÁT TUYẾN SAU)
         elif s_type == 'blink_strike' and target:
