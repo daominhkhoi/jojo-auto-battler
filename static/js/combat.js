@@ -298,14 +298,14 @@ export function handleCombatEnd(serverResult) {
         updateRoundUI();
 
         // Cơ chế lợi tức (Interest) chuẩn Auto Chess
-        let baseIncome = 10; // Thu nhập cơ bản
+        let baseIncome = (STATE.currentRound * 7); // Thu nhập cơ bản
         let interest = Math.floor(STATE.playerGold / 10);
         if (interest > 5) interest = 5; // Tối đa +5 lợi tức khi có 50 vàng
 
         let totalIncome = baseIncome + interest;
         updateGold(totalIncome);
 
-        let notifMsg = `Round ${STATE.currentRound} Start: +${totalIncome} Gold (Base 10, Interest ${interest})`;
+        let notifMsg = `Round ${STATE.currentRound} Start: +${totalIncome} Gold (Base ${baseIncome}, Interest ${interest})`;
         showNotification(notifMsg);
 
         if (findBtn) findBtn.style.display = 'none';

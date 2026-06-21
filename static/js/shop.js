@@ -50,6 +50,7 @@ function checkAndMerge(champName, starLevel) {
         upgraded.hp = upgraded.max_hp;
         upgraded.attack = Math.round(upgraded.attack * 1.8);
         upgraded.mana = 0;
+        upgraded.max_mana = Math.round(upgraded.max_mana * 0.7);
 
         if (upgraded.skill) {
             if (upgraded.skill.power) upgraded.skill.power = Math.round(upgraded.skill.power * 1.6);
@@ -305,11 +306,11 @@ export function showDisplayInfo(type, data) {
                 case 'execute': skillDesc = `Instantly executes targets below 30% HP. Otherwise, deals <b>${scaledPower.toLocaleString()}</b> physical damage.`; break;
                 case 'banish': skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'submerge': skillDesc = `Submerges into shadows, becoming untargetable for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'mana_battery': skillDesc = `Channels <b>${scaledPower.toLocaleString()}</b> Mana per second to the ally with lowest current Mana.`; break;
+                case 'mana_battery': skillDesc = `Channels <b>${scaledPower.toLocaleString()}</b> Mana per second to the ally with lowest current Mana for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'pull': skillDesc = `Erases space, pulling all enemies to self and dealing <b>${scaledPower.toLocaleString()}</b> damage.`; break;
                 case 'mind_control': skillDesc = `Brainwashes the target to fight for your team for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'polymorph': skillDesc = `Transforms the target into a harmless creature, disabling attacks for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'stat_steal': skillDesc = `Steals <b>${scaledPower.toLocaleString()}</b> Attack from the target for the rest of the battle.`; break;
+                case 'stat_steal': skillDesc = `Steals <b>${scaledPower.toLocaleString()}</b> Attack from the target for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'banish': skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'reflect_shield': skillDesc = `Reflects <b>${Math.round(scaledPercent * 100)}%</b> of incoming damage back to the attackers.`; break;
                 case 'damage_link': skillDesc = `Links with the target for <b>${scaledDuration.toFixed(1)}s</b>. The linked target takes all damage you receive.`; break;
@@ -322,7 +323,7 @@ export function showDisplayInfo(type, data) {
                 case 'global_slow': skillDesc = `Manipulates gravity/time, slowing down all enemies' Attack Speed by <b>50%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'mana_lock': skillDesc = `Silences the target, preventing Mana gain for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'stun': skillDesc = `Stuns the target, completely disabling movement and actions for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'heal': skillDesc = `Restores <b>${scaledPower.toLocaleString()}</b> HP to the most wounded ally.`; break;
+                case 'heal': skillDesc = `Heals the most wounded ally for <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'aoe_heal': skillDesc = `Heals allies in a radius (<b>${s.radius}</b>) for <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'regen': skillDesc = `Regenerates <b>${scaledPower.toLocaleString()}</b> HP per second for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'buff_atk': skillDesc = `Increases Attack by <b>+${scaledPower.toLocaleString()}</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;

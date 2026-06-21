@@ -216,7 +216,7 @@ class Champion:
             if target.hp <= 0: target.is_alive = False
             
         elif s_type == 'heal' and target:
-            target.hp = min(target.max_hp, target.hp + s_power)
+            target.active_buffs.append({'type': 'heal', 'power': s_power, 'duration': s_duration})
             
         elif s_type == 'regen':
             self.active_buffs.append({'type': 'regen', 'power': s_power, 'duration': s_duration})
@@ -273,8 +273,12 @@ class Champion:
                     c.active_buffs.append({'type': 'speed_debuff', 'power': penalty, 'duration': s_duration})
 
         elif s_type == 'stat_steal' and target:
-            target.attack = max(0, target.attack - s_power)
-            self.attack += s_power
+            actual_steal = min(s_power, target.attack)
+            target.attack -= actual_steal
+            self.attack += actual_steal
+            steal_dur = s_duration if s_duration > 0 else 5.0
+            target.active_buffs.append({'type': 'stat_steal_victim', 'power': actual_steal, 'duration': steal_dur})
+            self.active_buffs.append({'type': 'stat_steal_beneficiary', 'power': actual_steal, 'duration': steal_dur})
 
         elif s_type == 'banish' and target:
             target.is_banished = True
@@ -319,7 +323,7 @@ class Champion:
             elif bt == 'aoe_dot':
                 dmg, evs = self.take_damage(buff['power'] / 10.0, None, board_state)
                 events.extend(evs)
-            elif bt == 'regen' or bt == 'aoe_heal':
+            elif bt == 'regen' or bt == 'aoe_heal' or bt == 'heal':
                 self.hp = min(self.max_hp, self.hp + buff['power'] / 10.0)
             elif bt == 'life_tether':
                 caster = next((c for c in board_state if c.id == buff.get('caster_id')), None)
@@ -346,6 +350,8 @@ class Champion:
                 elif bt == 'mind_control': self.team = buff['original_team'] 
                 elif bt == 'banish': self.is_banished = False
                 elif bt == 'submerge': self.is_submerged = False
+                elif bt == 'stat_steal_victim': self.attack += buff['power']
+                elif bt == 'stat_steal_beneficiary': self.attack -= buff['power']
                 self.active_buffs.remove(buff)
 
         return events

@@ -1,109 +1,109 @@
-Name;Cost;HP;ATK;Range;Speed;Mana;Traits;SkillType;SkillStat;Radius;SkillDuration;Target
-Achtung Baby;2;96250;2520;4.0;1.3;100;Morioh, Utility;submerge;;;2.8;self
-Aerosmith;3;90000;6324;5.0;1.2;100;Bucciarati, Long-Distance;damage;10507;;;enemy_closest
-Anubis;1;93750;1800;1.0;0.9;48;Tarot, Bound;buff_atk;8000;;4.5;self
-Aqua Necklace;2;131250;2520;1.0;0.9;64;Morioh, Bound;mind_control;;;5.0;enemy_closest
-Atom Heart Father;1;56250;3900;1.5;1.3;80;Morioh, Power Type;stun;;;4.9;enemy_closest
-Atum;2;96250;2520;3.0;1.4;100;Tarot, Utility;stat_steal;21749;;;enemy_closest
-Baby Face;1;50000;4200;2.0;1.4;100;La Squadra, Automatic;clone;0.48;;;self
-Bad Company;4;120000;8625;5.0;1.1;80;Morioh, Long-Distance;aoe_dot;36822;2.5;7.2;area_closest
-Bastet;1;93750;1800;1.0;0.8;48;Tarot, Bound;stun;;;4.3;enemy_furthest
-Beach Boy;3;168750;3300;1.0;1.4;64;La Squadra, Bound;damage;32450;;;enemy_closest
-Black Sabbath;3;90000;7699;1.0;1.4;100;Unita Speciale, Automatic;execute;9802;;;enemy_closest
-Boy II Man;2;96250;2520;3.0;0.6;120;Morioh, Utility;stat_steal;14106;;;enemy_random
-Burning Down the House;2;96250;2520;3.0;0.6;120;Green Dolphin, Utility;submerge;;;2.8;self
-Cinderella;2;96250;2520;4.0;1.3;120;Morioh, Utility;polymorph;;;3.2;enemy_closest
-Clash;3;123750;3300;2.0;0.6;120;Unita Speciale, Utility;blink_strike;28000;;;enemy_furthest
-C-MOON;4;135000;9750;1.5;1.5;80;Green Dolphin, Power Type;global_slow;;;2.9;all_enemies
-Crazy Diamond;4;135000;9750;1.0;0.8;80;Morioh, Power Type;heal;18273;;;ally_lowest_hp
-Cream;4;225000;4500;1.0;0.6;64;Tarot, Bound;banish;;;2.8;enemy_closest
-Chariot Requiem;5;180000;13000;1.5;1.1;80;Requiem, Power Type;damage;45318;;;enemy_closest
-Cheap Trick;2;131250;2520;1.0;0.8;64;Morioh, Bound;damage;16360;;;enemy_closest
-Dark Blue Moon;2;78750;5460;1.0;1.1;64;Tarot, Power Type;aoe_dot;21229;2;3.3;area_closest
-Death Thirteen;2;87500;2940;3.0;1.2;150;Tarot, Phenomenon;stun;;;3.1;enemy_random
-Diver Down;3;101250;7150;1.5;1.5;64;Green Dolphin, Power Type;reflect_shield;0.37;;3.5;ally_lowest_hp
-Dragon's Dream;2;131250;2520;1.0;0.6;48;Green Dolphin, Bound;damage;46192;;;enemy_closest
-Earth Wind and Fire;2;96250;2520;3.0;0.9;100;Morioh, Utility;polymorph;;;5.1;enemy_random
-Ebony Devil;1;50000;4200;2.0;0.9;80;Tarot, Automatic;damage_link;;;4.4;enemy_closest
-Echoes Act1;1;56250;3900;1.5;1.1;80;Morioh, Power Type;mana_lock;;;2.5;enemy_closest
-Echoes Act2;1;56250;3900;1.5;1.3;64;Morioh, Power Type;stun;;;3.5;enemy_closest
-Echoes Act3;2;78750;5460;1.0;1.0;64;Morioh, Power Type;stun;;;6.4;enemy_highest_atk
-Emperor;1;50000;3449;5.0;0.9;80;Tarot, Long-Distance;ricochet;19688;5;;bounce_closest
-Empress;1;93750;1800;1.0;1.5;64;Tarot, Bound;dot;47925;;6.0;enemy_highest_atk
-Enigma;1;68750;1800;3.0;1.0;120;Morioh, Utility;banish;;;3.3;enemy_closest
-Foo Fighters;3;90000;6324;4.0;0.8;100;Green Dolphin, Long-Distance;regen;15000;;4.0;self
-Geb;3;168750;3300;1.0;0.9;48;Tarot, Bound;blink_strike;32000;;;enemy_furthest
-Gold Experience Requiem;5;220000;6000;3.0;1.1;120;Requiem, Utility;time_stop;;;2.9;all_except_self
-Gold Experience;2;78750;5460;1.0;0.8;80;Bucciarati, Power Type;aoe_heal;15798;5;;ally_lowest_hp
-Goo Goo Dolls;1;62500;2100;4.0;0.8;150;Green Dolphin, Phenomenon;polymorph;;;5.3;enemy_highest_atk
-Green Day;4;150000;5250;4.0;0.9;120;Unita Speciale, Phenomenon;aoe_dot;10644;3;2.1;area_closest
-Green, Green Grass of Home;1;93750;1800;1.0;1.3;48;Green Dolphin, Bound;damage;9884;;;enemy_closest
-Hanged Man;3;90000;6324;5.0;0.6;80;Tarot, Long-Distance;blink_strike;40000;;;enemy_furthest
-Harvest;2;131250;2520;1.0;0.6;48;Morioh, Bound;mana_battery;24;;;ally_lowest_mana
-Heaven's Door;2;96250;2520;3.0;1.3;120;Morioh, Utility;mind_control;;;3.7;enemy_closest
-Hermit Purple;1;68750;1800;3.0;1.5;100;Stardust, Utility;mana_lock;;;4.6;enemy_furthest
-Hierophant Green;3;90000;6324;4.0;1.5;100;Stardust, Long-Distance;ricochet;39013;2.5;;bounce_closest
-High Priestess;1;50000;4200;2.0;0.8;100;Tarot, Automatic;damage;41362;;;enemy_closest
-Highway Star;2;70000;5880;2.0;1.1;100;Morioh, Automatic;life_tether;10283;;2.5;enemy_furthest
-Highway to Hell;2;131250;2520;1.0;0.9;48;Green Dolphin, Bound;damage_link;;;3.3;enemy_closest
-Horus;3;168750;3300;1.0;0.9;48;Tarot, Bound;stun;;;2.7;enemy_closest
-Jail House Lock;2;96250;2520;4.0;1.2;120;Green Dolphin, Utility;mana_lock;;;3.3;enemy_random
-Judgement;2;78750;5460;1.0;0.9;80;Tarot, Power Type;clone;0.58;;;self
-Jumpin' Jack Flash;1;62500;2100;4.0;0.6;120;Green Dolphin, Phenomenon;global_slow;;;2.9;all_enemies
-Justice;3;112500;3849;3.0;1.5;120;Tarot, Phenomenon;mind_control;;;2.2;enemy_random
-Killer Queen;4;135000;9750;1.5;0.7;64;Morioh, Power Type;execute;12953;;;enemy_lowest_hp
-King Crimson;5;180000;13000;1.5;0.6;80;Unita Speciale, Power Type;evasion;;;4.6;self
-Kiss;3;101250;7150;1.0;1.0;64;Green Dolphin, Power Type;clone;0.66;;;self
-Kraft Work;2;131250;2520;1.0;1.0;64;Morioh, Bound;reflect_shield;0.5;;4.4;self
-Khnum;1;68750;1800;2.0;1.5;100;Tarot, Utility;polymorph;;;2.9;enemy_closest
-Limp Bizkit;2;131250;2520;1.0;1.5;64;Green Dolphin, Bound;submerge;;;4.5;self
-Little Feet;1;62500;2100;3.0;0.6;150;La Squadra, Phenomenon;polymorph;;;2.5;enemy_highest_atk
-Love Deluxe;1;93750;1800;1.0;1.0;64;Morioh, Bound;stun;;;2.3;enemy_closest
-Lovers;1;93750;1800;1.0;1.0;48;Tarot, Bound;damage;9666;;;enemy_closest
-Made in Heaven;5;180000;13000;1.0;1.2;80;Green Dolphin, Power Type;speed_buff;99;;3.3;self
-Magician's Red;3;112500;3849;5.0;1.1;150;Stardust, Phenomenon;dot;13590;;2.6;enemy_closest
-Man in the Mirror;1;62500;2100;4.0;1.0;150;La Squadra, Phenomenon;banish;;;3.9;enemy_random
-Manhattan Transfer;1;50000;3449;4.0;1.2;80;Green Dolphin, Long-Distance;ricochet;9670;5;;bounce_closest
-Marilyn Manson;1;50000;4200;1.0;1.5;80;Green Dolphin, Automatic;damage;35970;;;enemy_closest
-Metallica;4;150000;5250;4.0;0.8;150;La Squadra, Phenomenon;dot;9917;;2.5;enemy_closest
-Moody Blues;1;68750;1800;2.0;1.3;120;Bucciarati, Utility;clone;0.21;;;self
-Mr.President;2;96250;2520;4.0;1.4;100;Bucciarati, Utility;aoe_heal;9311;3;;ally_lowest_hp
-Notorious B.I.G;2;70000;5880;2.0;1.0;80;Unita Speciale, Automatic;revive;;;10.0;self
-Oasis;4;135000;9750;1.5;1.0;64;Unita Speciale, Power Type;submerge;;;2.3;self
-Osiris;2;96250;2520;4.0;1.5;100;Tarot, Utility;stat_steal;9279;;;enemy_closest
-Pearl Jam;2;96250;2520;2.0;1.1;100;Morioh, Utility;mana_battery;50;;;ally_lowest_mana
-Planet Waves;1;50000;3449;5.0;1.2;80;Green Dolphin, Long-Distance;damage;45908;;;enemy_random
-Purple Haze;4;150000;5250;5.0;1.2;120;Bucciarati, Phenomenon;aoe_dot;10280;2.5;2.7;area_closest
-Ratt;2;70000;4830;5.0;1.3;100;Morioh, Long-Distance;dot;15240;;3.4;enemy_furthest
-Red Hot Chili Pepper;2;131250;2520;1.0;0.7;48;Morioh, Bound;blink_strike;18000;;;enemy_furthest
-Rolling Stones;2;70000;5880;2.0;1.5;100;Unita Speciale, Automatic;execute;22436;;;enemy_lowest_hp
-Sethan;2;96250;2520;3.0;1.0;100;Tarot, Utility;polymorph;;;3.4;enemy_highest_atk
-Sex Pistols;3;90000;6324;5.0;0.9;100;Bucciarati, Long-Distance;ricochet;9442;1.5;;bounce_closest
-Silver Chariot;3;101250;7150;1.5;0.6;64;Stardust, Power Type;speed_buff;34;;2.2;self
-Sky High;1;62500;2100;5.0;1.4;150;Green Dolphin, Phenomenon;dot;38575;;7.1;enemy_closest
-Soft Machine;2;96250;2520;2.0;1.3;120;Morioh, Utility;stat_steal;12335;;;enemy_highest_atk
-Spice Girl;2;78750;5460;1.0;0.6;80;Bucciarati, Power Type;reflect_shield;0.37;;3.4;ally_lowest_hp
-Star Platinum;5;180000;13000;1.5;0.7;64;Stardust, Power Type;time_stop;;;2.7;all_except_self
-Sticky Fingers;4;135000;9750;1.0;1.4;80;Bucciarati, Power Type;swap;15000;;;enemy_furthest
-Stone Free;3;101250;7150;1.5;1.0;80;Green Dolphin, Power Type;damage;11168;;;enemy_closest
-Stray Cat;1;93750;1800;1.0;1.3;64;Morioh, Bound;damage;26966;;;enemy_furthest
-Strength;1;93750;1800;1.0;0.7;64;Tarot, Bound;aoe_dot;10938;2.5;2.6;area_closest
-Sun;1;62500;2100;4.0;1.1;120;Tarot, Phenomenon;aoe_dot;21133;2.5;4.0;all_enemies
-Super Fly;1;93750;1800;1.0;0.6;48;Morioh, Bound;damage_link;;;5.9;enemy_random
-Surface;1;93750;1800;1.0;1.2;64;Morioh, Bound;mind_control;;;2.9;enemy_closest
-Survivor;1;68750;1800;2.0;1.0;100;Green Dolphin, Utility;mind_control;;;3.4;enemy_random
-Talking Head;1;68750;1800;4.0;1.4;100;Unita Speciale, Utility;mana_lock;;;4.8;enemy_highest_atk
-Tohth;2;96250;2520;3.0;1.0;100;Tarot, Utility;evasion;;;4.0;self
-Tower of Gray;2;70000;4830;5.0;1.3;100;Tarot, Long-Distance;evasion;;;4.3;self
-The Fool;3;168750;3300;1.0;1.5;48;Stardust, Bound;reflect_shield;0.29;;2.0;self
-The Grateful Dead;3;112500;3849;5.0;1.4;120;La Squadra, Phenomenon;aoe_dot;20244;2;4.4;area_closest
-The Hand;4;135000;9750;1.5;1.2;80;Morioh, Power Type;pull;47554;1.5;;all_enemies
-The Lock;1;68750;1800;4.0;0.6;120;Morioh, Utility;mana_lock;;;3.1;enemy_closest
-The World;5;180000;13000;1.5;1.3;64;Tarot, Power Type;time_stop;;;2.3;all_except_self
-Under World;1;62500;2100;4.0;1.2;120;Green Dolphin, Phenomenon;aoe_dot;20155;2.5;3.5;area_closest
-Weather Report;4;150000;5250;4.0;1.0;150;Green Dolphin, Phenomenon;aoe_dot;22402;2.5;3.4;all_enemies
-Wheel of Fortune;2;131250;2520;1.0;1.2;48;Tarot, Bound;buff_atk;9000;;5.0;self
-White Album;4;150000;5250;4.0;1.1;150;La Squadra, Phenomenon;reflect_shield;0.43;;3.8;self
-Whitesnake;4;135000;9750;1.5;1.3;80;Green Dolphin, Power Type;stat_steal;17322;;;enemy_highest_atk
-Yellow Temperance;2;70000;5880;1.0;1.5;100;Tarot, Automatic;reflect_shield;0.58;;4.0;self
-Yo-Yo Ma;2;70000;5880;1.0;1.4;100;Green Dolphin, Automatic;dot;20232;;4.1;enemy_closest
+﻿Name;Cost;HP;ATK;Range;Speed;Mana;Traits;SkillType;SkillStat;Radius;SkillDuration;Target
+Achtung Baby;2;96250;2520;4.0;1.3;80;Morioh, Utility;submerge;;;2.8;self
+Aerosmith;3;90000;6324;5.0;1.2;80;Bucciarati, Long-Distance;damage;10507;;;enemy_closest
+Anubis;1;93750;1800;1.0;0.9;38;Tarot, Bound;buff_atk;8000;;4.5;self
+Aqua Necklace;2;131250;2520;1.0;0.9;51;Morioh, Bound;mind_control;;;5.0;enemy_closest
+Atom Heart Father;1;56250;3900;1.5;1.3;64;Morioh, Power Type;stun;;;4.9;enemy_closest
+Atum;2;96250;2520;3.0;1.4;80;Tarot, Utility;stat_steal;21749;;5.0;enemy_closest
+Baby Face;1;50000;4200;2.0;1.4;80;La Squadra, Automatic;clone;0.48;;;self
+Bad Company;4;120000;8625;5.0;1.1;64;Morioh, Long-Distance;aoe_dot;36822;2.5;7.2;area_closest
+Bastet;1;93750;1800;1.0;0.8;38;Tarot, Bound;stun;;;4.3;enemy_furthest
+Beach Boy;3;168750;3300;1.0;1.4;51;La Squadra, Bound;damage;32450;;;enemy_closest
+Black Sabbath;3;90000;7699;1.0;1.4;80;Unita Speciale, Automatic;execute;9802;;;enemy_closest
+Boy II Man;2;96250;2520;3.0;0.6;96;Morioh, Utility;stat_steal;14106;;5.0;enemy_random
+Burning Down the House;2;96250;2520;3.0;0.6;96;Green Dolphin, Utility;submerge;;;2.8;self
+Cinderella;2;96250;2520;4.0;1.3;96;Morioh, Utility;polymorph;;;3.2;enemy_closest
+Clash;3;123750;3300;2.0;0.6;96;Unita Speciale, Utility;blink_strike;28000;;;enemy_furthest
+C-MOON;4;135000;9750;1.5;1.5;64;Green Dolphin, Power Type;global_slow;;;2.9;all_enemies
+Crazy Diamond;4;135000;9750;1.0;0.8;64;Morioh, Power Type;heal;18273;;5.0;ally_lowest_hp
+Cream;4;225000;4500;1.0;0.6;51;Tarot, Bound;banish;;;2.8;enemy_closest
+Chariot Requiem;5;180000;13000;1.5;1.1;64;Requiem, Power Type;damage;45318;;;enemy_closest
+Cheap Trick;2;131250;2520;1.0;0.8;51;Morioh, Bound;damage;16360;;;enemy_closest
+Dark Blue Moon;2;78750;5460;1.0;1.1;51;Tarot, Power Type;aoe_dot;21229;2;3.3;area_closest
+Death Thirteen;2;87500;2940;3.0;1.2;120;Tarot, Phenomenon;stun;;;3.1;enemy_random
+Diver Down;3;101250;7150;1.5;1.5;51;Green Dolphin, Power Type;reflect_shield;0.37;;3.5;ally_lowest_hp
+Dragon's Dream;2;131250;2520;1.0;0.6;38;Green Dolphin, Bound;damage;46192;;;enemy_closest
+Earth Wind and Fire;2;96250;2520;3.0;0.9;80;Morioh, Utility;polymorph;;;5.1;enemy_random
+Ebony Devil;1;50000;4200;2.0;0.9;64;Tarot, Automatic;damage_link;;;4.4;enemy_closest
+Echoes Act1;1;56250;3900;1.5;1.1;64;Morioh, Power Type;mana_lock;;;2.5;enemy_closest
+Echoes Act2;1;56250;3900;1.5;1.3;51;Morioh, Power Type;stun;;;3.5;enemy_closest
+Echoes Act3;2;78750;5460;1.0;1.0;51;Morioh, Power Type;stun;;;6.4;enemy_highest_atk
+Emperor;1;50000;3449;5.0;0.9;64;Tarot, Long-Distance;ricochet;19688;5;;bounce_closest
+Empress;1;93750;1800;1.0;1.5;51;Tarot, Bound;dot;47925;;6.0;enemy_highest_atk
+Enigma;1;68750;1800;3.0;1.0;96;Morioh, Utility;banish;;;3.3;enemy_closest
+Foo Fighters;3;90000;6324;4.0;0.8;80;Green Dolphin, Long-Distance;regen;15000;;4.0;self
+Geb;3;168750;3300;1.0;0.9;38;Tarot, Bound;blink_strike;32000;;;enemy_furthest
+Gold Experience Requiem;5;220000;6000;3.0;1.1;96;Requiem, Utility;time_stop;;;2.9;all_except_self
+Gold Experience;2;78750;5460;1.0;0.8;64;Bucciarati, Power Type;aoe_heal;15798;5;5.0;ally_lowest_hp
+Goo Goo Dolls;1;62500;2100;4.0;0.8;120;Green Dolphin, Phenomenon;polymorph;;;5.3;enemy_highest_atk
+Green Day;4;150000;5250;4.0;0.9;96;Unita Speciale, Phenomenon;aoe_dot;10644;3;2.1;area_closest
+Green, Green Grass of Home;1;93750;1800;1.0;1.3;38;Green Dolphin, Bound;damage;9884;;;enemy_closest
+Hanged Man;3;90000;6324;5.0;0.6;64;Tarot, Long-Distance;blink_strike;40000;;;enemy_furthest
+Harvest;2;131250;2520;1.0;0.6;38;Morioh, Bound;mana_battery;24;;5.0;ally_lowest_mana
+Heaven's Door;2;96250;2520;3.0;1.3;96;Morioh, Utility;mind_control;;;3.7;enemy_closest
+Hermit Purple;1;68750;1800;3.0;1.5;80;Stardust, Utility;mana_lock;;;4.6;enemy_furthest
+Hierophant Green;3;90000;6324;4.0;1.5;80;Stardust, Long-Distance;ricochet;39013;2.5;;bounce_closest
+High Priestess;1;50000;4200;2.0;0.8;80;Tarot, Automatic;damage;41362;;;enemy_closest
+Highway Star;2;70000;5880;2.0;1.1;80;Morioh, Automatic;life_tether;10283;;2.5;enemy_furthest
+Highway to Hell;2;131250;2520;1.0;0.9;38;Green Dolphin, Bound;damage_link;;;3.3;enemy_closest
+Horus;3;168750;3300;1.0;0.9;38;Tarot, Bound;stun;;;2.7;enemy_closest
+Jail House Lock;2;96250;2520;4.0;1.2;96;Green Dolphin, Utility;mana_lock;;;3.3;enemy_random
+Judgement;2;78750;5460;1.0;0.9;64;Tarot, Power Type;clone;0.58;;;self
+Jumpin' Jack Flash;1;62500;2100;4.0;0.6;96;Green Dolphin, Phenomenon;global_slow;;;2.9;all_enemies
+Justice;3;112500;3849;3.0;1.5;96;Tarot, Phenomenon;mind_control;;;2.2;enemy_random
+Killer Queen;4;135000;9750;1.5;0.7;51;Morioh, Power Type;execute;12953;;;enemy_lowest_hp
+King Crimson;5;180000;13000;1.5;0.6;64;Unita Speciale, Power Type;evasion;;;4.6;self
+Kiss;3;101250;7150;1.0;1.0;51;Green Dolphin, Power Type;clone;0.66;;;self
+Kraft Work;2;131250;2520;1.0;1.0;51;Morioh, Bound;reflect_shield;0.5;;4.4;self
+Khnum;1;68750;1800;2.0;1.5;80;Tarot, Utility;polymorph;;;2.9;enemy_closest
+Limp Bizkit;2;131250;2520;1.0;1.5;51;Green Dolphin, Bound;submerge;;;4.5;self
+Little Feet;1;62500;2100;3.0;0.6;120;La Squadra, Phenomenon;polymorph;;;2.5;enemy_highest_atk
+Love Deluxe;1;93750;1800;1.0;1.0;51;Morioh, Bound;stun;;;2.3;enemy_closest
+Lovers;1;93750;1800;1.0;1.0;38;Tarot, Bound;damage;9666;;;enemy_closest
+Made in Heaven;5;180000;13000;1.0;1.2;64;Green Dolphin, Power Type;speed_buff;99;;3.3;self
+Magician's Red;3;112500;3849;5.0;1.1;120;Stardust, Phenomenon;dot;13590;;2.6;enemy_closest
+Man in the Mirror;1;62500;2100;4.0;1.0;120;La Squadra, Phenomenon;banish;;;3.9;enemy_random
+Manhattan Transfer;1;50000;3449;4.0;1.2;64;Green Dolphin, Long-Distance;ricochet;9670;5;;bounce_closest
+Marilyn Manson;1;50000;4200;1.0;1.5;64;Green Dolphin, Automatic;damage;35970;;;enemy_closest
+Metallica;4;150000;5250;4.0;0.8;120;La Squadra, Phenomenon;dot;9917;;2.5;enemy_closest
+Moody Blues;1;68750;1800;2.0;1.3;96;Bucciarati, Utility;clone;0.21;;;self
+Mr.President;2;96250;2520;4.0;1.4;80;Bucciarati, Utility;aoe_heal;9311;3;4.0;ally_lowest_hp
+Notorious B.I.G;2;70000;5880;2.0;1.0;64;Unita Speciale, Automatic;revive;;;10.0;self
+Oasis;4;135000;9750;1.5;1.0;51;Unita Speciale, Power Type;submerge;;;2.3;self
+Osiris;2;96250;2520;4.0;1.5;80;Tarot, Utility;stat_steal;9279;;5.0;enemy_closest
+Pearl Jam;2;96250;2520;2.0;1.1;80;Morioh, Utility;mana_battery;50;;5.0;ally_lowest_mana
+Planet Waves;1;50000;3449;5.0;1.2;64;Green Dolphin, Long-Distance;damage;45908;;;enemy_random
+Purple Haze;4;150000;5250;5.0;1.2;96;Bucciarati, Phenomenon;aoe_dot;10280;2.5;2.7;area_closest
+Ratt;2;70000;4830;5.0;1.3;80;Morioh, Long-Distance;dot;15240;;3.4;enemy_furthest
+Red Hot Chili Pepper;2;131250;2520;1.0;0.7;38;Morioh, Bound;blink_strike;18000;;;enemy_furthest
+Rolling Stones;2;70000;5880;2.0;1.5;80;Unita Speciale, Automatic;execute;22436;;;enemy_lowest_hp
+Sethan;2;96250;2520;3.0;1.0;80;Tarot, Utility;polymorph;;;3.4;enemy_highest_atk
+Sex Pistols;3;90000;6324;5.0;0.9;80;Bucciarati, Long-Distance;ricochet;9442;1.5;;bounce_closest
+Silver Chariot;3;101250;7150;1.5;0.6;51;Stardust, Power Type;speed_buff;34;;2.2;self
+Sky High;1;62500;2100;5.0;1.4;120;Green Dolphin, Phenomenon;dot;38575;;7.1;enemy_closest
+Soft Machine;2;96250;2520;2.0;1.3;96;Morioh, Utility;stat_steal;12335;;5.0;enemy_highest_atk
+Spice Girl;2;78750;5460;1.0;0.6;64;Bucciarati, Power Type;reflect_shield;0.37;;3.4;ally_lowest_hp
+Star Platinum;5;180000;13000;1.5;0.7;51;Stardust, Power Type;time_stop;;;2.7;all_except_self
+Sticky Fingers;4;135000;9750;1.0;1.4;64;Bucciarati, Power Type;swap;15000;;;enemy_furthest
+Stone Free;3;101250;7150;1.5;1.0;64;Green Dolphin, Power Type;damage;11168;;;enemy_closest
+Stray Cat;1;93750;1800;1.0;1.3;51;Morioh, Bound;damage;26966;;;enemy_furthest
+Strength;1;93750;1800;1.0;0.7;51;Tarot, Bound;aoe_dot;10938;2.5;2.6;area_closest
+Sun;1;62500;2100;4.0;1.1;96;Tarot, Phenomenon;aoe_dot;21133;2.5;4.0;all_enemies
+Super Fly;1;93750;1800;1.0;0.6;38;Morioh, Bound;damage_link;;;5.9;enemy_random
+Surface;1;93750;1800;1.0;1.2;51;Morioh, Bound;mind_control;;;2.9;enemy_closest
+Survivor;1;68750;1800;2.0;1.0;80;Green Dolphin, Utility;mind_control;;;3.4;enemy_random
+Talking Head;1;68750;1800;4.0;1.4;80;Unita Speciale, Utility;mana_lock;;;4.8;enemy_highest_atk
+Tohth;2;96250;2520;3.0;1.0;80;Tarot, Utility;evasion;;;4.0;self
+Tower of Gray;2;70000;4830;5.0;1.3;80;Tarot, Long-Distance;evasion;;;4.3;self
+The Fool;3;168750;3300;1.0;1.5;38;Stardust, Bound;reflect_shield;0.29;;2.0;self
+The Grateful Dead;3;112500;3849;5.0;1.4;96;La Squadra, Phenomenon;aoe_dot;20244;2;4.4;area_closest
+The Hand;4;135000;9750;1.5;1.2;64;Morioh, Power Type;pull;47554;1.5;;all_enemies
+The Lock;1;68750;1800;4.0;0.6;96;Morioh, Utility;mana_lock;;;3.1;enemy_closest
+The World;5;180000;13000;1.5;1.3;51;Tarot, Power Type;time_stop;;;2.3;all_except_self
+Under World;1;62500;2100;4.0;1.2;96;Green Dolphin, Phenomenon;aoe_dot;20155;2.5;3.5;area_closest
+Weather Report;4;150000;5250;4.0;1.0;120;Green Dolphin, Phenomenon;polymorph;;;3;all_enemies
+Wheel of Fortune;2;131250;2520;1.0;1.2;38;Tarot, Bound;buff_atk;9000;;5.0;self
+White Album;4;150000;5250;4.0;1.1;120;La Squadra, Phenomenon;reflect_shield;0.43;;3.8;self
+Whitesnake;4;135000;9750;1.5;1.3;64;Green Dolphin, Power Type;stat_steal;17322;;5.0;enemy_highest_atk
+Yellow Temperance;2;70000;5880;1.0;1.5;80;Tarot, Automatic;reflect_shield;0.58;;4.0;self
+Yo-Yo Ma;2;70000;5880;1.0;1.4;80;Green Dolphin, Automatic;dot;20232;;4.1;enemy_closest

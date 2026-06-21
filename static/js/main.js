@@ -211,7 +211,9 @@ window.addEventListener('DOMContentLoaded', () => {
         // 3. Tự động giả lập cú Click vào nút FIND MATCH
         const findBtn = document.getElementById('findMatchBtn');
         if (findBtn) {
-            findBtn.click();
+            setTimeout(() => {
+                findBtn.click();
+            }, 500); // Đợi 500ms cho socket kết nối rồi mới click
         }
     }
 });
