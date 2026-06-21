@@ -1,4 +1,5 @@
 import { CHAMPION_POOL } from './entities.js';
+import { IMAGES } from './assets.js';
 
 export const CONFIG = {
     BOARD_COLS: 5,            // 5 cột ngang trên sân
@@ -18,10 +19,13 @@ export const STATE = {
     playerId: null,
     playerGold: 20,
     playerLevel: 1,
+    levelCost: 5,
     currentXp: 0,
     xpToNextLevel: 2,
     champions: [],
     activeProjectiles: [],
+    particles: [],
+    floatingTexts: [],
     isCombatPhase: false,
     playerLP: 100, 
     botLP: 100,   
@@ -37,6 +41,12 @@ CHAMPION_POOL.forEach(champ => {
     img.src = champ.img;
     IMAGE_CACHE[champ.name] = img;
 });
+
+if (IMAGES["Background"]) {
+    const bgImg = new Image();
+    bgImg.src = IMAGES["Background"];
+    IMAGE_CACHE["Background"] = bgImg;
+}
 
 // Hàm ma thuật tự động chuyển tọa độ lưới sang vị trí Pixel chính xác trên màn hình
 export function getCanvasCoords(gridX, gridY) {
@@ -58,56 +68,117 @@ export function getCanvasCoords(gridX, gridY) {
 }
 
 export const TRAITS_INFO = {
-    // === PHE PHÁI (FACTIONS) ===
-    "Team Bucciarati": {
-        desc: "Protagonists seeking to overthrow the Boss.",
+    // === FACTIONS (PARTS) ===
+    "Stardust": {
+        desc: "Jotaro's companions (Part 3). Travel the world.",
         thresholds: [
-            { req: 2, effect: "All team members gain +15.000 HP" },
-            { req: 4, effect: "All team members gain +35.000 HP" },
-            { req: 6, effect: "All team members gain +70.000 HP" }
+            { req: 2, effect: "+20% HP and ATK" },
+            { req: 4, effect: "+50% HP and ATK" },
+            { req: 6, effect: "+90% HP and ATK" }
+        ]
+    },
+    "Tarot": {
+        desc: "DIO's minions (Part 3). Striking from the shadows.",
+        thresholds: [
+            { req: 2, effect: "Start combat with 30 Mana" },
+            { req: 4, effect: "Start combat with 60 Mana" },
+            { req: 6, effect: "Start combat with 100 Mana" }
+        ]
+    },
+    "Morioh": {
+        desc: "Protectors of the crazy, noisy, bizarre town (Part 4).",
+        thresholds: [
+            { req: 2, effect: "+25.000 HP" },
+            { req: 4, effect: "+60.000 HP" },
+            { req: 6, effect: "+120.000 HP" }
+        ]
+    },
+    "Bucciarati": {
+        desc: "The golden wind (Part 5).",
+        thresholds: [
+            { req: 2, effect: "+30% Skill Power" },
+            { req: 4, effect: "+70% Skill Power" },
+            { req: 6, effect: "+130% Skill Power" }
         ]
     },
     "La Squadra": {
-        desc: "Execution Squad. Lethal and ruthless.",
+        desc: "The execution squad (Part 5).",
         thresholds: [
-            { req: 2, effect: "All La Squadra gain +6.000 Attack" },
-            { req: 4, effect: "All La Squadra gain +15.000 Attack" },
-            { req: 6, effect: "All La Squadra gain +30.000 Attack" }
+            { req: 2, effect: "+15.000 Attack" },
+            { req: 4, effect: "+40.000 Attack" },
+            { req: 6, effect: "+80.000 Attack" }
         ]
     },
     "Unita Speciale": {
-        desc: "The Boss's elite guard. Absolute loyalty.",
+        desc: "The Boss's elite guard (Part 5).",
         thresholds: [
-            { req: 2, effect: "Gain +30% Attack Speed & Skill Power" },
-            { req: 4, effect: "Gain +60% Attack Speed & Skill Power" }
+            { req: 2, effect: "+30% Attack Speed & Skill Power" },
+            { req: 4, effect: "+60% Attack Speed & Skill Power" }
         ]
     },
-    "Renegade": {
-        desc: "Rogue stand users.",
+    "Green Dolphin": {
+        desc: "Inmates of Stone Ocean (Part 6).",
         thresholds: [
-            { req: 2, effect: "Gain +20.000 HP and +5.000 Attack" }
+            { req: 2, effect: "Reflect 20% Damage" },
+            { req: 4, effect: "Reflect 50% Damage" },
+            { req: 6, effect: "Reflect 90% Damage" }
+        ]
+    },
+    "Requiem": {
+        desc: "Pierced by the Stand Arrow.",
+        thresholds: [
+            { req: 1, effect: "+30.000 Attack" },
+            { req: 2, effect: "+100.000 HP & +100.000 Attack" }
         ]
     },
 
-    // === HỆ PHÁI (CLASSES) ===
-    "Sniper": {
-        desc: "Ranged attackers.",
-        thresholds: [{ req: 2, effect: "+1 Range, +20% Attack" }]
+    // === CLASSES (STAND TYPES) ===
+    "Power Type": {
+        desc: "Close-range power (Brawler).",
+        thresholds: [
+            { req: 2, effect: "+20% Attack Speed" },
+            { req: 4, effect: "+50% Attack Speed" },
+            { req: 6, effect: "+90% Attack Speed" }
+        ]
     },
-    "Brawler": {
-        desc: "Close-combat specialists.",
-        thresholds: [{ req: 2, effect: "+30% Attack Speed" }]
+    "Long-Distance": {
+        desc: "Ranged operation (Sniper).",
+        thresholds: [
+            { req: 2, effect: "+1 Range, +20% Attack" },
+            { req: 4, effect: "+1 Range, +50% Attack" },
+            { req: 6, effect: "+1 Range, +100% Attack" }
+        ]
     },
-    "Support": {
-        desc: "Tactical advantage.",
-        thresholds: [{ req: 2, effect: "Start combat with 30 Mana" }]
+    "Automatic": {
+        desc: "Tracking stands (Assassin).",
+        thresholds: [
+            { req: 2, effect: "+40% Attack" },
+            { req: 4, effect: "+90% Attack" },
+            { req: 6, effect: "+150% Attack" }
+        ]
     },
-    "Assassin": {
-        desc: "Lethal strikes.",
-        thresholds: [{ req: 2, effect: "+50% Attack Damage" }]
+    "Phenomenon": {
+        desc: "Environment manipulation (Mage).",
+        thresholds: [
+            { req: 2, effect: "+30% Skill Duration & Radius" },
+            { req: 4, effect: "+70% Skill Duration & Radius" },
+            { req: 6, effect: "+130% Skill Duration & Radius" }
+        ]
     },
-    "Mage": {
-        desc: "Stand powers focused on magic/abilities.",
-        thresholds: [{ req: 1, effect: "Skills deal +30% power" }]
+    "Utility": {
+        desc: "Special abilities (Support).",
+        thresholds: [
+            { req: 2, effect: "+10.000 HP for ALL ALLIES" },
+            { req: 4, effect: "+25.000 HP for ALL ALLIES" },
+            { req: 6, effect: "+50.000 HP for ALL ALLIES" }
+        ]
+    },
+    "Bound": {
+        desc: "Materialized stands (Vanguard).",
+        thresholds: [
+            { req: 2, effect: "+30% Max HP" },
+            { req: 4, effect: "+70% Max HP" },
+            { req: 6, effect: "+120% Max HP" }
+        ]
     }
 };

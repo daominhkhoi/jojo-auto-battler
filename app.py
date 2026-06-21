@@ -3,6 +3,8 @@ from flask_socketio import SocketIO, join_room, leave_room
 from engine.game_logic import Champion, find_closest_target, calculate_distance, move_towards
 import os
 import time
+import pandas as pd
+from flask import jsonify
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'minhkhoigame_secret'
@@ -119,7 +121,8 @@ def handle_submit_board(data):
             speed=champ['speed'], max_mana=champ['max_mana'],
             star=champ.get('star', 1),
             skill=champ.get('skill'),
-            start_mana=champ.get('start_mana', 0) 
+            start_mana=champ.get('start_mana', 0),
+            active_buffs=champ.get('active_buffs', [])
         )
         game['board_state'].append(new_champ)
 
@@ -127,7 +130,7 @@ def handle_submit_board(data):
     
     if game['ready_count'] == 2:
         print(f"🔒 CẢ 2 ĐÃ SẴN SÀNG! Khởi động 5 giây soi đội hình cho {room_name}")
-        socketio.emit('match_locked', room=room_name)
+        socketio.emit('match_locked', to=room_name)
         
         base_champions = [c.to_dict() for c in game['board_state']]
 
@@ -153,7 +156,7 @@ def handle_submit_board(data):
         def delay_start():
             socketio.sleep(5)
             print(f"🔥 HẾT GIỜ SOI BÀI! BẮT ĐẦU CHIẾN ĐẤU tại {room_name}")
-            socketio.emit('combat_start', room=room_name)
+            socketio.emit('combat_start', to=room_name)
             socketio.start_background_task(run_game_loop, room_name)
             
         socketio.start_background_task(delay_start)
@@ -170,12 +173,14 @@ def run_game_loop(room_name):
     while True:
         socketio.sleep(0.1) 
         all_tick_events = []
+        new_clones = []
         
         for champ in game['board_state']:
             if not champ.is_alive: continue
             
-            # 1. TRỪ GIỜ CÁC BÙA LỢI & CẬP NHẬT TRẠNG THÁI CHOÁNG/CẤM MANA
-            champ.update_buffs() 
+            # 1. CẬP NHẬT BUFF TRƯỚC
+            buff_events = champ.update_buffs(game['board_state']) 
+            if buff_events: all_tick_events.extend(buff_events)
             
             target = find_closest_target(champ, game['board_state'])
             if target:
@@ -187,30 +192,33 @@ def run_game_loop(room_name):
                         # 2. TUNG CHIÊU (CÓ TRUYỀN board_state ĐỂ DÙNG CLONE/AOE)
                         if champ.mana >= champ.max_mana:
                             skill_event = champ.cast_skill(target, game['board_state'])
-                            if skill_event: all_tick_events.append(skill_event)
+                            if skill_event: 
+                                if 'spawned_clones' in skill_event:
+                                    new_clones.extend(skill_event.pop('spawned_clones'))
+                                if 'extra_events' in skill_event:
+                                    all_tick_events.extend(skill_event.pop('extra_events'))
+                                all_tick_events.append(skill_event)
                             champ.reset_attack_cooldown()
                         
                         # 3. NẾU CHƯA ĐẦY THÌ ĐÁNH THƯỜNG
                         else:
-                            target.hp -= champ.attack
-                            
                             # CHỈ HỒI MANA KHI KHÔNG BỊ CẤM PHÉP (mana_lock)
                             if not getattr(champ, 'is_mana_locked', False):
                                 champ.mana += 15
-                                
-                            if target.hp <= 0:
-                                target.is_alive = False; target.hp = 0
                             
+                            damage = champ.attack
+                            actual_damage, evs = target.take_damage(damage, champ, game['board_state'])
+                            all_tick_events.append({'type': 'attack', 'attackerId': champ.id, 'targetId': target.id, 'damage': actual_damage})
+                            all_tick_events.extend(evs)
                             champ.reset_attack_cooldown()
-                            all_tick_events.append({
-                                'type': 'attack', 
-                                'attackerId': champ.id,
-                                'targetId': target.id
-                            })
+                            
                 else:
                     # TƯỚNG CHỈ DI CHUYỂN KHI KHÔNG BỊ CHOÁNG
                     if not getattr(champ, 'is_stunned', False):
                         move_towards(champ, target.x, target.y)
+
+        if new_clones:
+            game['board_state'].extend(new_clones)
 
         # Phát tín hiệu Tọa độ và Sự kiện đánh nhau về cho 2 máy
         base_champions = [c.to_dict() for c in game['board_state']]
@@ -252,6 +260,86 @@ def run_game_loop(room_name):
             socketio.emit('combat_end', {'result': 'win' if winner == 'Team1' else ('loss' if winner == 'Team2' else 'draw')}, to=game['player1'])
             socketio.emit('combat_end', {'result': 'win' if winner == 'Team2' else ('loss' if winner == 'Team1' else 'draw')}, to=game['player2'])
             break
+
+# ==========================================
+# 4. API TẢI DỮ LIỆU TƯỚNG TỪ EXCEL/CSV
+# ==========================================
+@app.route('/api/champions')
+def get_champions_api():
+    champions = []
+    try:
+        # 1. Tìm vị trí chuẩn xác của file (Nằm chung thư mục với app.py)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        excel_path = os.path.join(current_dir, 'champions.xlsx')
+        csv_path = os.path.join(current_dir, 'champions.csv')
+        manage_excel_path = os.path.join(current_dir, 'manage.xlsx')
+        manage_csv_path = os.path.join(current_dir, 'manage.csv')
+        
+        # 2. Ưu tiên đọc Excel, nếu không có thì tự động nhảy sang tìm CSV
+        if os.path.exists(excel_path):
+            try: df = pd.read_excel(excel_path)
+            except: df = pd.read_csv(excel_path, sep=';', encoding='utf-8-sig')
+        elif os.path.exists(manage_excel_path):
+            try: df = pd.read_excel(manage_excel_path)
+            except: df = pd.read_csv(manage_excel_path, sep=';', encoding='utf-8-sig')
+        elif os.path.exists(csv_path):
+            df = pd.read_csv(csv_path, sep=';', encoding='utf-8-sig')
+        elif os.path.exists(manage_csv_path):
+            df = pd.read_csv(manage_csv_path, sep=';', encoding='utf-8-sig')
+        else:
+            print(f"❌ KHÔNG TÌM THẤY FILE: Hãy bỏ file champions.csv hoặc manage.csv vào thư mục: {current_dir}")
+            return jsonify([])
+            
+        # 3. Dọn dẹp tên cột (Xóa ký tự ẩn BOM, gọt khoảng trắng thừa 2 đầu)
+        df.columns = df.columns.str.replace('\ufeff', '').str.strip()
+        df = df.fillna('')
+        
+        # 4. Bắt đầu quét từng dòng dữ liệu
+        for _, row in df.iterrows():
+            name = str(row.get('Name', '')).strip()
+            # Bỏ qua dòng trống hoặc dòng bị lỗi nan
+            if not name or name == 'nan' or name == 'None': continue
+            
+            traits_str = str(row.get('Traits', ''))
+            traits = [t.strip() for t in traits_str.split(',')] if traits_str and traits_str != 'nan' else []
+            
+            skill_type = str(row.get('SkillType', 'damage')).strip()
+            skill = {'type': skill_type if skill_type and skill_type != 'nan' else 'damage'}
+            
+            power_val = row.get('SkillStat', '')
+            if power_val != '' and str(power_val) != 'nan':
+                val = float(power_val)
+                if val <= 2: skill['percent'] = val
+                else: skill['power'] = int(val)
+                    
+            duration_val = row.get('SkillDuration', '')
+            if duration_val != '' and str(duration_val) != 'nan': skill['duration'] = float(duration_val)
+                
+            radius_val = row.get('Radius', '')
+            if radius_val != '' and str(radius_val) != 'nan': skill['radius'] = float(radius_val)
+
+            # ---> THÊM 2 DÒNG NÀY VÀO ĐỂ ĐỌC CỘT MỤC TIÊU <---
+            target_val = str(row.get('Target', 'enemy_closest')).strip()
+            skill['target'] = target_val if target_val and target_val != 'nan' else 'enemy_closest'
+
+            champ = {
+                'name': name,
+                'cost': int(row.get('Cost', 1)) if row.get('Cost') != '' else 1,
+                'hp': int(row.get('HP', 1000)) if row.get('HP') != '' else 1000,
+                'attack': int(row.get('ATK', 100)) if row.get('ATK') != '' else 100,
+                'attack_range': float(row.get('Range', 1)) if row.get('Range') != '' else 1,
+                'speed': float(row.get('Speed', 1)) if row.get('Speed') != '' else 1,
+                'max_mana': int(row.get('Mana', 200)) if row.get('Mana') != '' else 200,
+                'traits': traits,
+                'skill': skill
+            }
+            champions.append(champ)
+            
+    except Exception as e:
+        # IN RA LỖI RÕ RÀNG Ở CỬA SỔ CMD NẾU VẪN THẤT BẠI
+        print(f"\n❌ LỖI ĐỌC FILE: {e}\n")
+        
+    return jsonify(champions)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

@@ -21,8 +21,8 @@ document.getElementById('rollBtn').addEventListener('click', () => {
         showNotification("Cannot roll during combat!");
         return;
     }
-    if (STATE.playerGold >= 2) {
-        updateGold(-2);
+    if (STATE.playerGold >= 1) {
+        updateGold(-1);
         refreshShop();
     } else {
         showNotification("Not enough gold!");

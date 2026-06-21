@@ -19,13 +19,11 @@ export function updateUnitCount() {
 export function buyXp() {
     if (STATE.isCombatPhase) return;
 
-    if (!STATE.levelCost) STATE.levelCost = 5;
-
     if (STATE.playerGold >= STATE.levelCost) {
         updateGold(-STATE.levelCost);
 
         STATE.playerLevel++;
-        STATE.levelCost *= 2;
+        STATE.levelCost += 5; // Tăng giá tuyến tính (+5 mỗi cấp) thay vì x2
 
         document.getElementById('levelText').innerText = STATE.playerLevel;
         document.getElementById('buyXpBtn').innerText = `Level Up (${STATE.levelCost} 🪙)`;
@@ -48,13 +46,17 @@ function checkAndMerge(champName, starLevel) {
         const upgraded = targets[0];
         upgraded.star += 1;
 
-        upgraded.max_hp = Math.round(upgraded.max_hp * 2.1);
+        upgraded.max_hp = Math.round(upgraded.max_hp * 1.8);
         upgraded.hp = upgraded.max_hp;
-        upgraded.attack = Math.round(upgraded.attack * 2.1);
-        upgraded.attack_range = parseFloat((upgraded.attack_range * 1.1).toFixed(1));
-        upgraded.max_mana = Math.round(upgraded.max_mana * 0.75);
+        upgraded.attack = Math.round(upgraded.attack * 1.8);
         upgraded.mana = 0;
-        upgraded.speed = Math.round(upgraded.speed * 1.25);
+
+        if (upgraded.skill) {
+            if (upgraded.skill.power) upgraded.skill.power = Math.round(upgraded.skill.power * 1.6);
+            if (upgraded.skill.duration) upgraded.skill.duration = parseFloat((upgraded.skill.duration * 1.2).toFixed(1));
+            if (upgraded.skill.radius) upgraded.skill.radius = parseFloat((upgraded.skill.radius * 1.2).toFixed(1));
+            if (upgraded.skill.percent) upgraded.skill.percent = parseFloat((upgraded.skill.percent * 1.3).toFixed(2));
+        }
 
         STATE.champions.push(upgraded);
         showNotification(`Upgraded! [${champName}] is now ${upgraded.star} ⭐!`);
@@ -87,7 +89,8 @@ export function buyChampion(champTemplate, cardElement) {
         cost: champTemplate.cost,
         targetX: slot.x, targetY: slot.y, originalX: slot.x, originalY: slot.y,
         hp: champTemplate.hp, max_hp: champTemplate.hp, mana: 0, max_mana: champTemplate.max_mana,
-        attack: champTemplate.attack, attack_range: champTemplate.attack_range, speed: champTemplate.speed, is_alive: true, shakeTimer: 0
+        attack: champTemplate.attack, attack_range: champTemplate.attack_range, speed: champTemplate.speed, is_alive: true, shakeTimer: 0,
+        skill: champTemplate.skill ? JSON.parse(JSON.stringify(champTemplate.skill)) : null
     });
 
     checkAndMerge(champTemplate.name, 1);
@@ -95,14 +98,39 @@ export function buyChampion(champTemplate, cardElement) {
 }
 
 function rollChampion() {
+    const level = STATE.playerLevel || 1;
     const roll = Math.random() * 100;
     let targetCost = 1;
 
-    if (roll < 10) targetCost = 5;
-    else if (roll < 20) targetCost = 4;
-    else if (roll < 20) targetCost = 3;
-    else if (roll < 30) targetCost = 2;
-    else targetCost = 1;
+    // Tỉ lệ xuất hiện tướng phụ thuộc vào Level của người chơi
+    if (level === 1) {
+        if (roll < 100) targetCost = 1;
+    } else if (level === 2) {
+        if (roll < 70) targetCost = 1;
+        else targetCost = 2;
+    } else if (level === 3) {
+        if (roll < 50) targetCost = 1;
+        else if (roll < 85) targetCost = 2;
+        else targetCost = 3;
+    } else if (level === 4) {
+        if (roll < 30) targetCost = 1;
+        else if (roll < 70) targetCost = 2;
+        else if (roll < 95) targetCost = 3;
+        else targetCost = 4;
+    } else if (level === 5) {
+        if (roll < 15) targetCost = 1;
+        else if (roll < 45) targetCost = 2;
+        else if (roll < 85) targetCost = 3;
+        else if (roll < 99) targetCost = 4;
+        else targetCost = 5;
+    } else {
+        // Level 6+
+        if (roll < 10) targetCost = 1;
+        else if (roll < 25) targetCost = 2;
+        else if (roll < 55) targetCost = 3;
+        else if (roll < 80) targetCost = 4;
+        else targetCost = 5;
+    }
 
     const pool = CHAMPION_POOL.filter(c => c.cost === targetCost);
 
@@ -116,12 +144,25 @@ export function refreshShop() {
     if (!container) return;
 
     container.innerHTML = '';
-    for (let i = 0; i < 5; i++) {
+    // Tăng số lượng thẻ mua từ 5 lên 7
+    for (let i = 0; i < 7; i++) {
         const randomChamp = rollChampion();
 
         const card = document.createElement('div');
         card.className = 'shop-card';
         card.innerHTML = `<h3>${randomChamp.name}</h3><img src="${randomChamp.img}" width="40" height="40" style="border-radius: 5px;"><p class="cost">${randomChamp.cost} 🪙</p>`;
+
+        // Màu background và viền theo cost giống common, uncommon,...
+        const colors = {
+            1: { border: '#bdc3c7', bg: 'linear-gradient(to bottom, #2c3e50, #7f8c8d)' }, // Trắng xám (Common)
+            2: { border: '#2ecc71', bg: 'linear-gradient(to bottom, #2c3e50, #27ae60)' }, // Xanh lá (Uncommon)
+            3: { border: '#3498db', bg: 'linear-gradient(to bottom, #2c3e50, #2980b9)' }, // Xanh dương (Rare)
+            4: { border: '#9b59b6', bg: 'linear-gradient(to bottom, #2c3e50, #8e44ad)' }, // Tím (Epic)
+            5: { border: '#e67e22', bg: 'linear-gradient(to bottom, #2c3e50, #d35400)' }  // Cam (Legendary)
+        };
+        const theme = colors[randomChamp.cost] || colors[1];
+        card.style.border = `2px solid ${theme.border}`;
+        card.style.background = theme.bg;
 
         card.onclick = () => buyChampion(randomChamp, card);
         card.onmouseenter = () => showDisplayInfo('champ', randomChamp);
@@ -243,49 +284,53 @@ export function showDisplayInfo(type, data) {
         const traitsHTML = template.traits ? `<p>🔮 Traits: <b>${template.traits.join(', ')}</b></p>` : '';
         const imgSrc = template.img || '';
 
-        // --- CẬP NHẬT: TÍNH TOÁN SKILL DỰA THEO SỐ SAO (STAR LEVEL) ---
         const currentStar = data.star || 1;
         const starFactor = currentStar - 1;
 
         let skillHTML = '';
-        if (template.skill) {
-            const s = template.skill;
+        if (data.skill || template.skill) {
+            const s = data.skill || template.skill;
             let skillName = s.type.toUpperCase();
             let skillDesc = '';
 
-            // Công thức nhân mới y hệt như trên Server
-            const scaledPower = Math.round((s.power || 0) * Math.pow(2.1, starFactor));
-            const scaledDuration = (s.duration || 0) * Math.pow(1.1, starFactor);
-            const scaledRadius = ((s.radius || 1.5) * Math.pow(1.1, starFactor)).toFixed(1);
-            const scaledPercent = (s.percent || 0.5) + (starFactor * 0.15);
+            const scaledPower = s.power ? Math.round(s.power) : 0;
+            const scaledDuration = s.duration ? s.duration : 0;
+            const scaledRadius = s.radius ? s.radius : 1.5;
+            const scaledPercent = s.percent ? s.percent : 0.5;
 
             switch (s.type) {
-                case 'damage':
-                    skillDesc = `Deals <b>${scaledPower.toLocaleString()}</b> burst damage to the target.`; break;
-                case 'heal':
-                    skillDesc = `Instantly restores <b>${scaledPower.toLocaleString()}</b> HP to itself.`; break;
-                case 'regen':
-                    skillDesc = `Regenerates <b>${scaledPower.toLocaleString()}</b> HP per second for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'buff_atk':
-                    skillDesc = `Empowers itself with <b>+${scaledPower.toLocaleString()}</b> Attack for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'dot':
-                    skillDesc = `Infects target, dealing <b>${scaledPower.toLocaleString()}</b> Damage per second for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'aoe_heal':
-                    skillDesc = `Creates a healing zone (Radius <b>${s.radius}</b>), allies recover <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'aoe_dot':
-                    skillDesc = `Creates a toxic zone (Radius <b>${s.radius}</b>), enemies take <b>${scaledPower.toLocaleString()}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'speed_buff':
-                    skillDesc = `Gains <b>+${scaledPower.toLocaleString()}%</b> Attack Speed for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'swap':
-                    skillDesc = `Teleports, swaps positions with a <b>RANDOM</b> enemy, and deals <b>${scaledPower.toLocaleString()}</b> damage.`; break;
-                case 'clone':
-                    skillDesc = `Creates a Shadow Clone with <b>${Math.round(scaledPercent * 100)}%</b> of original stats.`; break;
-                case 'mana_lock':
-                    skillDesc = `Silences the <b>TARGET</b>, stopping its Mana gain for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'stun':
-                    skillDesc = `Stuns the target, disabling attacks and movement for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                default:
-                    skillDesc = 'Casts a mysterious ability.';
+                case 'damage': skillDesc = `Deals <b>${scaledPower.toLocaleString()}</b> burst damage to the nearest enemy.`; break;
+                case 'time_stop': skillDesc = `Freezes time for all enemies for <b>${scaledDuration.toFixed(1)}s</b>. Self gains massive Attack Speed.`; break;
+                case 'blink_strike': skillDesc = `Teleports behind the furthest enemy and deals <b>${scaledPower.toLocaleString()}</b> damage, ignoring frontliners.`; break;
+                case 'execute': skillDesc = `Instantly executes targets below 30% HP. Otherwise, deals <b>${scaledPower.toLocaleString()}</b> physical damage.`; break;
+                case 'banish': skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'submerge': skillDesc = `Submerges into shadows, becoming untargetable for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'mana_battery': skillDesc = `Channels <b>${scaledPower.toLocaleString()}</b> Mana per second to the ally with lowest current Mana.`; break;
+                case 'pull': skillDesc = `Erases space, pulling all enemies to self and dealing <b>${scaledPower.toLocaleString()}</b> damage.`; break;
+                case 'mind_control': skillDesc = `Brainwashes the target to fight for your team for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'polymorph': skillDesc = `Transforms the target into a harmless creature, disabling attacks for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'stat_steal': skillDesc = `Steals <b>${scaledPower.toLocaleString()}</b> Attack from the target for the rest of the battle.`; break;
+                case 'banish': skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'reflect_shield': skillDesc = `Reflects <b>${Math.round(scaledPercent * 100)}%</b> of incoming damage back to the attackers.`; break;
+                case 'damage_link': skillDesc = `Links with the target for <b>${scaledDuration.toFixed(1)}s</b>. The linked target takes all damage you receive.`; break;
+                case 'life_tether': skillDesc = `Tethers to the target, draining <b>${scaledPower.toLocaleString()}</b> HP/s to heal yourself for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'evasion': skillDesc = `Dodges all incoming attacks and damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'revive': skillDesc = `Upon taking lethal damage, instantly revives with <b>100% HP</b>.`; break;
+                case 'ricochet': skillDesc = `Fires a projectile that bounces between enemies, dealing <b>${scaledPower.toLocaleString()}</b> damage on each hit.`; break;
+                case 'dot': skillDesc = `Inflicts damage over time, dealing <b>${scaledPower.toLocaleString()}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'aoe_dot': skillDesc = `Creates a toxic zone (Radius <b>${s.radius}</b>) dealing <b>${scaledPower.toLocaleString()}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'global_slow': skillDesc = `Manipulates gravity/time, slowing down all enemies' Attack Speed by <b>50%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'mana_lock': skillDesc = `Silences the target, preventing Mana gain for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'stun': skillDesc = `Stuns the target, completely disabling movement and actions for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'heal': skillDesc = `Restores <b>${scaledPower.toLocaleString()}</b> HP to the most wounded ally.`; break;
+                case 'aoe_heal': skillDesc = `Heals allies in a radius (<b>${s.radius}</b>) for <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'regen': skillDesc = `Regenerates <b>${scaledPower.toLocaleString()}</b> HP per second for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'buff_atk': skillDesc = `Increases Attack by <b>+${scaledPower.toLocaleString()}</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'speed_buff': skillDesc = `Boosts Attack Speed by <b>+${scaledPower.toLocaleString()}%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'swap': skillDesc = `Swaps positions with the target and deals <b>${scaledPower.toLocaleString()}</b> damage.`; break;
+                case 'clone': skillDesc = `Creates a Shadow Clone with <b>${Math.round(scaledPercent * 100)}%</b> of your original stats.`; break;
+                case 'reflect_shield': skillDesc = `Activates a defensive barrier, reflecting <b>${Math.round(scaledPercent * 100)}%</b> of incoming damage back to attackers.`; break;
+                default: skillDesc = 'Casts a unique and powerful Stand ability.';
             }
 
             skillHTML = `

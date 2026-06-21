@@ -1,6 +1,7 @@
 // static/js/combat.js
 import { CONFIG, STATE, getCanvasCoords, CHAMPION_POOL } from './globals.js';
 import { updateGold, refreshShop } from './shop.js';
+import { startPrepTimer, stopPrepTimer } from './network.js';
 import { showNotification } from './notifications.js';
 
 export function updatePhysics() {
@@ -27,6 +28,16 @@ export function updatePhysics() {
                 const target = STATE.champions.find(c => c.id === proj.targetId);
                 if (target) target.shakeTimer = 12;
                 STATE.hitEffects.push({ x: proj.targetX, y: proj.targetY, lifeTime: 8, maxLife: 8 });
+
+                // Spawn sparks
+                if (!STATE.particles) STATE.particles = [];
+                for (let p = 0; p < 5; p++) {
+                    STATE.particles.push({
+                        x: proj.targetX, y: proj.targetY,
+                        vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10,
+                        color: '#e74c3c', size: Math.random() * 3 + 1, life: 15 + Math.random() * 10
+                    });
+                }
             }
             if (proj.lifeTime <= 0) STATE.activeProjectiles.splice(i, 1);
         } else {
@@ -34,12 +45,32 @@ export function updatePhysics() {
             const dy = proj.targetY - proj.y;
             const dist = Math.hypot(dx, dy);
 
+            // Spawn trail particles for ranged
+            if (Math.random() < 0.5) {
+                if (!STATE.particles) STATE.particles = [];
+                STATE.particles.push({
+                    x: proj.x, y: proj.y,
+                    vx: -dx / dist * 2 + (Math.random() - 0.5), vy: -dy / dist * 2 + (Math.random() - 0.5),
+                    color: '#00ffff', size: 2, life: 10
+                });
+            }
+
             if (dist < proj.speed) {
                 const target = STATE.champions.find(c => c.id === proj.targetId);
                 if (target) target.shakeTimer = 12;
 
                 STATE.hitEffects.push({ x: proj.targetX, y: proj.targetY, lifeTime: 12, maxLife: 12 });
                 STATE.activeProjectiles.splice(i, 1);
+
+                // Spawn impact spark
+                if (!STATE.particles) STATE.particles = [];
+                for (let p = 0; p < 8; p++) {
+                    STATE.particles.push({
+                        x: proj.targetX, y: proj.targetY,
+                        vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12,
+                        color: '#00ffff', size: Math.random() * 4 + 1, life: 20 + Math.random() * 10
+                    });
+                }
             } else {
                 proj.x += (dx / dist) * proj.speed;
                 proj.y += (dy / dist) * proj.speed;
@@ -50,6 +81,22 @@ export function updatePhysics() {
     for (let i = STATE.hitEffects.length - 1; i >= 0; i--) {
         STATE.hitEffects[i].lifeTime--;
         if (STATE.hitEffects[i].lifeTime <= 0) STATE.hitEffects.splice(i, 1);
+    }
+
+    if (!STATE.particles) STATE.particles = [];
+    for (let i = STATE.particles.length - 1; i >= 0; i--) {
+        const p = STATE.particles[i];
+        p.x += p.vx; p.y += p.vy;
+        p.life--;
+        if (p.life <= 0) STATE.particles.splice(i, 1);
+    }
+
+    if (!STATE.floatingTexts) STATE.floatingTexts = [];
+    for (let i = STATE.floatingTexts.length - 1; i >= 0; i--) {
+        const t = STATE.floatingTexts[i];
+        t.y -= t.speed;
+        t.life--;
+        if (t.life <= 0) STATE.floatingTexts.splice(i, 1);
     }
 }
 
@@ -65,10 +112,29 @@ export function syncTickData(data) {
         if (localChamp) {
             localChamp.targetX = serverChamp.x;
             localChamp.targetY = serverChamp.y;
+
+            localChamp.hp = serverChamp.hp;
+            if (localChamp.is_alive && !serverChamp.is_alive) {
+                if (!STATE.particles) STATE.particles = [];
+                const tarSize = getCanvasCoords(localChamp.targetX, localChamp.targetY);
+                for (let p = 0; p < 20; p++) {
+                    STATE.particles.push({
+                        x: (localChamp.pixelX || tarSize.x) + tarSize.w / 2,
+                        y: (localChamp.pixelY || tarSize.y) + tarSize.h / 2,
+                        vx: (Math.random() - 0.5) * 8,
+                        vy: (Math.random() - 0.5) * 8,
+                        color: '#f1c40f',
+                        size: Math.random() * 5 + 2,
+                        life: 30 + Math.random() * 20
+                    });
+                }
+            }
+
             localChamp.hp = serverChamp.hp;
             localChamp.mana = serverChamp.mana;
             localChamp.is_alive = serverChamp.is_alive;
-            localChamp.buffs = serverChamp.buffs || []; // Đồng bộ mảng bùa lợi liên tục
+            localChamp.buffs = serverChamp.buffs || [];
+            localChamp.buff_details = serverChamp.buff_details || [];
         } else {
             const template = CHAMPION_POOL.find(t => t.name === serverChamp.name) || {};
 
@@ -108,14 +174,24 @@ export function syncTickData(data) {
                 fxLife = Math.round(event.duration * 60);
             }
 
-            STATE.hitEffects.push({
-                x: targetChamp.pixelX + tarSize.w / 2,
-                y: targetChamp.pixelY + tarSize.h / 2,
-                lifeTime: fxLife,
-                maxLife: fxLife,
-                effectType: event.skill_type,
-                radius: event.radius || 1.5 // Nhận bán kính ô cờ từ Server gửi xuống
-            });
+            if (event.skill_type === 'ricochet') {
+                STATE.hitEffects.push({
+                    x: 0, y: 0, // Dùng tọa độ thực khi vẽ
+                    effectType: 'ricochet_chain',
+                    path: event.bounce_path || [targetChamp.id],
+                    casterId: caster.id,
+                    lifeTime: 30, maxLife: 30
+                });
+            } else {
+                STATE.hitEffects.push({
+                    x: targetChamp.pixelX + tarSize.w / 2,
+                    y: targetChamp.pixelY + tarSize.h / 2,
+                    lifeTime: fxLife,
+                    maxLife: fxLife,
+                    effectType: event.skill_type,
+                    radius: event.radius || 1.5 // Nhận bán kính ô cờ từ Server gửi xuống
+                });
+            }
 
             if (event.skill_type === 'damage' && target) target.shakeTimer = 30;
         }
@@ -135,6 +211,20 @@ export function syncTickData(data) {
                 type: isRanged ? 'projectile' : 'melee',
                 speed: isRanged ? 16 : 0,
                 lifeTime: isRanged ? 0 : 15
+            });
+        }
+        else if (['evasion', 'reflect', 'damage_link_proc', 'revive'].includes(event.type)) {
+            const target = STATE.champions.find(c => c.id === event.targetId || c.id === event.target_id);
+            if (!target) return;
+            const tarSize = getCanvasCoords(target.targetX, target.targetY);
+
+            STATE.hitEffects.push({
+                x: target.pixelX + tarSize.w / 2,
+                y: target.pixelY + tarSize.h / 2,
+                lifeTime: 30,
+                maxLife: 30,
+                effectType: event.type,
+                damage: event.damage
             });
         }
     });
@@ -162,9 +252,10 @@ export function handleCombatEnd(serverResult) {
     const readyBtn = document.getElementById('readyBtn');
     const findBtn = document.getElementById('findMatchBtn');
 
-    // --- 2. KIỂM TRA ĐIỀU KIỆN CHẠM MỐC 5 ĐIỂM ---
-    if (STATE.playerLP >= 5 || STATE.botLP >= 5) {
-        const isWinner = STATE.playerLP >= 5;
+    // --- 2. KIỂM TRA ĐIỀU KIỆN CHẠM MỐC 10 ĐIỂM ---
+    if (STATE.playerLP >= 10 || STATE.botLP >= 10) {
+        stopPrepTimer();
+        const isWinner = STATE.playerLP >= 10;
         const resultMsg = isWinner ? "🏆 YOU WON THE MATCH! 🏆" : "💀 YOU LOST THE MATCH! 💀";
 
         // TẠO MÀN HÌNH GAME OVER ĐEN MỜ ĐÈ LÊN TOÀN BỘ TRÒ CHƠI
@@ -202,12 +293,20 @@ export function handleCombatEnd(serverResult) {
         });
 
     } else {
-        // --- 3. NẾU CHƯA AI ĐƯỢC 5 ĐIỂM THÌ ĐÁNH TIẾP ---
+        // --- 3. NẾU CHƯA AI ĐƯỢC 10 ĐIỂM THÌ ĐÁNH TIẾP ---
         STATE.currentRound++;
         updateRoundUI();
-        const income = 10 * STATE.currentRound;
-        updateGold(income);
-        showNotification(`Round ${STATE.currentRound}: Received ${income} gold`);
+
+        // Cơ chế lợi tức (Interest) chuẩn Auto Chess
+        let baseIncome = 10; // Thu nhập cơ bản
+        let interest = Math.floor(STATE.playerGold / 10);
+        if (interest > 5) interest = 5; // Tối đa +5 lợi tức khi có 50 vàng
+
+        let totalIncome = baseIncome + interest;
+        updateGold(totalIncome);
+
+        let notifMsg = `Round ${STATE.currentRound} Start: +${totalIncome} Gold (Base 10, Interest ${interest})`;
+        showNotification(notifMsg);
 
         if (findBtn) findBtn.style.display = 'none';
         if (readyBtn) {
@@ -216,61 +315,7 @@ export function handleCombatEnd(serverResult) {
             readyBtn.style.backgroundColor = "#2ecc71";
             readyBtn.disabled = false;
         }
-    }
-}
-function handleRoundResult(playerWon, isDraw, myTeam, enemyTeam) {
-    if (isDraw) {
-        showNotification("TIME UP! IT'S A DRAW! No points awarded.");
-    } else {
-        // --- CỘNG 1 ĐIỂM CHO PHE CHIẾN THẮNG ---
-        if (playerWon) {
-            STATE.playerLP += 1;
-            showNotification(`Victory! You won this round!`);
-        } else {
-            STATE.botLP += 1;
-            showNotification(`Defeat! Opponent won this round!`);
-        }
-    }
-
-    updateLpUI();
-    resetBoardForNextRound();
-    refreshShop();
-    showNotification("Shop refreshed!");
-    STATE.isCombatPhase = false;
-
-    const readyBtn = document.getElementById('readyBtn');
-    const findBtn = document.getElementById('findMatchBtn');
-
-    // --- KIỂM TRA ĐIỀU KIỆN KẾT THÚC TRẬN ĐẤU (AI CHẠM 5 ĐIỂM TRƯỚC LÀ THẮNG) ---
-    if (STATE.playerLP >= 5 || STATE.botLP >= 5) {
-        // Đã có người đạt 5 trận thắng
-        const resultMsg = STATE.playerLP >= 5 ? "YOU WON THE MATCH! 🏆" : "YOU LOST THE MATCH! 💀";
-        showNotification(`GAME OVER. ${resultMsg}`);
-
-        // Khóa nút Ready lại không cho đánh tiếp
-        if (readyBtn) readyBtn.style.display = 'none';
-
-        // Hiện nút cho phép bấm để quay ra hàng chờ tìm trận mới
-        if (findBtn) {
-            findBtn.style.display = 'inline-block';
-            findBtn.innerText = "FIND NEW MATCH";
-            findBtn.disabled = false;
-        }
-    } else {
-        // Nếu chưa ai đạt 5 điểm thì tiếp tục vòng mới
-        STATE.currentRound++;
-        updateRoundUI();
-        const income = 10 * STATE.currentRound;
-        updateGold(income);
-        showNotification(`Round ${STATE.currentRound}: Received ${income} gold`);
-
-        if (findBtn) findBtn.style.display = 'none';
-        if (readyBtn) {
-            readyBtn.style.display = 'inline-block';
-            readyBtn.innerText = "READY";
-            readyBtn.style.backgroundColor = "#2ecc71";
-            readyBtn.disabled = false;
-        }
+        startPrepTimer();
     }
 }
 
@@ -303,8 +348,8 @@ export function updateLpUI() {
     const playerText = document.getElementById('playerLpText');
     const botText = document.getElementById('botLpText');
     if (playerText && botText) {
-        // Hiển thị dạng "Điểm hiện tại / 5"
-        playerText.innerText = `${STATE.playerLP}/5`;
-        botText.innerText = `${STATE.botLP}/5`;
+        // Hiển thị dạng "Điểm hiện tại / 10"
+        playerText.innerText = `${STATE.playerLP}/10`;
+        botText.innerText = `${STATE.botLP}/10`;
     }
 }

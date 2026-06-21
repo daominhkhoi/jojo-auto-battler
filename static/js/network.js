@@ -19,8 +19,8 @@ socket.on('match_found', (data) => {
     STATE.botLP = 0;
     const pText = document.getElementById('playerLpText');
     const bText = document.getElementById('botLpText');
-    if (pText) pText.innerText = "0/5"; // Hiện điểm số chạm 5
-    if (bText) bText.innerText = "0/5";
+    if (pText) pText.innerText = "0/10"; // Hiện điểm số chạm 10
+    if (bText) bText.innerText = "0/10";
 
     showNotification(`Match found with ${data.opponentName}!`);
 
@@ -33,6 +33,8 @@ socket.on('match_found', (data) => {
     // HIỆN CỬA HÀNG KHI ĐÃ CÓ TRẬN
     const bottomBar = document.getElementById('bottomBar');
     if (bottomBar) bottomBar.style.display = 'flex';
+    
+    startPrepTimer();
 });
 
 socket.on('opponent_disconnected', () => {
@@ -61,6 +63,41 @@ socket.on('opponent_disconnected', () => {
 socket.on('match_locked', () => {
     showNotification("Both ready! 5s to inspect opponent!");
 });
+
+let prepTimerInterval;
+
+export function startPrepTimer() {
+    clearInterval(prepTimerInterval);
+    let timeLeft = 300; // 5 phút
+    const timerDisplay = document.getElementById('timerDisplay');
+    if (timerDisplay) {
+        timerDisplay.style.display = 'inline-block';
+        timerDisplay.innerText = "05:00";
+    }
+
+    prepTimerInterval = setInterval(() => {
+        timeLeft--;
+        if (timerDisplay) {
+            const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+            const s = (timeLeft % 60).toString().padStart(2, '0');
+            timerDisplay.innerText = `${m}:${s}`;
+        }
+
+        if (timeLeft <= 0) {
+            clearInterval(prepTimerInterval);
+            const readyBtn = document.getElementById('readyBtn');
+            if (readyBtn && !readyBtn.disabled) {
+                readyBtn.click();
+            }
+        }
+    }, 1000);
+}
+
+export function stopPrepTimer() {
+    clearInterval(prepTimerInterval);
+    const timerDisplay = document.getElementById('timerDisplay');
+    if (timerDisplay) timerDisplay.style.display = 'none';
+}
 
 let combatTimerInterval;
 
@@ -123,6 +160,7 @@ export function declareReady() {
         readyBtn.disabled = true;
     }
     STATE.isCombatPhase = true;
+    stopPrepTimer();
 
     // ---> BẮT ĐẦU ĐOẠN CODE SỬA LỖI TRÙNG ID <---
     // 0. CẤP TIỀN TỐ ĐỘC QUYỀN CHO NGƯỜI CHƠI NÀY ĐỂ ID KHÔNG BAO GIỜ TRÙNG VỚI ĐỊCH
@@ -168,8 +206,10 @@ export function declareReady() {
     else if (traitCounts["Team Bucciarati"] >= 4) globalHpBuff += 35000;
     else if (traitCounts["Team Bucciarati"] >= 2) globalHpBuff += 15000;
 
-    // Artifact (Bảo vật) buff máu cho CẢ ĐỘI
-    if (traitCounts["Artifact"] >= 1) globalHpBuff += 5000;
+    // Global buffs (Utility Class)
+    if (traitCounts["Utility"] >= 6) globalHpBuff += 50000;
+    else if (traitCounts["Utility"] >= 4) globalHpBuff += 25000;
+    else if (traitCounts["Utility"] >= 2) globalHpBuff += 10000;
 
     const boardChamps = boardChampsRaw.map(c => {
         const template = CHAMPION_POOL.find(t => t.name === c.name) || {};
@@ -179,60 +219,108 @@ export function declareReady() {
         let finalRange = c.attack_range;
         let finalSpeed = c.speed;
         let finalMana = 0;
-        let finalSkill = JSON.parse(JSON.stringify(template.skill || { type: 'damage', power: 50, duration: 0 }));
+        let finalSkill = JSON.parse(JSON.stringify(c.skill || template.skill || { type: 'damage', power: 50, duration: 0 }));
+        let finalBuffs = [];
 
         if (template.traits) {
 
-            // --- PHE PHÁI (FACTIONS) ---
+            // === FACTIONS ===
+            if (template.traits.includes("Stardust")) {
+                if (traitCounts["Stardust"] >= 6) { finalHp *= 1.9; finalAttack *= 1.9; }
+                else if (traitCounts["Stardust"] >= 4) { finalHp *= 1.5; finalAttack *= 1.5; }
+                else if (traitCounts["Stardust"] >= 2) { finalHp *= 1.2; finalAttack *= 1.2; }
+            }
+
+            if (template.traits.includes("Tarot")) {
+                if (traitCounts["Tarot"] >= 6) finalMana = 100;
+                else if (traitCounts["Tarot"] >= 4) finalMana = 60;
+                else if (traitCounts["Tarot"] >= 2) finalMana = 30;
+            }
+
+            if (template.traits.includes("Morioh")) {
+                if (traitCounts["Morioh"] >= 6) finalHp += 120000;
+                else if (traitCounts["Morioh"] >= 4) finalHp += 60000;
+                else if (traitCounts["Morioh"] >= 2) finalHp += 25000;
+            }
+
+            if (template.traits.includes("Bucciarati")) {
+                if (traitCounts["Bucciarati"] >= 6) { if (finalSkill.power) finalSkill.power *= 2.3; }
+                else if (traitCounts["Bucciarati"] >= 4) { if (finalSkill.power) finalSkill.power *= 1.7; }
+                else if (traitCounts["Bucciarati"] >= 2) { if (finalSkill.power) finalSkill.power *= 1.3; }
+            }
+
             if (template.traits.includes("La Squadra")) {
-                if (traitCounts["La Squadra"] >= 6) finalAttack += 30000;
-                else if (traitCounts["La Squadra"] >= 4) finalAttack += 15000;
-                else if (traitCounts["La Squadra"] >= 2) finalAttack += 6000;
+                if (traitCounts["La Squadra"] >= 6) finalAttack += 80000;
+                else if (traitCounts["La Squadra"] >= 4) finalAttack += 40000;
+                else if (traitCounts["La Squadra"] >= 2) finalAttack += 15000;
             }
 
             if (template.traits.includes("Unita Speciale")) {
-                if (traitCounts["Unita Speciale"] >= 4) {
-                    finalSpeed *= 1.6;
-                    if (finalSkill.power) finalSkill.power = Math.round(finalSkill.power * 1.6);
-                }
-                else if (traitCounts["Unita Speciale"] >= 2) {
-                    finalSpeed *= 1.3;
-                    if (finalSkill.power) finalSkill.power = Math.round(finalSkill.power * 1.3);
-                }
+                if (traitCounts["Unita Speciale"] >= 4) { finalSpeed *= 1.6; if (finalSkill.power) finalSkill.power *= 1.6; }
+                else if (traitCounts["Unita Speciale"] >= 2) { finalSpeed *= 1.3; if (finalSkill.power) finalSkill.power *= 1.3; }
             }
 
-            if (template.traits.includes("Renegade") && traitCounts["Renegade"] >= 2) {
-                finalHp += 20000;
-                finalAttack += 5000;
+            if (template.traits.includes("Green Dolphin")) {
+                let reflectPercent = 0;
+                if (traitCounts["Green Dolphin"] >= 6) reflectPercent = 0.9;
+                else if (traitCounts["Green Dolphin"] >= 4) reflectPercent = 0.5;
+                else if (traitCounts["Green Dolphin"] >= 2) reflectPercent = 0.2;
+                
+                if (reflectPercent > 0) {
+                    finalBuffs.push({ type: 'reflect_shield', power: reflectPercent });
+                }
             }
 
             if (template.traits.includes("Requiem")) {
-                if (traitCounts["Requiem"] >= 2) {
-                    finalHp += 50000;
-                    finalAttack += 50000;
+                if (traitCounts["Requiem"] >= 2) { finalHp += 100000; finalAttack += 100000; }
+                else if (traitCounts["Requiem"] >= 1) { finalAttack += 30000; }
+            }
+
+            // === CLASSES ===
+            if (template.traits.includes("Power Type")) {
+                if (traitCounts["Power Type"] >= 6) finalSpeed *= 1.9;
+                else if (traitCounts["Power Type"] >= 4) finalSpeed *= 1.5;
+                else if (traitCounts["Power Type"] >= 2) finalSpeed *= 1.2;
+            }
+
+            if (template.traits.includes("Long-Distance")) {
+                if (traitCounts["Long-Distance"] >= 6) { finalRange += 1; finalAttack *= 2.0; }
+                else if (traitCounts["Long-Distance"] >= 4) { finalRange += 1; finalAttack *= 1.5; }
+                else if (traitCounts["Long-Distance"] >= 2) { finalRange += 1; finalAttack *= 1.2; }
+            }
+
+            if (template.traits.includes("Automatic")) {
+                if (traitCounts["Automatic"] >= 6) finalAttack *= 2.5;
+                else if (traitCounts["Automatic"] >= 4) finalAttack *= 1.9;
+                else if (traitCounts["Automatic"] >= 2) finalAttack *= 1.4;
+            }
+
+            if (template.traits.includes("Phenomenon")) {
+                if (traitCounts["Phenomenon"] >= 6) { 
+                    if (finalSkill.duration) finalSkill.duration *= 2.3;
+                    if (finalSkill.radius) finalSkill.radius *= 2.3;
                 }
-                else if (traitCounts["Requiem"] >= 1) {
-                    finalAttack += 20000;
+                else if (traitCounts["Phenomenon"] >= 4) {
+                    if (finalSkill.duration) finalSkill.duration *= 1.7;
+                    if (finalSkill.radius) finalSkill.radius *= 1.7;
+                }
+                else if (traitCounts["Phenomenon"] >= 2) {
+                    if (finalSkill.duration) finalSkill.duration *= 1.3;
+                    if (finalSkill.radius) finalSkill.radius *= 1.3;
                 }
             }
 
-            // --- LỚP NHÂN VẬT (CLASSES) ---
-            if (template.traits.includes("Sniper") && traitCounts["Sniper"] >= 2) {
-                finalRange += 1; finalAttack *= 1.2;
-            }
-            if (template.traits.includes("Brawler") && traitCounts["Brawler"] >= 2) {
-                finalSpeed *= 1.3;
-            }
-            if (template.traits.includes("Assassin") && traitCounts["Assassin"] >= 2) {
-                finalAttack *= 1.5;
-            }
-            if (template.traits.includes("Mage") && traitCounts["Mage"] >= 1) {
-                if (finalSkill.power) finalSkill.power = Math.round(finalSkill.power * 1.3);
-            }
-            if (template.traits.includes("Support") && traitCounts["Support"] >= 2) {
-                finalMana = 30;
+            if (template.traits.includes("Bound")) {
+                if (traitCounts["Bound"] >= 6) finalHp *= 2.2;
+                else if (traitCounts["Bound"] >= 4) finalHp *= 1.7;
+                else if (traitCounts["Bound"] >= 2) finalHp *= 1.3;
             }
         }
+
+        // Đảm bảo làm tròn số sau khi tính toán %
+        if (finalSkill.power) finalSkill.power = Math.round(finalSkill.power);
+        if (finalSkill.duration) finalSkill.duration = parseFloat(finalSkill.duration.toFixed(1));
+        if (finalSkill.radius) finalSkill.radius = parseFloat(finalSkill.radius.toFixed(1));
 
         return {
             id: c.id, name: c.name, star: c.star,
@@ -242,7 +330,8 @@ export function declareReady() {
             attack_range: finalRange,
             speed: parseFloat(finalSpeed.toFixed(2)),
             max_mana: c.max_mana, start_mana: finalMana,
-            skill: finalSkill
+            skill: finalSkill,
+            active_buffs: finalBuffs
         };
     });
 

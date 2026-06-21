@@ -124,6 +124,7 @@
                 <th>Tộc / Hệ</th>
                 <th>Loại Kỹ Năng</th>
                 <th>Chỉ Số Kỹ Năng</th>
+                <th>Bán kính</th>
                 <th>Thời Gian (s)</th>
             </tr>
         </thead>
@@ -159,8 +160,9 @@
                 <td>${champ.speed}</td>
                 <td>${champ.max_mana}</td>
                 <td style="font-size: 13px;">${(champ.traits || []).join(', ')}</td>
-                <td style="color: #8e44ad; font-weight: bold;">${skill.type.toUpperCase()}</td>
+                <td style="color: #8e44ad; font-weight: bold;">${skill.type ? skill.type.toUpperCase() : ''}</td>
                 <td>${skillPowerDisplay}</td>
+                <td style="color: #e67e22; font-weight: bold;">${skill.radius ? skill.radius : '-'}</td>
                 <td>${skill.duration ? skill.duration + 's' : '-'}</td>
             `;
             tbody.appendChild(tr);
@@ -168,13 +170,11 @@
 
         // 2. CHỨC NĂNG XUẤT FILE EXCEL (.CSV) CHUẨN VIỆT NAM
         document.getElementById('exportBtn').addEventListener('click', () => {
-            // Chuỗi BOM giúp Excel không bị lỗi font Tiếng Việt
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
 
-            // ĐỔI SANG DÙNG DẤU CHẤM PHẨY (;) ĐỂ EXCEL TỰ ĐỘNG CHIA CỘT
-            csvContent += "Tên Tướng;Vàng;Máu (HP);Sát Thương (ATK);Tầm Đánh;Tốc Độ;Mana;Tộc / Hệ;Loại Kỹ Năng;Chỉ Số Kỹ Năng;Thời Gian Kỹ Năng\n";
+            // THÊM "Bán Kính" VÀO TIÊU ĐỀ
+            csvContent += "Tên Tướng;Vàng;Máu (HP);Sát Thương (ATK);Tầm Đánh;Tốc Độ;Mana;Tộc / Hệ;Loại Kỹ Năng;Chỉ Số Kỹ Năng;Bán Kính;Thời Gian Kỹ Năng\n";
 
-            // Điền từng hàng
             CHAMPION_POOL.forEach(champ => {
                 const skill = champ.skill || {};
 
@@ -192,9 +192,9 @@
                     `"${(champ.traits || []).join(', ')}"`,
                     skill.type || '',
                     skillPower,
+                    skill.radius || '', // THÊM CỘT BÁN KÍNH VÀO ĐÂY
                     skill.duration || ''
                 ];
-                // ÉP nối các giá trị bằng dấu CHẤM PHẨY
                 csvContent += row.join(';') + "\n";
             });
 
