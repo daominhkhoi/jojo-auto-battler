@@ -420,7 +420,7 @@ button:hover {
    ========================================= */
 @media (max-width: 1024px) {
     .game-layout {
-        gap: 10px;
+        gap: 15px;
     }
 
     .side-panel {
