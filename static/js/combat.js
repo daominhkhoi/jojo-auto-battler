@@ -306,7 +306,7 @@ export function handleCombatEnd(serverResult) {
         updateRoundUI();
 
         let baseIncome = (STATE.currentRound * 5) + 5;
-
+        updateGold(baseIncome);
         let notifMsg = `Round ${STATE.currentRound} Start: +${baseIncome} Gold`;
         showNotification(notifMsg);
 

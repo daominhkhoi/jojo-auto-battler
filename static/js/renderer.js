@@ -85,7 +85,7 @@ export function renderBoard(ctx, canvas) {
             }
         }
 
-        ctx.strokeStyle = champ.team === 'Team1' ? '#4facfe' : '#ff0844';
+        ctx.strokeStyle = champ.originalX !== undefined ? '#4facfe' : '#ff0844';
         ctx.lineWidth = champ.targetY >= 6 ? 2 : 3.5;
         ctx.strokeRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
 
@@ -97,7 +97,7 @@ export function renderBoard(ctx, canvas) {
         const barW = currentSize.w - 8;
         
         // Vẽ viền (Border)
-        ctx.strokeStyle = champ.team === 'Team1' ? '#4facfe' : '#ff0844';
+        ctx.strokeStyle = champ.originalX !== undefined ? '#4facfe' : '#ff0844';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(pX + 4 - 1, barY - 1, barW + 2, totalBarHeight + 2);
 
