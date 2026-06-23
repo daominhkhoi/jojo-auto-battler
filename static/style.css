@@ -376,7 +376,7 @@ button {
 .sell-zone {
     display: none;
     position: absolute;
-    bottom: 120px;
+    top: 150px;
     left: 50%;
     transform: translateX(-50%);
     width: 150px;

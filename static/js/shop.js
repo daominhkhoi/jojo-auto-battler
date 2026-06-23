@@ -142,6 +142,17 @@ function rollChampion() {
 
 let selectedShopCard = null;
 
+document.addEventListener('click', (e) => {
+    const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+    if (isTouchDevice && selectedShopCard) {
+        if (!e.target.closest('.shop-card')) {
+            selectedShopCard = null;
+            document.querySelectorAll('.shop-card').forEach(c => c.style.transform = '');
+            showDisplayInfo(null);
+        }
+    }
+});
+
 export function refreshShop() {
     const container = document.getElementById('shopContainer');
     if (!container) return;
@@ -166,30 +177,46 @@ export function refreshShop() {
         card.style.border = `2px solid ${theme.border}`;
         card.style.background = theme.bg;
 
-        card.onclick = () => {
-            if (selectedShopCard === card) {
+        card.onclick = (e) => {
+            const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+
+            if (isTouchDevice) {
+                if (selectedShopCard === card) {
+                    buyChampion(randomChamp, card);
+                    selectedShopCard = null;
+                } else {
+                    document.querySelectorAll('.shop-card').forEach(c => c.style.transform = '');
+                    selectedShopCard = card;
+                    showDisplayInfo('champ', randomChamp);
+                    card.style.transform = 'scale(1.05)';
+                    card.style.borderColor = '#f1c40f';
+                    
+                    const infoPanel = document.getElementById('infoPanel');
+                    if (infoPanel && window.innerWidth <= 768) {
+                        infoPanel.classList.add('show');
+                        const synPanel = document.getElementById('synergyPanel');
+                        if (synPanel) synPanel.classList.remove('show');
+                    }
+                    e.stopPropagation(); // Ngăn sự kiện click ra ngoài làm reset
+                }
+            } else {
+                // Laptop: Bấm là mua luôn
                 buyChampion(randomChamp, card);
                 selectedShopCard = null;
-            } else {
-                document.querySelectorAll('.shop-card').forEach(c => c.style.transform = '');
-                selectedShopCard = card;
-                showDisplayInfo('champ', randomChamp);
-                card.style.transform = 'scale(1.05)';
-                card.style.borderColor = '#f1c40f';
-                
-                const infoPanel = document.getElementById('infoPanel');
-                if (infoPanel && window.innerWidth <= 768) {
-                    infoPanel.classList.add('show');
-                    const synPanel = document.getElementById('synergyPanel');
-                    if (synPanel) synPanel.classList.remove('show');
-                }
+                showDisplayInfo(null);
             }
         };
         card.onmouseenter = () => {
-            if (selectedShopCard !== card) showDisplayInfo('champ', randomChamp);
+            const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+            if (!isTouchDevice && selectedShopCard !== card) {
+                showDisplayInfo('champ', randomChamp);
+            }
         };
         card.onmouseleave = () => {
-            if (!selectedShopCard) showDisplayInfo(null);
+            const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+            if (!isTouchDevice && !selectedShopCard) {
+                showDisplayInfo(null);
+            }
         };
 
         container.appendChild(card);

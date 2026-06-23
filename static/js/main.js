@@ -79,7 +79,8 @@ function handlePointerDown(e) {
             originalX = champ.targetX;
             originalY = champ.targetY;
             
-            if (sellZone) sellZone.style.display = 'block';
+            const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+            if (sellZone && isTouchDevice) sellZone.style.display = 'block';
         }
     });
 }
@@ -100,7 +101,8 @@ function handlePointerMove(e) {
         draggedChamp.pixelX = mP.x - size.w / 2;
         draggedChamp.pixelY = mP.y - size.h / 2;
 
-        if (sellZone) {
+        const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+        if (sellZone && isTouchDevice) {
             const rect = sellZone.getBoundingClientRect();
             if (mP.rawX >= rect.left && mP.rawX <= rect.right &&
                 mP.rawY >= rect.top && mP.rawY <= rect.bottom) {
@@ -135,7 +137,8 @@ function handlePointerUp(e) {
     if (isDragging && draggedChamp) {
         const mP = getMousePos(e);
         
-        if (sellZone) {
+        const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+        if (sellZone && isTouchDevice) {
             const rect = sellZone.getBoundingClientRect();
             if (mP.rawX >= rect.left && mP.rawX <= rect.right &&
                 mP.rawY >= rect.top && mP.rawY <= rect.bottom) {
