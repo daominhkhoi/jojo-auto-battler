@@ -444,7 +444,7 @@ button:hover {
     }
 
     .top-bar h2 {
-        font-size: 10px;
+        font-size: 13px;
         margin: 0 0 1px 0;
     }
 
@@ -456,18 +456,18 @@ button:hover {
     }
 
     .gold-display {
-        font-size: 10px;
+        font-size: 13px;
     }
 
     .controls {
         flex-wrap: wrap;
         gap: 6px;
-        margin-bottom: 2px;
+        margin-bottom: 5px;
     }
 
     .controls button {
-        padding: 1px 10px;
-        font-size: 10px;
+        padding: 5px 10px;
+        font-size: 13px;
     }
 
     .mobile-toggle {
