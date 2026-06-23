@@ -244,18 +244,38 @@ def run_game_loop(room_name):
         team1_alive = any(c.team == 'Team1' and c.is_alive for c in game['board_state'])
         team2_alive = any(c.team == 'Team2' and c.is_alive for c in game['board_state'])
 
-        if not team1_alive or not team2_alive:
-            game['ready_count'] = 0
-            game['board_state'] = []
-            
-            # TRỌNG TÀI QUYẾT ĐỊNH THẮNG THUA CHÍNH XÁC 100%
+        elapsed_time = time.time() - start_time
+        time_out = elapsed_time > 180 # 3 phút
+
+        if not team1_alive or not team2_alive or time_out:
+            # Xác định người thắng trước khi xóa bàn cờ
             if team1_alive and not team2_alive:
                 winner = 'Team1'
             elif team2_alive and not team1_alive:
                 winner = 'Team2'
+            elif time_out:
+                team1_count = sum(1 for c in game['board_state'] if c.team == 'Team1' and c.is_alive)
+                team2_count = sum(1 for c in game['board_state'] if c.team == 'Team2' and c.is_alive)
+                if team1_count > team2_count:
+                    winner = 'Team1'
+                elif team2_count > team1_count:
+                    winner = 'Team2'
+                else:
+                    # Cùng số quân -> So tổng HP
+                    team1_hp = sum(c.hp for c in game['board_state'] if c.team == 'Team1' and c.is_alive)
+                    team2_hp = sum(c.hp for c in game['board_state'] if c.team == 'Team2' and c.is_alive)
+                    if team1_hp > team2_hp:
+                        winner = 'Team1'
+                    elif team2_hp > team1_hp:
+                        winner = 'Team2'
+                    else:
+                        winner = 'Draw'
             else:
                 winner = 'Draw'
-                
+
+            game['ready_count'] = 0
+            game['board_state'] = []
+            
             # Gửi kết quả CỤ THỂ ('win', 'loss', 'draw') cho từng người chơi
             socketio.emit('combat_end', {'result': 'win' if winner == 'Team1' else ('loss' if winner == 'Team2' else 'draw')}, to=game['player1'])
             socketio.emit('combat_end', {'result': 'win' if winner == 'Team2' else ('loss' if winner == 'Team1' else 'draw')}, to=game['player2'])

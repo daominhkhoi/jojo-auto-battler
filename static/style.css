@@ -444,19 +444,19 @@ button:hover {
     }
 
     .top-bar h2 {
-        font-size: 16px;
+        font-size: 10px;
         margin: 0 0 5px 0;
     }
 
     .player-info {
         flex-wrap: wrap;
-        font-size: 13px;
-        gap: 8px;
-        padding: 5px 10px;
+        font-size: 10px;
+        gap: 5px;
+        padding: 1px 1px;
     }
 
     .gold-display {
-        font-size: 16px;
+        font-size: 10px;
     }
 
     .controls {
@@ -466,8 +466,8 @@ button:hover {
     }
 
     .controls button {
-        padding: 6px 10px;
-        font-size: 12px;
+        padding: 1px 10px;
+        font-size: 10px;
     }
 
     .mobile-toggle {
@@ -560,7 +560,8 @@ button:hover {
     }
 
     .shop-card p {
-        display: none; /* Hide description on mobile to save horizontal space */
+        display: none;
+        /* Hide description on mobile to save horizontal space */
     }
 
     .cost {
