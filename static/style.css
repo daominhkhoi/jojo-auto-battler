@@ -530,28 +530,40 @@ button:hover {
 
     .shop-container {
         justify-content: flex-start;
-        width: max-content;
+        width: 100%;
         margin: 0;
-        padding: 0 10px;
-        gap: 8px;
+        padding: 0 2px;
+        gap: 2px;
     }
 
     .shop-card {
-        flex: 0 0 80px;
-        width: 80px;
-        padding: 5px;
+        flex: 1 1 0;
+        width: auto;
+        padding: 2px;
+        overflow: hidden;
+    }
+
+    .shop-card img {
+        width: 100%;
+        max-width: 35px;
+        height: auto;
+        margin: 0 auto;
+        display: block;
     }
 
     .shop-card h3 {
-        font-size: 12px;
-        margin: 2px 0 4px 0;
+        font-size: 9px;
+        margin: 2px 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .shop-card p {
-        font-size: 11px;
+        display: none; /* Hide description on mobile to save horizontal space */
     }
 
     .cost {
-        font-size: 12px;
+        font-size: 10px;
     }
 }

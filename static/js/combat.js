@@ -133,9 +133,6 @@ export function syncTickData(data) {
             localChamp.hp = serverChamp.hp;
             localChamp.mana = serverChamp.mana;
             localChamp.shield = serverChamp.shield || 0;
-            localChamp.attack = serverChamp.attack;
-            localChamp.speed = serverChamp.speed;
-            localChamp.attack_range = serverChamp.attack_range;
             localChamp.is_alive = serverChamp.is_alive;
             localChamp.team = serverChamp.team;
             localChamp.buffs = serverChamp.buffs || [];
