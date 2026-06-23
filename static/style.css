@@ -529,16 +529,19 @@ button:hover {
     }
 
     .shop-container {
-        justify-content: flex-start;
+        display: flex;
+        justify-content: space-between;
         width: 100%;
         margin: 0;
         padding: 0 2px;
         gap: 2px;
+        box-sizing: border-box;
     }
 
     .shop-card {
-        flex: 1 1 0;
-        width: auto;
+        flex: 1;
+        width: 13%; /* Đảm bảo không bị sập width về 0 */
+        min-width: 0;
         padding: 2px;
         overflow: hidden;
     }
