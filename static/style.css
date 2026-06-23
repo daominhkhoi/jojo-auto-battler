@@ -492,15 +492,28 @@ button:hover {
     .side-panel {
         display: none;
         position: absolute;
-        top: 0;
+        top: 15%;
         z-index: 500;
-        height: 100%;
-        max-height: 70vh;
-        width: 80%;
-        left: 50%;
-        transform: translateX(-50%);
+        height: auto;
+        max-height: 55vh;
         background-color: rgba(26, 34, 48, 0.95);
         border: 2px solid #3498db;
+        padding: 8px;
+        font-size: 12px;
+        overflow-y: auto;
+    }
+
+    #infoPanel {
+        left: 2%;
+        width: 45%;
+        max-width: 180px;
+    }
+
+    #synergyPanel {
+        right: 2%;
+        left: auto;
+        width: 45%;
+        max-width: 180px;
     }
 
     .side-panel.show {
@@ -516,13 +529,29 @@ button:hover {
     }
 
     .shop-container {
+        justify-content: flex-start;
         width: max-content;
-        margin: 0 auto;
+        margin: 0;
         padding: 0 10px;
+        gap: 8px;
     }
 
     .shop-card {
-        flex: 0 0 100px;
-        width: 100px;
+        flex: 0 0 80px;
+        width: 80px;
+        padding: 5px;
+    }
+
+    .shop-card h3 {
+        font-size: 12px;
+        margin: 2px 0 4px 0;
+    }
+
+    .shop-card p {
+        font-size: 11px;
+    }
+
+    .cost {
+        font-size: 12px;
     }
 }

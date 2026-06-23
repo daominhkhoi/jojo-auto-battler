@@ -336,12 +336,19 @@ class Champion:
             if target.hp <= 0: target.is_alive = False
             
         elif s_type == 'clone':
-            clone_id = f"{self.id}_clone_{int(time.time()*1000)}"
-            clone = Champion(clone_id, self.name, self.team, self.x + 0.5, self.y + 0.5, 
-                             self.max_hp * s_percent, self.attack * s_percent, self.attack_range, 
-                             self.speed, self.max_mana, self.star, skill=self.skill)
-            clone.is_clone = True 
-            event['spawned_clones'] = [clone]
+            has_clone = any(c.id.startswith(f"{self.id}_clone_") and c.is_alive for c in board_state)
+            if has_clone and target:
+                dmg, evs = target.take_damage(self.attack * 3, self, board_state)
+                event['skill_type'] = 'damage' # Default damage effect
+                if 'extra_events' not in event: event['extra_events'] = []
+                event['extra_events'].extend(evs)
+            else:
+                clone_id = f"{self.id}_clone_{int(time.time()*1000)}"
+                clone = Champion(clone_id, self.name, self.team, self.x + 0.5, self.y + 0.5, 
+                                 self.max_hp * s_percent, self.attack * s_percent, self.attack_range, 
+                                 self.speed, self.max_mana, self.star, skill=self.skill)
+                clone.is_clone = True 
+                event['spawned_clones'] = [clone]
             
         elif s_type == 'mana_lock' and target:
             target.active_buffs.append({'type': 'mana_lock', 'duration': s_duration})
