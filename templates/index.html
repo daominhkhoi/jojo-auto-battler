@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Minh Khoi - Auto Battler</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=1.1">
 </head>
@@ -29,6 +30,8 @@
                 <span id="timerDisplay" style="color: #e74c3c; font-weight: bold; font-size: 20px; display: none; margin-left: 10px;">02:00</span>
                 <button id="buyXpBtn" class="action-btn">Level Up (5 🪙)</button>
                 <button id="rollBtn" class="action-btn">Refresh (1 🪙)</button>
+                <button id="toggleInfoBtn" class="mobile-toggle">Info</button>
+                <button id="toggleSynergyBtn" class="mobile-toggle">Synergies</button>
             </div>
         </div>
 
@@ -45,6 +48,8 @@
                     <div class="info-placeholder">Deploy units to activate synergies</div>
                 </div>
             </div>
+            
+            <div id="sellZone" class="sell-zone">SELL</div>
         </div>
 
         <div class="bottom-bar" id="bottomBar" style="display: none;">

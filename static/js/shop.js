@@ -23,7 +23,7 @@ export function buyXp() {
         updateGold(-STATE.levelCost);
 
         STATE.playerLevel++;
-        STATE.levelCost += 5; // Tăng giá tuyến tính (+5 mỗi cấp) thay vì x2
+        STATE.levelCost = STATE.levelCost * 2;
 
         document.getElementById('levelText').innerText = STATE.playerLevel;
         document.getElementById('buyXpBtn').innerText = `Level Up (${STATE.levelCost} 🪙)`;
@@ -140,12 +140,13 @@ function rollChampion() {
     return pool[Math.floor(Math.random() * pool.length)];
 }
 
+let selectedShopCard = null;
+
 export function refreshShop() {
     const container = document.getElementById('shopContainer');
     if (!container) return;
 
     container.innerHTML = '';
-    // Tăng số lượng thẻ mua từ 5 lên 7
     for (let i = 0; i < 7; i++) {
         const randomChamp = rollChampion();
 
@@ -165,9 +166,31 @@ export function refreshShop() {
         card.style.border = `2px solid ${theme.border}`;
         card.style.background = theme.bg;
 
-        card.onclick = () => buyChampion(randomChamp, card);
-        card.onmouseenter = () => showDisplayInfo('champ', randomChamp);
-        card.onmouseleave = () => showDisplayInfo(null);
+        card.onclick = () => {
+            if (selectedShopCard === card) {
+                buyChampion(randomChamp, card);
+                selectedShopCard = null;
+            } else {
+                document.querySelectorAll('.shop-card').forEach(c => c.style.transform = '');
+                selectedShopCard = card;
+                showDisplayInfo('champ', randomChamp);
+                card.style.transform = 'scale(1.05)';
+                card.style.borderColor = '#f1c40f';
+                
+                const infoPanel = document.getElementById('infoPanel');
+                if (infoPanel && window.innerWidth <= 768) {
+                    infoPanel.classList.add('show');
+                    const synPanel = document.getElementById('synergyPanel');
+                    if (synPanel) synPanel.classList.remove('show');
+                }
+            }
+        };
+        card.onmouseenter = () => {
+            if (selectedShopCard !== card) showDisplayInfo('champ', randomChamp);
+        };
+        card.onmouseleave = () => {
+            if (!selectedShopCard) showDisplayInfo(null);
+        };
 
         container.appendChild(card);
     }

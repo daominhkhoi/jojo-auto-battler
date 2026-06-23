@@ -369,3 +369,125 @@ button {
     border-radius: 8px;
     box-shadow: 0 0 20px rgba(0,0,0,0.5);
 }
+
+/* =========================================
+   SELL ZONE
+   ========================================= */
+.sell-zone {
+    display: none;
+    position: absolute;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 150px;
+    height: 60px;
+    background-color: rgba(231, 76, 60, 0.2);
+    border: 2px dashed #e74c3c;
+    color: #e74c3c;
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    line-height: 60px;
+    border-radius: 10px;
+    z-index: 1000;
+}
+
+.sell-zone.active {
+    background-color: rgba(231, 76, 60, 0.6);
+    color: white;
+    transform: translateX(-50%) scale(1.1);
+}
+
+/* =========================================
+   MOBILE TOGGLE BUTTONS
+   ========================================= */
+.mobile-toggle {
+    display: none;
+    background-color: #8e44ad;
+}
+
+.mobile-toggle:hover {
+    background-color: #9b59b6;
+}
+
+/* =========================================
+   RESPONSIVE DESIGN (MOBILE & TABLET)
+   ========================================= */
+@media (max-width: 1024px) {
+    .game-layout {
+        gap: 10px;
+    }
+    .side-panel {
+        width: 200px;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        overflow-y: auto; /* Allow scrolling on mobile if things overflow slightly */
+    }
+    .fullscreen-wrapper {
+        height: auto;
+        min-height: 100vh;
+    }
+    .top-bar {
+        padding: 5px;
+    }
+    .player-info {
+        flex-wrap: wrap;
+        font-size: 14px;
+        gap: 10px;
+    }
+    .controls {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .mobile-toggle {
+        display: inline-block;
+    }
+    .game-layout {
+        position: relative;
+        flex-direction: column;
+        padding: 10px;
+        gap: 20px;
+    }
+    #gameBoard {
+        height: auto;
+        width: 100%;
+        max-width: 540px;
+        max-height: 70vh;
+    }
+    
+    /* Hide panels by default on mobile, display them as absolute overlays when active */
+    .side-panel {
+        display: none;
+        position: absolute;
+        top: 0;
+        z-index: 500;
+        height: 100%;
+        max-height: 70vh;
+        width: 80%;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(26, 34, 48, 0.95);
+        border: 2px solid #3498db;
+    }
+    .side-panel.show {
+        display: block;
+    }
+    
+    .bottom-bar {
+        padding-bottom: 20px;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .shop-container {
+        width: max-content;
+        padding: 0 10px;
+    }
+    .shop-card {
+        flex: 0 0 100px;
+        width: 100px;
+    }
+}

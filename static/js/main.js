@@ -44,14 +44,29 @@ function getMousePos(evt) {
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
+    let clientX = evt.clientX;
+    let clientY = evt.clientY;
+
+    if (evt.touches && evt.touches.length > 0) {
+        clientX = evt.touches[0].clientX;
+        clientY = evt.touches[0].clientY;
+    } else if (evt.changedTouches && evt.changedTouches.length > 0) {
+        clientX = evt.changedTouches[0].clientX;
+        clientY = evt.changedTouches[0].clientY;
+    }
+
     return {
-        x: (evt.clientX - rect.left) * scaleX,
-        y: (evt.clientY - rect.top) * scaleY
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY,
+        rawX: clientX,
+        rawY: clientY
     };
 }
 
+const sellZone = document.getElementById('sellZone');
+
 // 1. SỰ KIỆN NHẤN CHUỘT XUỐNG (Bắt đầu kéo)
-canvas.addEventListener('mousedown', (e) => {
+function handlePointerDown(e) {
     if (STATE.isCombatPhase) return;
     const mP = getMousePos(e);
 
@@ -63,30 +78,42 @@ canvas.addEventListener('mousedown', (e) => {
             draggedChamp = champ;
             originalX = champ.targetX;
             originalY = champ.targetY;
+            
+            if (sellZone) sellZone.style.display = 'block';
         }
     });
-});
+}
+canvas.addEventListener('mousedown', handlePointerDown);
+canvas.addEventListener('touchstart', (e) => {
+    handlePointerDown(e);
+    if (isDragging) e.preventDefault();
+}, { passive: false });
 
 // 2. SỰ KIỆN DI CHUYỂN CHUỘT (Kéo thẻ & Xem thông tin)
-canvas.addEventListener('mousemove', (e) => {
+function handlePointerMove(e) {
     const mP = getMousePos(e);
 
     if (isDragging && draggedChamp) {
-        // Cập nhật tọa độ thẻ di chuyển theo con trỏ chuột
+        if (e.type === 'touchmove') e.preventDefault(); // Ngăn cuộn trang
+
         const size = getCanvasCoords(draggedChamp.targetX, draggedChamp.targetY);
         draggedChamp.pixelX = mP.x - size.w / 2;
         draggedChamp.pixelY = mP.y - size.h / 2;
-    } else {
-        // --- LOGIC HOVER KHI RẢNH TAY ---
-        let foundHover = null;
 
-        // Quét ngược mảng để ưu tiên chọn thẻ nằm trên cùng nếu bị đè
+        if (sellZone) {
+            const rect = sellZone.getBoundingClientRect();
+            if (mP.rawX >= rect.left && mP.rawX <= rect.right &&
+                mP.rawY >= rect.top && mP.rawY <= rect.bottom) {
+                sellZone.classList.add('active');
+            } else {
+                sellZone.classList.remove('active');
+            }
+        }
+    } else {
+        let foundHover = null;
         for (let i = STATE.champions.length - 1; i >= 0; i--) {
             const champ = STATE.champions[i];
-            
-            // Nếu đang trong trận và tướng đã chết thì bỏ qua (không hiện tooltip)
             if (STATE.isCombatPhase && (!champ.is_alive || champ.hp <= 0)) continue;
-
             const size = getCanvasCoords(champ.targetX, champ.targetY);
             if (mP.x >= champ.pixelX && mP.x <= champ.pixelX + size.w &&
                 mP.y >= champ.pixelY && mP.y <= champ.pixelY + size.h) {
@@ -94,31 +121,44 @@ canvas.addEventListener('mousemove', (e) => {
                 break;
             }
         }
-
-        // Cập nhật DOM hiển thị InfoPanel
         if (foundHover !== hoveredChamp) {
             hoveredChamp = foundHover;
             showDisplayInfo('champ', hoveredChamp);
         }
     }
-});
+}
+canvas.addEventListener('mousemove', handlePointerMove);
+canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
 
 // 3. SỰ KIỆN NHẢ CHUỘT (Thả thẻ xuống ô)
-canvas.addEventListener('mouseup', (e) => {
+function handlePointerUp(e) {
     if (isDragging && draggedChamp) {
         const mP = getMousePos(e);
-        let gridX, gridY;
+        
+        if (sellZone) {
+            const rect = sellZone.getBoundingClientRect();
+            if (mP.rawX >= rect.left && mP.rawX <= rect.right &&
+                mP.rawY >= rect.top && mP.rawY <= rect.bottom) {
+                sellChampion(draggedChamp);
+                hoveredChamp = null;
+                showDisplayInfo(null);
+                
+                isDragging = false;
+                draggedChamp = null;
+                sellZone.style.display = 'none';
+                sellZone.classList.remove('active');
+                return;
+            }
+        }
 
+        let gridX, gridY;
         if (mP.y < CONFIG.BENCH_START_Y) {
-            // Thả trên sân đấu
             gridX = Math.max(0, Math.min(CONFIG.BOARD_COLS - 1, Math.floor(mP.x / CONFIG.BOARD_CELL_WIDTH)));
             gridY = Math.max(0, Math.min(CONFIG.BOARD_ROWS - 1, Math.floor(mP.y / CONFIG.BOARD_CELL_HEIGHT)));
-            // Chặn không cho đặt sang vùng sân địch (Y = 0, 1, 2)
             if (gridY < 3) gridY = 3;
         } else {
-            // Thả xuống hàng chờ
             gridX = Math.max(0, Math.min(CONFIG.BENCH_SLOTS - 1, Math.floor(mP.x / CONFIG.BENCH_CELL_WIDTH)));
-            gridY = 6; // Y = 6 quy ước là hàng chờ
+            gridY = 6;
         }
 
         const occupied = STATE.champions.find(c =>
@@ -126,16 +166,12 @@ canvas.addEventListener('mouseup', (e) => {
         );
 
         if (occupied) {
-            // Đổi chỗ nếu ô đã có chủ (Cập nhật tọa độ di chuyển)
             occupied.targetX = originalX;
             occupied.targetY = originalY;
-            
-            // ---> FIX LỖI: Bắt buộc phải cập nhật cả nhà gốc (original) cho Tướng bị đè <---
             occupied.originalX = originalX;
             occupied.originalY = originalY;
         }
 
-        // Kiểm tra giới hạn quân số khi kéo thẻ từ hàng chờ lên sân
         if (gridY < 6 && originalY === 6) {
             const currentOnBoard = STATE.champions.filter(c => c.targetY < 6 && c !== draggedChamp).length;
             if (currentOnBoard >= STATE.playerLevel) {
@@ -145,7 +181,6 @@ canvas.addEventListener('mouseup', (e) => {
             }
         }
 
-        // Chốt tọa độ lưới
         draggedChamp.targetX = gridX;
         draggedChamp.targetY = gridY;
         draggedChamp.originalX = gridX;
@@ -154,7 +189,28 @@ canvas.addEventListener('mouseup', (e) => {
         isDragging = false;
         draggedChamp = null;
         updateUnitCount();
+        
+        if (sellZone) {
+            sellZone.style.display = 'none';
+            sellZone.classList.remove('active');
+        }
     }
+}
+canvas.addEventListener('mouseup', handlePointerUp);
+canvas.addEventListener('touchend', handlePointerUp);
+
+// Mobile UI Toggles
+const infoPanel = document.getElementById('infoPanel');
+const synergyPanel = document.getElementById('synergyPanel');
+
+document.getElementById('toggleInfoBtn')?.addEventListener('click', () => {
+    infoPanel.classList.toggle('show');
+    if (synergyPanel) synergyPanel.classList.remove('show');
+});
+
+document.getElementById('toggleSynergyBtn')?.addEventListener('click', () => {
+    synergyPanel.classList.toggle('show');
+    if (infoPanel) infoPanel.classList.remove('show');
 });
 
 // 4. SỰ KIỆN CLICK CHUỘT PHẢI (Bán tướng)
