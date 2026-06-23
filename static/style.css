@@ -492,6 +492,7 @@ button:hover {
     }
 
     .bottom-bar {
+        display: block;
         padding-bottom: 20px;
         width: 100%;
         overflow-x: auto;
@@ -500,6 +501,7 @@ button:hover {
 
     .shop-container {
         width: max-content;
+        margin: 0 auto;
         padding: 0 10px;
     }
 
