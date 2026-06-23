@@ -262,32 +262,21 @@ def run_game_loop(room_name):
             break
 
 # ==========================================
-# 4. API TẢI DỮ LIỆU TƯỚNG TỪ EXCEL/CSV
+# 4. API TẢI DỮ LIỆU TƯỚNG TỪ GOOGLE SHEETS
 # ==========================================
 @app.route('/api/champions')
 def get_champions_api():
     champions = []
     try:
-        # 1. Tìm vị trí chuẩn xác của file (Nằm chung thư mục với app.py)
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        excel_path = os.path.join(current_dir, 'champions.xlsx')
-        csv_path = os.path.join(current_dir, 'champions.csv')
-        manage_excel_path = os.path.join(current_dir, 'manage.xlsx')
-        manage_csv_path = os.path.join(current_dir, 'manage.csv')
+        # 1. DÁN LINK GOOGLE SHEETS CSV VÀO ĐÂY
+        # Đảm bảo bạn đã chọn File -> Share -> Publish to web -> Chọn định dạng CSV
+        url_google_sheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vREGk7FjfrTa0W2mzlWKfzeJX-JOPEu7CsNgt8ksH6RxoRyo9EfS7JSoFxamK8KOdwGYZp8h7oOC9uw/pub?gid=1700806245&single=true&output=csv"
         
-        # 2. Ưu tiên đọc Excel, nếu không có thì tự động nhảy sang tìm CSV
-        if os.path.exists(excel_path):
-            try: df = pd.read_excel(excel_path)
-            except: df = pd.read_csv(excel_path, sep=';', encoding='utf-8-sig')
-        elif os.path.exists(manage_excel_path):
-            try: df = pd.read_excel(manage_excel_path)
-            except: df = pd.read_csv(manage_excel_path, sep=';', encoding='utf-8-sig')
-        elif os.path.exists(csv_path):
-            df = pd.read_csv(csv_path, sep=';', encoding='utf-8-sig')
-        elif os.path.exists(manage_csv_path):
-            df = pd.read_csv(manage_csv_path, sep=';', encoding='utf-8-sig')
-        else:
-            print(f"❌ KHÔNG TÌM THẤY FILE: Hãy bỏ file champions.csv hoặc manage.csv vào thư mục: {current_dir}")
+        # 2. Đọc trực tiếp từ link web (Google Sheets mặc định dùng dấu phẩy ',')
+        try:
+            df = pd.read_csv(url_google_sheet, sep=',', encoding='utf-8')
+        except Exception as sheet_error:
+            print(f"❌ LỖI TẢI LINK GOOGLE SHEETS: Kiểm tra lại Link đã Publish chưa. Chi tiết: {sheet_error}")
             return jsonify([])
             
         # 3. Dọn dẹp tên cột (Xóa ký tự ẩn BOM, gọt khoảng trắng thừa 2 đầu)
@@ -318,7 +307,6 @@ def get_champions_api():
             radius_val = row.get('Radius', '')
             if radius_val != '' and str(radius_val) != 'nan': skill['radius'] = float(radius_val)
 
-            # ---> THÊM 2 DÒNG NÀY VÀO ĐỂ ĐỌC CỘT MỤC TIÊU <---
             target_val = str(row.get('Target', 'enemy_closest')).strip()
             skill['target'] = target_val if target_val and target_val != 'nan' else 'enemy_closest'
 
@@ -336,8 +324,7 @@ def get_champions_api():
             champions.append(champ)
             
     except Exception as e:
-        # IN RA LỖI RÕ RÀNG Ở CỬA SỔ CMD NẾU VẪN THẤT BẠI
-        print(f"\n❌ LỖI ĐỌC FILE: {e}\n")
+        print(f"\n❌ LỖI XỬ LÝ DỮ LIỆU: {e}\n")
         
     return jsonify(champions)
 
