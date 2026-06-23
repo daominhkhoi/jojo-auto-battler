@@ -204,7 +204,7 @@ def run_game_loop(room_name):
                         else:
                             # CHỈ HỒI MANA KHI KHÔNG BỊ CẤM PHÉP (mana_lock)
                             if not getattr(champ, 'is_mana_locked', False):
-                                champ.mana += 15
+                                champ.mana += 10
                             
                             damage = champ.attack
                             actual_damage, evs = target.take_damage(damage, champ, game['board_state'])
@@ -245,7 +245,7 @@ def run_game_loop(room_name):
         team2_alive = any(c.team == 'Team2' and c.is_alive for c in game['board_state'])
 
         elapsed_time = time.time() - start_time
-        time_out = elapsed_time > 180 # 3 phút
+        time_out = elapsed_time > 120 # 2 phút
 
         if not team1_alive or not team2_alive or time_out:
             # Xác định người thắng trước khi xóa bàn cờ
