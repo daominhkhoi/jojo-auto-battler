@@ -312,7 +312,7 @@ export function showDisplayInfo(type, data) {
                 case 'mind_control': skillDesc = `Brainwashes the target to fight for your team for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'polymorph': skillDesc = `Transforms the target into a harmless creature, disabling attacks for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'stat_steal': skillDesc = `Steals <b>${scaledPower.toLocaleString()}</b> Attack from the target for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'soul_swap': skillDesc = `Permanently swaps the souls of the strongest enemy and the weakest ally, exchanging their teams and fully healing both. Max 2 times per round.`; break;
+                case 'soul_swap': skillDesc = `Permanently swaps the souls of the strongest enemy and the weakest ally, exchanging their teams and fully healing both. Max 1 time per round.`; break;
                 case 'banish': skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'hp_shield': skillDesc = `Activates a defensive barrier absorbing <b>${Math.round(scaledPercent * 100)}%</b> of Max HP in damage.`; break;
                 case 'damage_link': skillDesc = `Links lifeforce with the target. Target absorbs your damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;

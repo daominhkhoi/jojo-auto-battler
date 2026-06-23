@@ -263,7 +263,7 @@ class Champion:
         # 9. SOUL SWAP (HOÁN ĐỔI LINH HỒN - CHARIOT REQUIEM)
         elif s_type == 'soul_swap':
             self.soul_swap_count = getattr(self, 'soul_swap_count', 0)
-            if self.soul_swap_count < 2:
+            if self.soul_swap_count < 1:
                 self.soul_swap_count += 1
                 
                 enemy_team = [c for c in board_state if c.team != self.team and c.is_alive and not getattr(c, 'is_banished', False)]
