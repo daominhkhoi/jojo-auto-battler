@@ -302,6 +302,7 @@ export function showDisplayInfo(type, data) {
             switch (s.type) {
                 case 'damage': skillDesc = `Deals <b>${scaledPower.toLocaleString()}</b> burst damage to the nearest enemy.`; break;
                 case 'time_stop': skillDesc = `Freezes time for all enemies for <b>${scaledDuration.toFixed(1)}s</b>. Self gains massive Attack Speed.`; break;
+                case 'return_to_zero': skillDesc = `Reverts all enemies' actions to zero, wiping their Mana and purging all their active buffs instantly.`; break;
                 case 'blink_strike': skillDesc = `Teleports behind the furthest enemy and deals <b>${scaledPower.toLocaleString()}</b> damage, ignoring frontliners.`; break;
                 case 'execute': skillDesc = `Instantly executes targets below 30% HP. Otherwise, deals <b>${scaledPower.toLocaleString()}</b> physical damage.`; break;
                 case 'banish': skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
@@ -311,9 +312,10 @@ export function showDisplayInfo(type, data) {
                 case 'mind_control': skillDesc = `Brainwashes the target to fight for your team for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'polymorph': skillDesc = `Transforms the target into a harmless creature, disabling attacks for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'stat_steal': skillDesc = `Steals <b>${scaledPower.toLocaleString()}</b> Attack from the target for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'soul_swap': skillDesc = `Permanently swaps the souls of the strongest enemy and the weakest ally, exchanging their teams and fully healing both. Max 2 times per round.`; break;
                 case 'banish': skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'reflect_shield': skillDesc = `Reflects <b>${Math.round(scaledPercent * 100)}%</b> of incoming damage back to the attackers.`; break;
-                case 'damage_link': skillDesc = `Links with the target for <b>${scaledDuration.toFixed(1)}s</b>. The linked target takes all damage you receive.`; break;
+                case 'hp_shield': skillDesc = `Activates a defensive barrier absorbing <b>${Math.round(scaledPercent * 100)}%</b> of Max HP in damage.`; break;
+                case 'damage_link': skillDesc = `Links lifeforce with the target. Target absorbs your damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'life_tether': skillDesc = `Tethers to the target, draining <b>${scaledPower.toLocaleString()}</b> HP/s to heal yourself for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'evasion': skillDesc = `Dodges all incoming attacks and damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'revive': skillDesc = `Upon taking lethal damage, instantly revives with <b>100% HP</b>.`; break;
@@ -330,13 +332,30 @@ export function showDisplayInfo(type, data) {
                 case 'speed_buff': skillDesc = `Boosts Attack Speed by <b>+${scaledPower.toLocaleString()}%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'swap': skillDesc = `Swaps positions with the target and deals <b>${scaledPower.toLocaleString()}</b> damage.`; break;
                 case 'clone': skillDesc = `Creates a Shadow Clone with <b>${Math.round(scaledPercent * 100)}%</b> of your original stats.`; break;
-                case 'reflect_shield': skillDesc = `Activates a defensive barrier, reflecting <b>${Math.round(scaledPercent * 100)}%</b> of incoming damage back to attackers.`; break;
+                case 'hp_shield': skillDesc = `Activates a defensive barrier absorbing <b>${Math.round(scaledPercent * 100)}%</b> of Max HP in damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 default: skillDesc = 'Casts a unique and powerful Stand ability.';
             }
+
+            const targetMap = {
+                'self': 'Self',
+                'enemy_closest': 'Nearest Enemy',
+                'enemy_furthest': 'Furthest Enemy',
+                'enemy_highest_atk': 'Highest Attack Enemy',
+                'enemy_lowest_hp': 'Lowest HP Enemy',
+                'enemy_random': 'Random Enemy',
+                'ally_lowest_hp': 'Lowest HP Ally',
+                'ally_lowest_mana': 'Lowest Mana Ally',
+                'all_enemies': 'All Enemies',
+                'all_except_self': 'Everyone Else',
+                'bounce_closest': 'Nearest Enemy (Bouncing)',
+                'area_closest': 'Nearest Enemy Area'
+            };
+            const targetStr = targetMap[s.target] || 'The Target';
 
             skillHTML = `
                 <div style="background: rgba(142, 68, 173, 0.2); border-left: 4px solid #9b59b6; padding: 10px; margin: 10px 0; border-radius: 4px;">
                     <p style="margin: 0; color: #e8daef; font-size: 15px; text-shadow: 1px 1px 2px black;">✨ <b>SKILL: ${skillName}</b></p>
+                    <p style="margin: 2px 0 5px 0; color: #e74c3c; font-size: 13px;">🎯 <b>Target:</b> ${targetStr}</p>
                     <p style="margin: 5px 0 0 0; color: #d2b4de; font-size: 14px; font-style: italic;">${skillDesc}</p>
                 </div>
             `;
@@ -347,10 +366,12 @@ export function showDisplayInfo(type, data) {
             ${imgSrc ? `<img src="${imgSrc}" style="width:100%; height:300px; object-fit:cover; border-radius:8px; border:2px solid #f39c12; margin-bottom:10px;">` : ''}
             <div class="card-stats">
                 ${traitsHTML}
-                ${skillHTML} <p>❤️ HP: <b>${hp.toLocaleString()} / ${(data.max_hp || template.hp).toLocaleString()}</b></p>
-                <p>⚔️ Attack: <b>${(data.attack || template.attack).toLocaleString()}</b></p>
-                <p>🎯 Range: <b>${data.attack_range || template.attack_range}</b></p>
-                <p>⚡ Speed: <b>${data.speed || template.speed}</b></p>
+                ${skillHTML} 
+                <p>❤️ HP: <b>${hp.toLocaleString()} / ${(data.max_hp || template.hp).toLocaleString()}</b></p>
+                ${data.shield > 0 ? `<p>🛡️ Shield: <b style="color: #ecf0f1;">${Math.round(data.shield).toLocaleString()}</b></p>` : ''}
+                <p>⚔️ Attack: <b>${Math.round(data.attack !== undefined ? data.attack : template.attack).toLocaleString()}</b></p>
+                <p>🎯 Range: <b>${(data.attack_range !== undefined ? data.attack_range : template.attack_range).toFixed(1)}</b></p>
+                <p>⚡ Speed: <b>${(data.speed !== undefined ? data.speed : template.speed).toFixed(2)}</b></p>
                 <p>💧 Mana: <b>${data.mana || 0} / ${data.max_mana || template.max_mana}</b></p>
                 <p style="margin-top: 10px; border-top: 1px dashed #7f8c8d; padding-top: 10px;">🪙 Cost: <b>${data.cost || template.cost} Gold</b></p>
             </div>

@@ -83,6 +83,10 @@ canvas.addEventListener('mousemove', (e) => {
         // Quét ngược mảng để ưu tiên chọn thẻ nằm trên cùng nếu bị đè
         for (let i = STATE.champions.length - 1; i >= 0; i--) {
             const champ = STATE.champions[i];
+            
+            // Nếu đang trong trận và tướng đã chết thì bỏ qua (không hiện tooltip)
+            if (STATE.isCombatPhase && (!champ.is_alive || champ.hp <= 0)) continue;
+
             const size = getCanvasCoords(champ.targetX, champ.targetY);
             if (mP.x >= champ.pixelX && mP.x <= champ.pixelX + size.w &&
                 mP.y >= champ.pixelY && mP.y <= champ.pixelY + size.h) {
@@ -187,36 +191,40 @@ canvas.addEventListener('mouseleave', () => {
 function animationLoop() {
     updatePhysics();
     renderBoard(ctx, canvas);
+    
+    // Liên tục cập nhật thông tin panel nếu đang trong trận để hiện HP/Mana thời gian thực
+    if (STATE.isCombatPhase && hoveredChamp) {
+        showDisplayInfo('champ', hoveredChamp);
+    }
+    
     requestAnimationFrame(animationLoop);
 }
 
 // ==========================================
 // TỰ ĐỘNG KHÔI PHỤC VÀ TÌM TRẬN (SAU KHI F5 TỪ GAME OVER)
 // ==========================================
-window.addEventListener('DOMContentLoaded', () => {
-    // 1. Kiểm tra xem ván trước có để lại lệnh "tự tìm trận" không
-    if (sessionStorage.getItem('autoFindMatch') === 'true') {
+// 1. Kiểm tra xem ván trước có để lại lệnh "tự tìm trận" không
+if (sessionStorage.getItem('autoFindMatch') === 'true') {
 
-        // 2. Lấy tên đã cất ra và gán lại vào ô input
-        const savedName = sessionStorage.getItem('savedPlayerName');
-        const nameInput = document.getElementById('playerNameInput');
-        if (nameInput && savedName) {
-            nameInput.value = savedName;
-        }
-
-        // Xóa thư đi để nếu user tự bấm F5 bằng tay thì nó không tự tìm trận nữa
-        sessionStorage.removeItem('autoFindMatch');
-        sessionStorage.removeItem('savedPlayerName');
-
-        // 3. Tự động giả lập cú Click vào nút FIND MATCH
-        const findBtn = document.getElementById('findMatchBtn');
-        if (findBtn) {
-            setTimeout(() => {
-                findBtn.click();
-            }, 500); // Đợi 500ms cho socket kết nối rồi mới click
-        }
+    // 2. Lấy tên đã cất ra và gán lại vào ô input
+    const savedName = sessionStorage.getItem('savedPlayerName');
+    const nameInput = document.getElementById('playerNameInput');
+    if (nameInput && savedName) {
+        nameInput.value = savedName;
     }
-});
+
+    // Xóa thư đi để nếu user tự bấm F5 bằng tay thì nó không tự tìm trận nữa
+    sessionStorage.removeItem('autoFindMatch');
+    sessionStorage.removeItem('savedPlayerName');
+
+    // 3. Tự động giả lập cú Click vào nút FIND MATCH
+    const findBtn = document.getElementById('findMatchBtn');
+    if (findBtn) {
+        setTimeout(() => {
+            findBtn.click();
+        }, 500); // Đợi 500ms cho socket kết nối rồi mới click
+    }
+}
 
 // Khởi chạy game
 refreshShop();

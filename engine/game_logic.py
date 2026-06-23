@@ -1,6 +1,20 @@
 import math
 import time
 import random
+import os
+import pandas as pd
+
+_CHAMPION_COSTS = {}
+def get_champion_cost(name):
+    if not _CHAMPION_COSTS:
+        try:
+            csv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'champions.csv')
+            df = pd.read_csv(csv_path, sep=';')
+            for _, row in df.iterrows():
+                _CHAMPION_COSTS[row['Name']] = row['Cost']
+        except Exception:
+            pass
+    return _CHAMPION_COSTS.get(name, 1)
 
 class Champion:
     def __init__(self, id, name, team, x, y, hp, attack, attack_range, speed, max_mana, star=1, skill=None, start_mana=0, active_buffs=None):
@@ -29,6 +43,7 @@ class Champion:
         self.is_mana_locked = False
         self.is_submerged = False # Tàng hình
         self.is_banished = False  # Bị nhốt
+        self.shield = 0           # Giáp ảo
         self.original_team = team # Dùng cho Mind Control đổi phe
 
     def can_attack(self):
@@ -45,22 +60,37 @@ class Champion:
     def take_damage(self, amount, attacker, board_state):
         events = []
         if self.hp <= 0: return 0, events
+        amount = max(0, amount)
 
         # 1. Evasion
         if any(b['type'] == 'evasion' for b in self.active_buffs):
             events.append({'type': 'evasion', 'target_id': self.id})
             return 0, events
 
-        actual_damage = min(amount, self.hp)
+        actual_damage = amount
+        
+        # 2. HP Shield (Lá chắn)
+        if self.shield > 0:
+            if self.shield >= actual_damage:
+                self.shield -= actual_damage
+                events.append({'type': 'shield_block', 'target_id': self.id, 'damage_blocked': actual_damage})
+                return 0, events
+            else:
+                events.append({'type': 'shield_break', 'target_id': self.id, 'damage_blocked': self.shield})
+                actual_damage -= self.shield
+                self.shield = 0
+        
+        actual_damage = min(actual_damage, self.hp)
         self.hp -= actual_damage
 
-        # 2. Reflect Shield
+        # 2.5 Giáp phản đòn (Reflect Shield)
         for buff in self.active_buffs:
-            if buff['type'] == 'reflect_shield' and attacker and attacker.is_alive:
-                reflect_dmg = actual_damage * buff['power']
-                attacker.hp -= reflect_dmg
-                events.append({'type': 'reflect', 'caster_id': self.id, 'target_id': attacker.id, 'damage': reflect_dmg})
-                if attacker.hp <= 0: attacker.is_alive = False
+            if buff['type'] == 'reflect_shield':
+                reflect_dmg = actual_damage * buff.get('power', 0)
+                if attacker and attacker.is_alive:
+                    attacker.hp -= reflect_dmg
+                    events.append({'type': 'reflect', 'targetId': attacker.id, 'damage': reflect_dmg})
+                    if attacker.hp <= 0: attacker.is_alive = False
 
         # 3. Damage Link
         for buff in self.active_buffs:
@@ -142,7 +172,28 @@ class Champion:
             for c in board_state:
                 if c.id != self.id and c.is_alive:
                     c.active_buffs.append({'type': 'time_stopped', 'duration': s_duration})
-            self.active_buffs.append({'type': 'speed_buff', 'power': self.speed * 4, 'duration': s_duration})
+            bonus_speed = self.base_speed * 5
+            self.speed += bonus_speed
+            self.active_buffs.append({'type': 'speed_buff', 'power': bonus_speed, 'duration': s_duration})
+            self.active_buffs.append({'type': 'mana_lock', 'duration': s_duration})
+            
+        # 1.5. RETURN TO ZERO (GOLD EXPERIENCE REQUIEM)
+        elif s_type == 'return_to_zero':
+            for c in board_state:
+                if c.team != self.team and c.is_alive:
+                    c.mana = 0
+                    # Return to Zero: Xoá bỏ mọi buff/trạng thái hiện tại
+                    for buff in c.active_buffs[:]:
+                        bt = buff['type']
+                        if bt == 'buff_atk': c.attack -= buff['power']
+                        elif bt == 'speed_buff': c.speed -= buff['power'] 
+                        elif bt == 'speed_debuff': c.speed += buff['power']
+                        elif bt == 'mind_control': c.team = buff.get('original_team', c.team)
+                        elif bt == 'banish': c.is_banished = False
+                        elif bt == 'submerge': c.is_submerged = False
+                        elif bt == 'stat_steal_victim': c.attack += buff['power']
+                        elif bt == 'stat_steal_beneficiary': c.attack -= buff['power']
+                        c.active_buffs.remove(buff)
             
         # 2. BLINK STRIKE (ÁM SÁT TUYẾN SAU)
         elif s_type == 'blink_strike' and target:
@@ -154,7 +205,7 @@ class Champion:
             event['extra_events'].extend(evs)
             
         # 3. PULL (KÉO TOÀN BỘ ĐỊCH VỀ PHÍA MÌNH - THE HAND)
-        elif s_type == 'pull' and target:
+        elif s_type == 'pull':
             for c in board_state:
                 if c.team != self.team and c.is_alive and not getattr(c, 'is_submerged', False):
                     c.x, c.y = self.x, self.y
@@ -205,6 +256,36 @@ class Champion:
                 if current_target:
                     bounce_path.append(current_target.id)
             event['bounce_path'] = bounce_path
+            
+        # 9. SOUL SWAP (HOÁN ĐỔI LINH HỒN - CHARIOT REQUIEM)
+        elif s_type == 'soul_swap':
+            self.soul_swap_count = getattr(self, 'soul_swap_count', 0)
+            if self.soul_swap_count < 2:
+                self.soul_swap_count += 1
+                
+                enemy_team = [c for c in board_state if c.team != self.team and c.is_alive and not getattr(c, 'is_banished', False)]
+                ally_team = [c for c in board_state if c.team == self.team and c.is_alive and c.id != self.id and not getattr(c, 'is_banished', False)]
+                
+                if enemy_team and ally_team:
+                    enemy_target = max(enemy_team, key=lambda c: (get_champion_cost(c.name), getattr(c, 'star', 1)))
+                    ally_target = min(ally_team, key=lambda c: (get_champion_cost(c.name), getattr(c, 'star', 1)))
+                    
+                    # Swap team (and original_team for safety)
+                    enemy_target.team, ally_target.team = ally_target.team, enemy_target.team
+                    enemy_target.original_team = enemy_target.team
+                    ally_target.original_team = ally_target.team
+                    
+                    # Swap positions
+                    enemy_target.x, ally_target.x = ally_target.x, enemy_target.x
+                    enemy_target.y, ally_target.y = ally_target.y, enemy_target.y
+                    
+                    # Heal to full
+                    enemy_target.hp = getattr(enemy_target, 'max_hp', 1000)
+                    ally_target.hp = getattr(ally_target, 'max_hp', 1000)
+                    
+                    if 'extra_events' not in event: event['extra_events'] = []
+                    event['extra_events'].append({'type': 'swap', 'target_id': enemy_target.id})
+                    event['extra_events'].append({'type': 'swap', 'target_id': ally_target.id})
 
         # 9. MANA BATTERY (BƠM MANA)
         elif s_type == 'mana_battery' and target:
@@ -273,7 +354,7 @@ class Champion:
                     c.active_buffs.append({'type': 'speed_debuff', 'power': penalty, 'duration': s_duration})
 
         elif s_type == 'stat_steal' and target:
-            actual_steal = min(s_power, target.attack)
+            actual_steal = s_power
             target.attack -= actual_steal
             self.attack += actual_steal
             steal_dur = s_duration if s_duration > 0 else 5.0
@@ -284,15 +365,20 @@ class Champion:
             target.is_banished = True
             target.active_buffs.append({'type': 'banish', 'duration': s_duration if s_duration > 0 else 5})
 
-        elif s_type == 'reflect_shield' and target:
-            # Usually target is self or ally_lowest_hp
-            target.active_buffs.append({'type': 'reflect_shield', 'power': s_percent, 'duration': s_duration if s_duration > 0 else 5})
+        elif s_type == 'hp_shield' and target:
+            # Phòng trường hợp giáp chồng giáp: lấy lượng giáp lớn hơn, làm mới thời gian
+            new_shield = target.max_hp * s_percent
+            target.shield = max(getattr(target, 'shield', 0), new_shield)
+            target.active_buffs = [b for b in target.active_buffs if b['type'] != 'hp_shield']
+            target.active_buffs.append({'type': 'hp_shield', 'duration': s_duration if s_duration > 0 else 5})
 
         elif s_type == 'damage_link' and target:
-            self.active_buffs.append({'type': 'damage_link', 'linked_target': target, 'duration': s_duration if s_duration > 0 else 5})
+            self.active_buffs = [b for b in self.active_buffs if b['type'] != 'damage_link']
+            self.active_buffs.append({'type': 'damage_link', 'linked_target': target, 'caster_id': target.id, 'duration': s_duration if s_duration > 0 else 5})
 
         elif s_type == 'life_tether' and target:
-            target.active_buffs.append({'type': 'life_tether', 'caster': self, 'power': s_power, 'duration': s_duration if s_duration > 0 else 5})
+            target.active_buffs = [b for b in target.active_buffs if b['type'] != 'life_tether']
+            target.active_buffs.append({'type': 'life_tether', 'caster': self, 'caster_id': self.id, 'power': s_power, 'duration': s_duration if s_duration > 0 else 5})
 
         elif s_type == 'evasion' and target:
             target.active_buffs.append({'type': 'evasion', 'duration': s_duration if s_duration > 0 else 5})
@@ -352,6 +438,7 @@ class Champion:
                 elif bt == 'submerge': self.is_submerged = False
                 elif bt == 'stat_steal_victim': self.attack += buff['power']
                 elif bt == 'stat_steal_beneficiary': self.attack -= buff['power']
+                elif bt == 'hp_shield': self.shield = 0
                 self.active_buffs.remove(buff)
 
         return events
@@ -363,8 +450,9 @@ class Champion:
             
         return {
             'id': self.id, 'name': self.name, 'team': self.team,
-            'x': self.x, 'y': self.y, 'hp': self.hp, 'mana': self.mana,
+            'x': self.x, 'y': self.y, 'hp': self.hp, 'mana': self.mana, 'shield': getattr(self, 'shield', 0),
             'max_hp': self.max_hp, 'max_mana': self.max_mana,
+            'attack': self.attack, 'speed': self.speed, 'attack_range': self.attack_range,
             'is_alive': self.is_alive, 'star': getattr(self, 'star', 1),
             'buffs': [b['type'] for b in self.active_buffs],
             'buff_details': safe_buffs
@@ -373,11 +461,6 @@ class Champion:
 def calculate_distance(x1, y1, x2, y2): return math.hypot(x2 - x1, y2 - y1)
 
 def find_closest_target(attacker, board_state):
-    if hasattr(attacker, 'current_target_id') and attacker.current_target_id:
-        curr = next((c for c in board_state if c.id == attacker.current_target_id), None)
-        if curr and curr.is_alive and curr.team != attacker.team and not getattr(curr, 'is_submerged', False) and not getattr(curr, 'is_banished', False):
-            return curr
-
     closest_target, min_dist = None, float('inf')
     for champ in board_state:
         if champ.team != attacker.team and champ.is_alive and not getattr(champ, 'is_submerged', False) and not getattr(champ, 'is_banished', False):

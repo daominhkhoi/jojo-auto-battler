@@ -33,6 +33,7 @@
     <Folder Include="static\" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="champions.csv" />
     <Content Include="static\js\assets.js" />
     <Content Include="static\js\combat.js" />
     <Content Include="static\js\entities.js" />

@@ -132,7 +132,12 @@ export function syncTickData(data) {
 
             localChamp.hp = serverChamp.hp;
             localChamp.mana = serverChamp.mana;
+            localChamp.shield = serverChamp.shield || 0;
+            localChamp.attack = serverChamp.attack;
+            localChamp.speed = serverChamp.speed;
+            localChamp.attack_range = serverChamp.attack_range;
             localChamp.is_alive = serverChamp.is_alive;
+            localChamp.team = serverChamp.team;
             localChamp.buffs = serverChamp.buffs || [];
             localChamp.buff_details = serverChamp.buff_details || [];
         } else {
@@ -141,7 +146,7 @@ export function syncTickData(data) {
             STATE.champions.push({
                 id: serverChamp.id,
                 name: serverChamp.name,
-                team: "Team2",
+                team: serverChamp.team || "Team2",
                 star: serverChamp.star || 1,
                 targetX: serverChamp.x,
                 targetY: serverChamp.y,
@@ -149,7 +154,10 @@ export function syncTickData(data) {
                 max_hp: serverChamp.max_hp,
                 mana: serverChamp.mana,
                 max_mana: serverChamp.max_mana,
-                attack_range: template.attack_range || 1,
+                shield: serverChamp.shield || 0,
+                attack: serverChamp.attack || template.attack,
+                speed: serverChamp.speed || template.speed,
+                attack_range: serverChamp.attack_range || template.attack_range,
                 is_alive: serverChamp.is_alive,
                 shakeTimer: 0,
                 buffs: serverChamp.buffs || []
@@ -320,14 +328,18 @@ export function handleCombatEnd(serverResult) {
 }
 
 function resetBoardForNextRound() {
-    STATE.champions = STATE.champions.filter(c => c.team === 'Team1');
+    // Chỉ giữ lại những tướng gốc của người chơi (có originalX)
+    STATE.champions = STATE.champions.filter(c => c.originalX !== undefined);
     STATE.champions.forEach(champ => {
         champ.hp = champ.max_hp;
         champ.mana = 0;
+        champ.shield = 0;
         champ.is_alive = true;
+        champ.team = 'Team1'; // Trả lại đội hình gốc lỡ bị mind_control hay soul_swap
 
         // ---> THÊM DÒNG NÀY ĐỂ DỌN SẠCH CÁNH, KIẾM, ĐẦU LÂU KHI HẾT TRẬN <---
         champ.buffs = [];
+        champ.buff_details = [];
 
         if (champ.originalX !== undefined && champ.originalY !== undefined) {
             champ.targetX = champ.originalX;

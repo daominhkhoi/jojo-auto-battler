@@ -106,6 +106,13 @@ export function renderBoard(ctx, canvas) {
         ctx.fillStyle = 'red'; ctx.fillRect(pX + 4, barY, barW, barHeight);
         ctx.fillStyle = '#00ff00'; ctx.fillRect(pX + 4, barY, barW * hpP, barHeight);
 
+        // Giáp ảo (Shield) - Vẽ đè lên thanh máu
+        if (champ.shield && champ.shield > 0) {
+            const shP = Math.min(1, champ.shield / champ.max_hp);
+            ctx.fillStyle = 'rgba(236, 240, 241, 0.9)'; // Màu trắng đục
+            ctx.fillRect(pX + 4, barY, barW * shP, barHeight);
+        }
+
         // Thanh Mana
         const mnP = Math.max(0, Math.min(1, (champ.mana || 0) / champ.max_mana));
         const isManaLocked = (champ.buffs && champ.buffs.includes('mana_lock'));
@@ -130,11 +137,22 @@ export function renderBoard(ctx, canvas) {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
+        if (activeBuffs.includes('hp_shield')) {
+            const radius = currentSize.w / 2 + 5;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(236, 240, 241, ${0.5 + Math.sin(timeNow*5)*0.3})`;
+            ctx.lineWidth = 5;
+            ctx.stroke();
+            ctx.fillStyle = `rgba(236, 240, 241, 0.2)`;
+            ctx.fill();
+        }
+
         if (activeBuffs.includes('reflect_shield')) {
             const radius = currentSize.w / 2 + 5;
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(155, 89, 182, ${0.5 + Math.sin(timeNow*5)*0.3})`;
+            ctx.strokeStyle = `rgba(155, 89, 182, ${0.5 + Math.sin(timeNow*5)*0.3})`; // Màu Tím
             ctx.lineWidth = 5;
             ctx.stroke();
             ctx.fillStyle = `rgba(155, 89, 182, 0.2)`;
@@ -308,6 +326,28 @@ export function renderBoard(ctx, canvas) {
                 ctx.stroke();
                 ctx.fillStyle = `rgba(0, 0, 0, ${currentAlpha * 0.4})`;
                 ctx.fill();
+            }
+            else if (hit.effectType === 'return_to_zero') {
+                ctx.globalAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.0);
+                const maxRadius = canvas.width * 1.5;
+                const r = progress * maxRadius;
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, r, 0, Math.PI * 2);
+                
+                const innerR = Math.max(1, r * 0.8);
+                const outerR = Math.max(2, r);
+                const gradient = ctx.createRadialGradient(0, 0, innerR, 0, 0, outerR);
+                gradient.addColorStop(0, `rgba(255, 215, 0, 0)`);
+                gradient.addColorStop(0.8, `rgba(255, 215, 0, ${1 - progress})`);
+                gradient.addColorStop(1, `rgba(255, 255, 255, ${1 - progress})`);
+                
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                ctx.strokeStyle = `rgba(255, 255, 255, ${1 - progress})`;
+                ctx.lineWidth = 10;
+                ctx.stroke();
             }
             else if (hit.effectType === 'time_stop' || hit.effectType === 'global_slow') {
                 // Sóng âm đồng hồ ngưng đọng thời gian hoặc làm chậm
