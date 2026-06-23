@@ -49,13 +49,13 @@ class Champion:
     def can_attack(self):
         if self.is_stunned or self.is_banished or getattr(self, 'is_polymorphed', False): return False
         if self.attack_cooldown > 0:
-            self.attack_cooldown -= 0.1
+            safe_speed = max(0.1, self.speed)
+            self.attack_cooldown -= 0.1 * safe_speed
             return False
         return True
 
     def reset_attack_cooldown(self):
-        safe_speed = max(0.1, self.speed)
-        self.attack_cooldown = 1.0 / safe_speed
+        self.attack_cooldown = 1.0
 
     def take_damage(self, amount, attacker, board_state):
         events = []
@@ -172,7 +172,7 @@ class Champion:
             for c in board_state:
                 if c.id != self.id and c.is_alive:
                     c.active_buffs.append({'type': 'time_stopped', 'duration': s_duration})
-            bonus_speed = self.base_speed * 5
+            bonus_speed = self.base_speed * 3
             self.speed += bonus_speed
             self.active_buffs.append({'type': 'speed_buff', 'power': bonus_speed, 'duration': s_duration})
             self.active_buffs.append({'type': 'mana_lock', 'duration': s_duration})
