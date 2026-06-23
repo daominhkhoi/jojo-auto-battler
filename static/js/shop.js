@@ -147,8 +147,13 @@ document.addEventListener('click', (e) => {
     if (isTouchDevice && selectedShopCard) {
         if (!e.target.closest('.shop-card')) {
             selectedShopCard = null;
-            document.querySelectorAll('.shop-card').forEach(c => c.style.transform = '');
+            document.querySelectorAll('.shop-card').forEach(c => {
+                c.style.transform = '';
+                if (c.dataset.origBorder) c.style.borderColor = c.dataset.origBorder;
+            });
             showDisplayInfo(null);
+            const infoPanel = document.getElementById('infoPanel');
+            if (infoPanel) infoPanel.classList.remove('show');
         }
     }
 });
@@ -176,6 +181,7 @@ export function refreshShop() {
         const theme = colors[randomChamp.cost] || colors[1];
         card.style.border = `2px solid ${theme.border}`;
         card.style.background = theme.bg;
+        card.dataset.origBorder = theme.border;
 
         card.onclick = (e) => {
             const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
@@ -184,8 +190,13 @@ export function refreshShop() {
                 if (selectedShopCard === card) {
                     buyChampion(randomChamp, card);
                     selectedShopCard = null;
+                    const infoPanel = document.getElementById('infoPanel');
+                    if (infoPanel) infoPanel.classList.remove('show');
                 } else {
-                    document.querySelectorAll('.shop-card').forEach(c => c.style.transform = '');
+                    document.querySelectorAll('.shop-card').forEach(c => {
+                        c.style.transform = '';
+                        if (c.dataset.origBorder) c.style.borderColor = c.dataset.origBorder;
+                    });
                     selectedShopCard = card;
                     showDisplayInfo('champ', randomChamp);
                     card.style.transform = 'scale(1.05)';

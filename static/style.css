@@ -1,13 +1,16 @@
 /* =========================================
    CSS TỔNG THỂ & FULLSCREEN
    ========================================= */
-body, html {
+body,
+html {
     margin: 0;
     padding: 0;
     width: 100vw;
     height: 100vh;
-    background-color: #0b101a; /* Màu nền tối siêu ngầu */
-    overflow: hidden; /* Cắt bỏ thanh cuộn thừa */
+    background-color: #0b101a;
+    /* Màu nền tối siêu ngầu */
+    overflow: hidden;
+    /* Cắt bỏ thanh cuộn thừa */
     font-family: 'Segoe UI', Tahoma, sans-serif;
     color: white;
 }
@@ -28,9 +31,9 @@ body, html {
     padding: 1px 0;
 }
 
-    .top-bar h2 {
-        margin: 5px 0 10px 0;
-    }
+.top-bar h2 {
+    margin: 5px 0 10px 0;
+}
 
 .player-info {
     display: flex;
@@ -45,7 +48,7 @@ body, html {
     width: fit-content;
     margin-left: auto;
     margin-right: auto;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
 }
 
 .gold-display {
@@ -97,26 +100,26 @@ button {
     transition: all 0.2s;
 }
 
-    button:hover {
-        background-color: #d63d55;
-        transform: scale(1.05);
-    }
+button:hover {
+    background-color: #d63d55;
+    transform: scale(1.05);
+}
 
 .action-btn {
     background-color: #f39c12;
 }
 
-    .action-btn:hover {
-        background-color: #d68910;
-    }
+.action-btn:hover {
+    background-color: #d68910;
+}
 
 #rollBtn {
     background-color: #f39c12;
 }
 
-    #rollBtn:hover {
-        background-color: #d68910;
-    }
+#rollBtn:hover {
+    background-color: #d68910;
+}
 
 /* =========================================
    BỐ CỤC 3 CỘT (MÀN HÌNH 1320x919)
@@ -126,7 +129,8 @@ button {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 50px; /* Khoảng cách giữa 3 cột */
+    gap: 50px;
+    /* Khoảng cách giữa 3 cột */
     width: 100vw;
     padding: 0 1px;
     box-sizing: border-box;
@@ -134,7 +138,8 @@ button {
 
 /* Bàn cờ khổng lồ giữa màn hình */
 #gameBoard {
-    height: 70vh; /* Tự động scale vừa màn hình */
+    height: 70vh;
+    /* Tự động scale vừa màn hình */
     width: auto;
     background-color: #1a2230;
     border: 3px solid #0f3460;
@@ -151,7 +156,7 @@ button {
     border-radius: 12px;
     padding-left: 15px;
     padding-right: 15px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
     color: #ecf0f1;
     overflow-y: auto;
     box-sizing: border-box;
@@ -185,13 +190,13 @@ button {
     line-height: 1;
 }
 
-    .card-stats p {
-        margin: 6px 0;
-    }
+.card-stats p {
+    margin: 6px 0;
+}
 
-    .card-stats b {
-        color: #2ecc71;
-    }
+.card-stats b {
+    color: #2ecc71;
+}
 
 .info-placeholder {
     text-align: center;
@@ -214,14 +219,14 @@ button {
     transition: all 0.2s;
 }
 
-    .synergy-item:hover {
-        background: #34495e;
-        border-left-color: #f1c40f;
-    }
+.synergy-item:hover {
+    background: #34495e;
+    border-left-color: #f1c40f;
+}
 
-    .synergy-item.active {
-        border-left-color: #e74c3c;
-    }
+.synergy-item.active {
+    border-left-color: #e74c3c;
+}
 
 .synergy-item-header {
     display: flex;
@@ -256,21 +261,21 @@ button {
     transition: transform 0.2s;
 }
 
-    .shop-card:hover {
-        transform: scale(1.05);
-        border-color: #f1c40f;
-    }
+.shop-card:hover {
+    transform: scale(1.05);
+    border-color: #f1c40f;
+}
 
-    .shop-card h3 {
-        margin: 0 0 8px 0;
-        font-size: 15px;
-    }
+.shop-card h3 {
+    margin: 0 0 8px 0;
+    font-size: 15px;
+}
 
-    .shop-card p {
-        margin: 5px 0;
-        font-size: 13px;
-        color: #bdc3c7;
-    }
+.shop-card p {
+    margin: 5px 0;
+    font-size: 13px;
+    color: #bdc3c7;
+}
 
 .cost {
     color: #f1c40f;
@@ -302,7 +307,7 @@ button {
     border: 2px solid #ffd700;
     font-size: 24px;
     font-weight: bold;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     z-index: 9999;
     pointer-events: none;
     animation: slideDown 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
@@ -344,14 +349,14 @@ button {
     transition: all 0.3s ease;
 }
 
-    .name-input:focus {
-        border-color: #f39c12;
-    }
+.name-input:focus {
+    border-color: #f39c12;
+}
 
-    .name-input:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
+.name-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
 
 #gameCanvas {
     /* Mặc định chiều rộng phủ đầy màn hình, nhưng không vượt quá 1320px của bạn */
@@ -359,7 +364,7 @@ button {
     max-width: 1320px;
     /* Dùng vh (Viewport Height) để đảm bảo bàn cờ không bị lố chiều dọc, chừa chỗ cho Shop */
     height: auto;
-    max_height: 75vh;
+    max-height: 75vh;
     /* Lệnh thần thánh: Tự động co giãn giữ nguyên tỷ lệ gốc, KHÔNG BAO GIỜ BỊ MÉO ẢNH */
     object-fit: contain;
     /* Canh giữa bàn cờ nếu màn hình quá to */
@@ -367,7 +372,7 @@ button {
     margin: 0 auto;
     background-color: #1a1a2e;
     border-radius: 8px;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
 }
 
 /* =========================================
@@ -417,6 +422,7 @@ button {
     .game-layout {
         gap: 10px;
     }
+
     .side-panel {
         width: 200px;
     }
@@ -424,40 +430,48 @@ button {
 
 @media (max-width: 768px) {
     body {
-        overflow-y: auto; /* Allow scrolling on mobile if things overflow slightly */
+        overflow-y: auto;
+        /* Allow scrolling on mobile if things overflow slightly */
     }
+
     .fullscreen-wrapper {
         height: auto;
         min-height: 100vh;
     }
+
     .top-bar {
         padding: 5px;
     }
+
     .player-info {
         flex-wrap: wrap;
         font-size: 14px;
         gap: 10px;
     }
+
     .controls {
         flex-wrap: wrap;
         gap: 10px;
     }
+
     .mobile-toggle {
         display: inline-block;
     }
+
     .game-layout {
         position: relative;
         flex-direction: column;
         padding: 10px;
         gap: 20px;
     }
+
     #gameBoard {
         height: auto;
         width: 100%;
         max-width: 540px;
         max-height: 70vh;
     }
-    
+
     /* Hide panels by default on mobile, display them as absolute overlays when active */
     .side-panel {
         display: none;
@@ -472,20 +486,23 @@ button {
         background-color: rgba(26, 34, 48, 0.95);
         border: 2px solid #3498db;
     }
+
     .side-panel.show {
         display: block;
     }
-    
+
     .bottom-bar {
         padding-bottom: 20px;
         width: 100%;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
+
     .shop-container {
         width: max-content;
         padding: 0 10px;
     }
+
     .shop-card {
         flex: 0 0 100px;
         width: 100px;
