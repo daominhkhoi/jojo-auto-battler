@@ -128,7 +128,7 @@ button:hover {
     flex: 1;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: top;
     gap: 50px;
     /* Khoảng cách giữa 3 cột */
     width: 100vw;
@@ -440,7 +440,7 @@ button:hover {
     }
 
     .top-bar {
-        padding: 2px;
+        padding: 5px;
     }
 
     .top-bar h2 {
@@ -540,7 +540,8 @@ button:hover {
 
     .shop-card {
         flex: 1;
-        width: 13%; /* Đảm bảo không bị sập width về 0 */
+        width: 13%;
+        /* Đảm bảo không bị sập width về 0 */
         min-width: 0;
         padding: 2px;
         overflow: hidden;
