@@ -134,7 +134,10 @@ class Champion:
         elif target_mode == 'ally_lowest_hp':
             return min(allies, key=lambda c: c.hp, default=self)
         elif target_mode == 'ally_lowest_mana':
-            return min(allies, key=lambda c: c.mana, default=self)
+            valid_allies = [c for c in allies if c != self]
+            return min(valid_allies, key=lambda c: c.mana) if valid_allies else None
+        elif target_mode == 'enemy_highest_cost':
+            return max(enemies, key=lambda c: (get_champion_cost(c.name), getattr(c, 'star', 1)), default=None)
         return None
 
     def cast_skill(self, base_target, board_state):
@@ -270,6 +273,7 @@ class Champion:
                     enemy_target = max(enemy_team, key=lambda c: (get_champion_cost(c.name), getattr(c, 'star', 1)))
                     ally_target = min(ally_team, key=lambda c: (get_champion_cost(c.name), getattr(c, 'star', 1)))
                     
+                    event['targetId'] = enemy_target.id
                     # Swap team (and original_team for safety)
                     enemy_target.team, ally_target.team = ally_target.team, enemy_target.team
                     enemy_target.original_team = enemy_target.team
