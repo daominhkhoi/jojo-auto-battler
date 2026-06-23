@@ -67,22 +67,51 @@ const sellZone = document.getElementById('sellZone');
 
 // 1. SỰ KIỆN NHẤN CHUỘT XUỐNG (Bắt đầu kéo)
 function handlePointerDown(e) {
-    if (STATE.isCombatPhase) return;
     const mP = getMousePos(e);
+    let touchedChamp = null;
 
-    STATE.champions.forEach(champ => {
+    for (let i = STATE.champions.length - 1; i >= 0; i--) {
+        const champ = STATE.champions[i];
         const size = getCanvasCoords(champ.targetX, champ.targetY);
-        if (mP.x >= champ.pixelX && mP.x <= champ.pixelX + size.w &&
-            mP.y >= champ.pixelY && mP.y <= champ.pixelY + size.h) {
-            isDragging = true;
-            draggedChamp = champ;
-            originalX = champ.targetX;
-            originalY = champ.targetY;
-            
-            const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
-            if (sellZone && isTouchDevice) sellZone.style.display = 'block';
+        const drawX = champ.pixelX !== undefined ? champ.pixelX : size.x;
+        const drawY = champ.pixelY !== undefined ? champ.pixelY : size.y;
+
+        if (mP.x >= drawX && mP.x <= drawX + size.w &&
+            mP.y >= drawY && mP.y <= drawY + size.h) {
+            touchedChamp = champ;
+            break;
         }
-    });
+    }
+
+    const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+
+    if (touchedChamp) {
+        if (!STATE.isCombatPhase) {
+            isDragging = true;
+            draggedChamp = touchedChamp;
+            originalX = touchedChamp.targetX;
+            originalY = touchedChamp.targetY;
+            touchedChamp.startPixelX = touchedChamp.pixelX;
+            touchedChamp.startPixelY = touchedChamp.pixelY;
+            
+            if (sellZone && isTouchDevice) sellZone.style.display = 'block';
+        } else {
+            if (isTouchDevice) {
+                showDisplayInfo('champ', touchedChamp);
+                const infoPanel = document.getElementById('infoPanel');
+                if (infoPanel) {
+                    infoPanel.classList.add('show');
+                    const synPanel = document.getElementById('synergyPanel');
+                    if (synPanel) synPanel.classList.remove('show');
+                }
+            }
+        }
+    } else {
+        if (isTouchDevice) {
+            const infoPanel = document.getElementById('infoPanel');
+            if (infoPanel) infoPanel.classList.remove('show');
+        }
+    }
 }
 canvas.addEventListener('mousedown', handlePointerDown);
 canvas.addEventListener('touchstart', (e) => {
@@ -188,6 +217,21 @@ function handlePointerUp(e) {
         draggedChamp.targetY = gridY;
         draggedChamp.originalX = gridX;
         draggedChamp.originalY = gridY;
+
+        const isTouchDev = window.matchMedia("(pointer: coarse)").matches;
+        if (isTouchDev) {
+            const dx = (draggedChamp.pixelX || 0) - (draggedChamp.startPixelX || 0);
+            const dy = (draggedChamp.pixelY || 0) - (draggedChamp.startPixelY || 0);
+            if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+                showDisplayInfo('champ', draggedChamp);
+                const infoPanel = document.getElementById('infoPanel');
+                if (infoPanel) {
+                    infoPanel.classList.add('show');
+                    const synPanel = document.getElementById('synergyPanel');
+                    if (synPanel) synPanel.classList.remove('show');
+                }
+            }
+        }
 
         isDragging = false;
         draggedChamp = null;

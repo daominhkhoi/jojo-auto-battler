@@ -85,7 +85,11 @@ export function renderBoard(ctx, canvas) {
             }
         }
 
-        ctx.strokeStyle = champ.originalX !== undefined ? '#4facfe' : '#ff0844';
+        // Xác định team của người chơi hiện tại dựa trên các tướng có originalX
+        const localTeam = STATE.champions.find(c => c.originalX !== undefined)?.team || 'Team1';
+        const isAlly = (champ.team === localTeam);
+
+        ctx.strokeStyle = isAlly ? '#4facfe' : '#ff0844';
         ctx.lineWidth = champ.targetY >= 6 ? 2 : 3.5;
         ctx.strokeRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
 
@@ -97,7 +101,7 @@ export function renderBoard(ctx, canvas) {
         const barW = currentSize.w - 8;
         
         // Vẽ viền (Border)
-        ctx.strokeStyle = champ.originalX !== undefined ? '#4facfe' : '#ff0844';
+        ctx.strokeStyle = isAlly ? '#4facfe' : '#ff0844';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(pX + 4 - 1, barY - 1, barW + 2, totalBarHeight + 2);
 

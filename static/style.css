@@ -440,7 +440,11 @@ button:hover {
     }
 
     .top-bar {
-        padding: 5px;
+        padding: 2px;
+        position: sticky;
+        top: 0;
+        z-index: 99999;
+        background-color: #1a2230;
     }
 
     .top-bar h2 {
