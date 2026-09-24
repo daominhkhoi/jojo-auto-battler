@@ -2,6 +2,38 @@
 import { CONFIG, STATE, CHAMPION_POOL, TRAITS_INFO } from './globals.js';
 import { showNotification } from './notifications.js';
 
+// ======================================================================
+// FIX: CHAMPION POOL DEPLETION
+// Fixed copy counts per cost tier (like real TFT).
+// Pool is initialized once when champions are loaded, then depleted as
+// cards are bought and replenished when sold or a new shop rolls.
+// ======================================================================
+const POOL_COUNTS = { 1: 30, 2: 20, 3: 15, 4: 10, 5: 5 };
+
+// Tracks how many copies of each champion remain in the global pool
+const _pool = {}; // { champName: copiesRemaining }
+
+export function initChampPool() {
+    Object.keys(_pool).forEach(k => delete _pool[k]);
+    CHAMPION_POOL.forEach(champ => {
+        _pool[champ.name] = POOL_COUNTS[champ.cost] ?? 30;
+    });
+}
+
+function _returnToPool(champName, count = 1) {
+    const template = CHAMPION_POOL.find(t => t.name === champName);
+    if (!template) return;
+    const max = POOL_COUNTS[template.cost] ?? 30;
+    _pool[champName] = Math.min(max, (_pool[champName] || 0) + count);
+}
+
+function _takeFromPool(champName) {
+    if ((_pool[champName] || 0) <= 0) return false;
+    _pool[champName]--;
+    return true;
+}
+
+// ======================================================================
 export function updateGold(amount) {
     STATE.playerGold += amount;
     const goldEl = document.getElementById('goldText');
@@ -16,47 +48,54 @@ export function updateUnitCount() {
     updateSynergies(boardChamps);
 }
 
+// ======================================================================
+// FIX: Level cost uses a linear formula instead of exponential doubling.
+// Old: 5 → 10 → 20 → 40 → 80 (unreachable after lv 4)
+// New: 4 → 8 → 12 → 16 → 20 → 24 (always reachable, scales with level)
+// ======================================================================
 export function buyXp() {
     if (STATE.isCombatPhase) return;
 
     if (STATE.playerGold >= STATE.levelCost) {
         updateGold(-STATE.levelCost);
-
         STATE.playerLevel++;
-        STATE.levelCost = STATE.levelCost * 2;
+        STATE.levelCost = STATE.playerLevel * 4; // FIX: linear, not exponential
 
         document.getElementById('levelText').innerText = STATE.playerLevel;
         document.getElementById('buyXpBtn').innerText = `Level Up (${STATE.levelCost} 🪙)`;
 
         updateUnitCount();
-
         showNotification(`Level ${STATE.playerLevel} Reached! +1 Slot`);
     } else {
         showNotification(`Need ${STATE.levelCost} gold to level up!`);
     }
 }
 
+// ======================================================================
 function checkAndMerge(champName, starLevel) {
     if (starLevel >= 3) return;
     const copies = STATE.champions.filter(c => c.name === champName && c.star === starLevel);
     if (copies.length >= 3) {
-        const targets = copies.slice(0, 3);
+        const targets  = copies.slice(0, 3);
         STATE.champions = STATE.champions.filter(c => !targets.includes(c));
+
+        // Return 2 consumed copies to pool (1 stays as the upgraded unit)
+        _returnToPool(champName, 2);
 
         const upgraded = targets[0];
         upgraded.star += 1;
 
-        upgraded.max_hp = Math.round(upgraded.max_hp * 1.8);
-        upgraded.hp = upgraded.max_hp;
-        upgraded.attack = Math.round(upgraded.attack * 1.8);
-        upgraded.mana = 0;
+        upgraded.max_hp   = Math.round(upgraded.max_hp   * 1.8);
+        upgraded.hp       = upgraded.max_hp;
+        upgraded.attack   = Math.round(upgraded.attack   * 1.8);
+        upgraded.mana     = 0;
         upgraded.max_mana = Math.round(upgraded.max_mana * 0.7);
 
         if (upgraded.skill) {
-            if (upgraded.skill.power) upgraded.skill.power = Math.round(upgraded.skill.power * 1.6);
+            if (upgraded.skill.power)    upgraded.skill.power    = Math.round(upgraded.skill.power    * 1.6);
             if (upgraded.skill.duration) upgraded.skill.duration = parseFloat((upgraded.skill.duration * 1.2).toFixed(1));
-            if (upgraded.skill.radius) upgraded.skill.radius = parseFloat((upgraded.skill.radius * 1.2).toFixed(1));
-            if (upgraded.skill.percent) upgraded.skill.percent = parseFloat((upgraded.skill.percent * 1.3).toFixed(2));
+            if (upgraded.skill.radius)   upgraded.skill.radius   = parseFloat((upgraded.skill.radius   * 1.2).toFixed(1));
+            if (upgraded.skill.percent)  upgraded.skill.percent  = parseFloat((upgraded.skill.percent  * 1.3).toFixed(2));
         }
 
         STATE.champions.push(upgraded);
@@ -76,66 +115,64 @@ export function buyChampion(champTemplate, cardElement) {
             break;
         }
     }
-
     if (!slot) return showNotification("Bench is full!");
+
+    // FIX: Deduct from pool — if the pool is empty for this champ, refuse purchase
+    if (!_takeFromPool(champTemplate.name)) {
+        return showNotification(`No more copies of [${champTemplate.name}] available!`);
+    }
 
     updateGold(-champTemplate.cost);
     cardElement.style.visibility = 'hidden';
 
     STATE.champions.push({
-        id: Math.random().toString(36).substr(2, 9),
-        name: champTemplate.name,
-        team: "Team1",
-        star: 1,
-        cost: champTemplate.cost,
-        targetX: slot.x, targetY: slot.y, originalX: slot.x, originalY: slot.y,
-        hp: champTemplate.hp, max_hp: champTemplate.hp, mana: 0, max_mana: champTemplate.max_mana,
-        attack: champTemplate.attack, attack_range: champTemplate.attack_range, speed: champTemplate.speed, is_alive: true, shakeTimer: 0,
-        skill: champTemplate.skill ? JSON.parse(JSON.stringify(champTemplate.skill)) : null
+        id:          Math.random().toString(36).substr(2, 9),
+        name:        champTemplate.name,
+        team:        "Team1",
+        star:        1,
+        cost:        champTemplate.cost,
+        targetX:     slot.x, targetY: slot.y,
+        originalX:   slot.x, originalY: slot.y,
+        hp:          champTemplate.hp,  max_hp:   champTemplate.hp,
+        mana:        0,                 max_mana: champTemplate.max_mana,
+        attack:      champTemplate.attack,
+        // FIX: Store base values so resetBoardForNextRound can restore them
+        base_attack: champTemplate.attack,
+        base_speed:  champTemplate.speed,
+        attack_range: champTemplate.attack_range,
+        speed:       champTemplate.speed,
+        is_alive:    true,
+        shakeTimer:  0,
+        skill:       champTemplate.skill ? JSON.parse(JSON.stringify(champTemplate.skill)) : null,
+        traits:      champTemplate.traits || [],
     });
 
     checkAndMerge(champTemplate.name, 1);
     updateUnitCount();
 }
 
+// ======================================================================
 function rollChampion() {
     const level = STATE.playerLevel || 1;
-    const roll = Math.random() * 100;
+    const roll  = Math.random() * 100;
     let targetCost = 1;
 
-    // Tỉ lệ xuất hiện tướng phụ thuộc vào Level của người chơi
-    if (level === 1) {
-        if (roll < 100) targetCost = 1;
-    } else if (level === 2) {
-        if (roll < 70) targetCost = 1;
-        else targetCost = 2;
-    } else if (level === 3) {
-        if (roll < 50) targetCost = 1;
-        else if (roll < 85) targetCost = 2;
-        else targetCost = 3;
-    } else if (level === 4) {
-        if (roll < 30) targetCost = 1;
-        else if (roll < 70) targetCost = 2;
-        else if (roll < 95) targetCost = 3;
-        else targetCost = 4;
-    } else if (level === 5) {
-        if (roll < 15) targetCost = 1;
-        else if (roll < 45) targetCost = 2;
-        else if (roll < 85) targetCost = 3;
-        else if (roll < 99) targetCost = 4;
-        else targetCost = 5;
-    } else {
-        // Level 6+
-        if (roll < 10) targetCost = 1;
-        else if (roll < 25) targetCost = 2;
-        else if (roll < 55) targetCost = 3;
-        else if (roll < 80) targetCost = 4;
-        else targetCost = 5;
+    if      (level === 1) { targetCost = 1; }
+    else if (level === 2) { targetCost = roll < 70  ? 1 : 2; }
+    else if (level === 3) { targetCost = roll < 50  ? 1 : roll < 85 ? 2 : 3; }
+    else if (level === 4) { targetCost = roll < 30  ? 1 : roll < 70 ? 2 : roll < 95 ? 3 : 4; }
+    else if (level === 5) { targetCost = roll < 15  ? 1 : roll < 45 ? 2 : roll < 85 ? 3 : roll < 99 ? 4 : 5; }
+    else                  { targetCost = roll < 10  ? 1 : roll < 25 ? 2 : roll < 55 ? 3 : roll < 80 ? 4 : 5; }
+
+    // FIX: Filter pool to only champions that still have copies available
+    const pool = CHAMPION_POOL.filter(c => c.cost === targetCost && (_pool[c.name] || 0) > 0);
+
+    if (pool.length === 0) {
+        // Fallback: any champion still available
+        const fallback = CHAMPION_POOL.filter(c => (_pool[c.name] || 0) > 0);
+        if (fallback.length === 0) return null;
+        return fallback[Math.floor(Math.random() * fallback.length)];
     }
-
-    const pool = CHAMPION_POOL.filter(c => c.cost === targetCost);
-
-    if (pool.length === 0) return CHAMPION_POOL[Math.floor(Math.random() * CHAMPION_POOL.length)];
 
     return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -165,27 +202,34 @@ export function refreshShop() {
     container.innerHTML = '';
     for (let i = 0; i < 7; i++) {
         const randomChamp = rollChampion();
+        if (!randomChamp) {
+            // Pool is depleted — show empty slot
+            const emptyCard = document.createElement('div');
+            emptyCard.className = 'shop-card';
+            emptyCard.style.opacity = '0.3';
+            emptyCard.innerHTML = `<p style="text-align:center;margin-top:30px;">SOLD OUT</p>`;
+            container.appendChild(emptyCard);
+            continue;
+        }
 
         const card = document.createElement('div');
         card.className = 'shop-card';
         card.innerHTML = `<h3>${randomChamp.name}</h3><img src="${randomChamp.img}" width="40" height="40" style="border-radius: 5px;"><p class="cost">${randomChamp.cost} 🪙</p>`;
 
-        // Màu background và viền theo cost giống common, uncommon,...
         const colors = {
-            1: { border: '#bdc3c7', bg: 'linear-gradient(to bottom, #2c3e50, #7f8c8d)' }, // Trắng xám (Common)
-            2: { border: '#2ecc71', bg: 'linear-gradient(to bottom, #2c3e50, #27ae60)' }, // Xanh lá (Uncommon)
-            3: { border: '#3498db', bg: 'linear-gradient(to bottom, #2c3e50, #2980b9)' }, // Xanh dương (Rare)
-            4: { border: '#9b59b6', bg: 'linear-gradient(to bottom, #2c3e50, #8e44ad)' }, // Tím (Epic)
-            5: { border: '#e67e22', bg: 'linear-gradient(to bottom, #2c3e50, #d35400)' }  // Cam (Legendary)
+            1: { border: '#bdc3c7', bg: 'linear-gradient(to bottom, #2c3e50, #7f8c8d)' },
+            2: { border: '#2ecc71', bg: 'linear-gradient(to bottom, #2c3e50, #27ae60)' },
+            3: { border: '#3498db', bg: 'linear-gradient(to bottom, #2c3e50, #2980b9)' },
+            4: { border: '#9b59b6', bg: 'linear-gradient(to bottom, #2c3e50, #8e44ad)' },
+            5: { border: '#e67e22', bg: 'linear-gradient(to bottom, #2c3e50, #d35400)' }
         };
         const theme = colors[randomChamp.cost] || colors[1];
-        card.style.border = `2px solid ${theme.border}`;
-        card.style.background = theme.bg;
+        card.style.border      = `2px solid ${theme.border}`;
+        card.style.background  = theme.bg;
         card.dataset.origBorder = theme.border;
 
         card.onclick = (e) => {
             const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
-
             if (isTouchDevice) {
                 if (selectedShopCard === card) {
                     buyChampion(randomChamp, card);
@@ -199,37 +243,32 @@ export function refreshShop() {
                     });
                     selectedShopCard = card;
                     showDisplayInfo('champ', randomChamp);
-                    card.style.transform = 'scale(1.05)';
+                    card.style.transform  = 'scale(1.05)';
                     card.style.borderColor = '#f1c40f';
-                    
                     const infoPanel = document.getElementById('infoPanel');
                     if (infoPanel && window.innerWidth <= 768) {
                         infoPanel.classList.add('show');
                         const synPanel = document.getElementById('synergyPanel');
                         if (synPanel) synPanel.classList.remove('show');
                     }
-                    e.stopPropagation(); // Ngăn sự kiện click ra ngoài làm reset
+                    e.stopPropagation();
                 }
             } else {
-                // Laptop: Bấm là mua luôn
                 buyChampion(randomChamp, card);
                 selectedShopCard = null;
                 showDisplayInfo(null);
             }
         };
         card.onmouseenter = () => {
-            const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
-            if (!isTouchDevice && selectedShopCard !== card) {
+            if (!window.matchMedia("(pointer: coarse)").matches && selectedShopCard !== card) {
                 showDisplayInfo('champ', randomChamp);
             }
         };
         card.onmouseleave = () => {
-            const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
-            if (!isTouchDevice && !selectedShopCard) {
+            if (!window.matchMedia("(pointer: coarse)").matches && !selectedShopCard) {
                 showDisplayInfo(null);
             }
         };
-
         container.appendChild(card);
     }
 }
@@ -237,15 +276,16 @@ export function refreshShop() {
 export function sellChampion(champ) {
     const index = STATE.champions.indexOf(champ);
     if (index > -1) {
-        const template = CHAMPION_POOL.find(t => t.name === champ.name) || {};
-        const baseCost = template.cost || 1;
+        const template   = CHAMPION_POOL.find(t => t.name === champ.name) || {};
+        const baseCost   = template.cost || 1;
+        const copies     = Math.pow(3, (champ.star || 1) - 1);
+        const sellPrice  = baseCost * copies;
 
-        const copies = Math.pow(3, (champ.star || 1) - 1);
-        const sellPrice = baseCost * copies;
+        // FIX: Return copies back to pool on sell
+        _returnToPool(champ.name, copies);
 
         updateGold(sellPrice);
         STATE.champions.splice(index, 1);
-
         showNotification(`Sold [${champ.name} ${'⭐'.repeat(champ.star)}] for ${sellPrice} 🪙.`);
         updateUnitCount();
     }
@@ -254,8 +294,8 @@ export function sellChampion(champ) {
 export function updateSynergies(boardChamps) {
     if (!TRAITS_INFO) return;
 
-    const uniqueChamps = [];
-    const countedNames = new Set();
+    const uniqueChamps  = [];
+    const countedNames  = new Set();
 
     boardChamps.forEach(c => {
         if (c.team === 'Team1' && !countedNames.has(c.name)) {
@@ -291,12 +331,12 @@ function renderSynergyPanel(traitCounts) {
 
     sortedTraits.forEach(trait => {
         const count = traitCounts[trait];
-        const info = TRAITS_INFO[trait];
+        const info  = TRAITS_INFO[trait];
         if (!info) return;
 
         let activeLevel = 0;
-        let nextReq = info.thresholds[0].req;
-        let isMax = false;
+        let nextReq     = info.thresholds[0].req;
+        let isMax       = false;
 
         for (let i = info.thresholds.length - 1; i >= 0; i--) {
             if (count >= info.thresholds[i].req) {
@@ -307,7 +347,7 @@ function renderSynergyPanel(traitCounts) {
             }
         }
 
-        const displayReq = isMax ? info.thresholds[info.thresholds.length - 1].req : nextReq;
+        const displayReq    = isMax ? info.thresholds[info.thresholds.length - 1].req : nextReq;
         const isActiveClass = activeLevel > 0 ? 'active' : '';
 
         html += `
@@ -341,13 +381,11 @@ export function showDisplayInfo(type, data) {
     }
 
     if (type === 'champ') {
-        const template = CHAMPION_POOL.find(c => c.name === data.name) || {};
-        const hp = Math.round(data.hp !== undefined ? data.hp : (data.max_hp || template.hp));
-        const traitsHTML = template.traits ? `<p>🔮 Traits: <b>${template.traits.join(', ')}</b></p>` : '';
-        const imgSrc = template.img || '';
-
+        const template    = CHAMPION_POOL.find(c => c.name === data.name) || {};
+        const hp          = Math.round(data.hp !== undefined ? data.hp : (data.max_hp || template.hp));
+        const traitsHTML  = template.traits ? `<p>🔮 Traits: <b>${template.traits.join(', ')}</b></p>` : '';
+        const imgSrc      = template.img || '';
         const currentStar = data.star || 1;
-        const starFactor = currentStar - 1;
 
         let skillHTML = '';
         if (data.skill || template.skill) {
@@ -355,61 +393,54 @@ export function showDisplayInfo(type, data) {
             let skillName = s.type.toUpperCase();
             let skillDesc = '';
 
-            const scaledPower = s.power ? Math.round(s.power) : 0;
-            const scaledDuration = s.duration ? s.duration : 0;
-            const scaledRadius = s.radius ? s.radius : 1.5;
-            const scaledPercent = s.percent ? s.percent : 0.5;
+            const scaledPower   = s.power    ? Math.round(s.power)   : 0;
+            const scaledDuration = s.duration ? s.duration            : 0;
+            const scaledRadius  = s.radius   ? s.radius              : 1.5;
+            const scaledPercent = s.percent  ? s.percent             : 0.5;
 
+            // FIX: Removed duplicate case 'banish' and case 'hp_shield' entries
             switch (s.type) {
-                case 'damage': skillDesc = `Deals <b>${scaledPower.toLocaleString()}</b> burst damage to the nearest enemy.`; break;
-                case 'time_stop': skillDesc = `Freezes time for all enemies for <b>${scaledDuration.toFixed(1)}s</b>. Self gains massive Attack Speed.`; break;
-                case 'return_to_zero': skillDesc = `Reverts all enemies' actions to zero, wiping their Mana and purging all their active buffs instantly.`; break;
-                case 'blink_strike': skillDesc = `Teleports behind the furthest enemy and deals <b>${scaledPower.toLocaleString()}</b> damage, ignoring frontliners.`; break;
-                case 'execute': skillDesc = `Instantly executes targets below 30% HP. Otherwise, deals <b>${scaledPower.toLocaleString()}</b> physical damage.`; break;
-                case 'banish': skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'submerge': skillDesc = `Submerges into shadows, becoming untargetable for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'mana_battery': skillDesc = `Channels <b>${scaledPower.toLocaleString()}</b> Mana per second to the ally with lowest current Mana for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'pull': skillDesc = `Erases space, pulling all enemies to self and dealing <b>${scaledPower.toLocaleString()}</b> damage.`; break;
-                case 'mind_control': skillDesc = `Brainwashes the target to fight for your team for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'polymorph': skillDesc = `Transforms the target into a harmless creature, disabling attacks for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'stat_steal': skillDesc = `Steals <b>${scaledPower.toLocaleString()}</b> Attack from the target for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'soul_swap': skillDesc = `Permanently swaps the souls of the strongest enemy and the weakest ally, exchanging their teams and fully healing both. Max 1 time per round.`; break;
-                case 'banish': skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'hp_shield': skillDesc = `Activates a defensive barrier absorbing <b>${Math.round(scaledPercent * 100)}%</b> of Max HP in damage.`; break;
-                case 'damage_link': skillDesc = `Links lifeforce with the target. Target absorbs your damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'life_tether': skillDesc = `Tethers to the target, draining <b>${scaledPower.toLocaleString()}</b> HP/s to heal yourself for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'evasion': skillDesc = `Dodges all incoming attacks and damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'revive': skillDesc = `Upon taking lethal damage, instantly revives with <b>100% HP</b>.`; break;
-                case 'ricochet': skillDesc = `Fires a projectile that bounces between enemies, dealing <b>${scaledPower.toLocaleString()}</b> damage on each hit.`; break;
-                case 'dot': skillDesc = `Inflicts damage over time, dealing <b>${scaledPower.toLocaleString()}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'aoe_dot': skillDesc = `Creates a toxic zone (Radius <b>${s.radius}</b>) dealing <b>${scaledPower.toLocaleString()}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'global_slow': skillDesc = `Manipulates gravity/time, slowing down all enemies' Attack Speed by <b>50%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'mana_lock': skillDesc = `Silences the target, preventing Mana gain for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'stun': skillDesc = `Stuns the target, completely disabling movement and actions for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'heal': skillDesc = `Heals the most wounded ally for <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'aoe_heal': skillDesc = `Heals allies in a radius (<b>${s.radius}</b>) for <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'regen': skillDesc = `Regenerates <b>${scaledPower.toLocaleString()}</b> HP per second for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'buff_atk': skillDesc = `Increases Attack by <b>+${scaledPower.toLocaleString()}</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'speed_buff': skillDesc = `Boosts Attack Speed by <b>+${scaledPower.toLocaleString()}%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'swap': skillDesc = `Swaps positions with the target and deals <b>${scaledPower.toLocaleString()}</b> damage.`; break;
-                case 'clone': skillDesc = `Creates a Shadow Clone with <b>${Math.round(scaledPercent * 100)}%</b> of your original stats.`; break;
-                case 'hp_shield': skillDesc = `Activates a defensive barrier absorbing <b>${Math.round(scaledPercent * 100)}%</b> of Max HP in damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                default: skillDesc = 'Casts a unique and powerful Stand ability.';
+                case 'damage':         skillDesc = `Deals <b>${scaledPower.toLocaleString()}</b> burst damage to the nearest enemy.`; break;
+                case 'time_stop':      skillDesc = `Freezes time for all enemies for <b>${scaledDuration.toFixed(1)}s</b>. Self gains massive Attack Speed.`; break;
+                case 'return_to_zero': skillDesc = `Reverts all enemies' actions to zero, wiping their Mana and purging all active buffs instantly.`; break;
+                case 'blink_strike':   skillDesc = `Teleports behind the furthest enemy and deals <b>${scaledPower.toLocaleString()}</b> damage.`; break;
+                case 'execute':        skillDesc = `Instantly executes targets below 30% HP. Otherwise, deals <b>${scaledPower.toLocaleString()}</b> physical damage.`; break;
+                case 'banish':         skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'submerge':       skillDesc = `Submerges into shadows, becoming untargetable for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'mana_battery':   skillDesc = `Channels <b>${scaledPower.toLocaleString()}</b> Mana/s to the lowest-Mana ally for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'pull':           skillDesc = `Erases space, pulling all enemies to self and dealing <b>${scaledPower.toLocaleString()}</b> damage.`; break;
+                case 'mind_control':   skillDesc = `Brainwashes the target to fight for your team for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'polymorph':      skillDesc = `Transforms the target into a harmless creature for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'stat_steal':     skillDesc = `Steals <b>${scaledPower.toLocaleString()}</b> Attack from the target for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'soul_swap':      skillDesc = `Permanently swaps the strongest enemy with the weakest ally. Max 1 time per round.`; break;
+                case 'hp_shield':      skillDesc = `Activates a barrier absorbing <b>${Math.round(scaledPercent * 100)}%</b> of Max HP in damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'damage_link':    skillDesc = `Links lifeforce with the target. Target absorbs your damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'life_tether':    skillDesc = `Drains <b>${scaledPower.toLocaleString()}</b> HP/s from tethered target to heal yourself for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'evasion':        skillDesc = `Dodges all incoming damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'revive':         skillDesc = `Upon taking lethal damage, instantly revives with <b>100% HP</b>.`; break;
+                case 'ricochet':       skillDesc = `Fires a projectile bouncing ${Math.round(scaledRadius)} times, dealing <b>${scaledPower.toLocaleString()}</b> per hit.`; break;
+                case 'dot':            skillDesc = `Inflicts <b>${scaledPower.toLocaleString()}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'aoe_dot':        skillDesc = `Toxic zone (Radius <b>${scaledRadius}</b>) dealing <b>${scaledPower.toLocaleString()}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'global_slow':    skillDesc = `Slows all enemies' Attack Speed by <b>50%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'mana_lock':      skillDesc = `Silences the target, preventing Mana gain for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'stun':           skillDesc = `Stuns the target for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'heal':           skillDesc = `Heals the most wounded ally for <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'aoe_heal':       skillDesc = `Heals allies in radius (<b>${scaledRadius}</b>) for <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'regen':          skillDesc = `Regenerates <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'buff_atk':       skillDesc = `Increases Attack by <b>+${scaledPower.toLocaleString()}</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'speed_buff':     skillDesc = `Boosts Attack Speed by <b>+${scaledPower.toLocaleString()}%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'swap':           skillDesc = `Swaps positions with the target and deals <b>${scaledPower.toLocaleString()}</b> damage.`; break;
+                case 'clone':          skillDesc = `Creates a Shadow Clone with <b>${Math.round(scaledPercent * 100)}%</b> of original stats.`; break;
+                default:               skillDesc = 'Casts a unique and powerful Stand ability.';
             }
 
             const targetMap = {
-                'self': 'Self',
-                'enemy_closest': 'Nearest Enemy',
-                'enemy_furthest': 'Furthest Enemy',
-                'enemy_highest_atk': 'Highest Attack Enemy',
-                'enemy_lowest_hp': 'Lowest HP Enemy',
-                'enemy_random': 'Random Enemy',
-                'ally_lowest_hp': 'Lowest HP Ally',
-                'ally_lowest_mana': 'Lowest Mana Ally',
-                'all_enemies': 'All Enemies',
-                'all_except_self': 'Everyone Else',
-                'bounce_closest': 'Nearest Enemy (Bouncing)',
-                'area_closest': 'Nearest Enemy Area'
+                'self': 'Self', 'enemy_closest': 'Nearest Enemy',
+                'enemy_furthest': 'Furthest Enemy', 'enemy_highest_atk': 'Highest Attack Enemy',
+                'enemy_lowest_hp': 'Lowest HP Enemy', 'enemy_random': 'Random Enemy',
+                'ally_lowest_hp': 'Lowest HP Ally', 'ally_lowest_mana': 'Lowest Mana Ally',
+                'all_enemies': 'All Enemies', 'all_except_self': 'Everyone Else',
+                'bounce_closest': 'Nearest Enemy (Bouncing)', 'area_closest': 'Nearest Enemy Area'
             };
             const targetStr = targetMap[s.target] || 'The Target';
 
@@ -427,8 +458,8 @@ export function showDisplayInfo(type, data) {
             ${imgSrc ? `<img src="${imgSrc}" style="width:100%; height:300px; object-fit:cover; border-radius:8px; border:2px solid #f39c12; margin-bottom:10px;">` : ''}
             <div class="card-stats">
                 ${traitsHTML}
-                ${skillHTML} 
-                <p>❤️ HP: <b>${hp.toLocaleString()} / ${(data.max_hp || template.hp).toLocaleString()}</b></p>
+                ${skillHTML}
+                <p>❤️ HP: <b>${hp.toLocaleString()} / ${(data.max_hp || template.hp || 0).toLocaleString()}</b></p>
                 ${data.shield > 0 ? `<p>🛡️ Shield: <b style="color: #ecf0f1;">${Math.round(data.shield).toLocaleString()}</b></p>` : ''}
                 <p>⚔️ Attack: <b>${Math.round(data.attack !== undefined ? data.attack : template.attack).toLocaleString()}</b></p>
                 <p>🎯 Range: <b>${(data.attack_range !== undefined ? data.attack_range : template.attack_range).toFixed(1)}</b></p>
@@ -445,7 +476,7 @@ export function showDisplayInfo(type, data) {
         let thresholdsHTML = '';
         info.thresholds.forEach(t => {
             const isActive = data.count >= t.req;
-            const color = isActive ? '#e74c3c' : '#7f8c8d';
+            const color    = isActive ? '#e74c3c' : '#7f8c8d';
             thresholdsHTML += `<p style="color: ${color}; font-size: 17px; margin: 10px 0;"><b>[${t.req}]</b> ${t.effect}</p>`;
         });
 

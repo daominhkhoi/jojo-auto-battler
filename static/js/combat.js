@@ -113,7 +113,9 @@ export function syncTickData(data) {
             localChamp.targetX = serverChamp.x;
             localChamp.targetY = serverChamp.y;
 
-            localChamp.hp = serverChamp.hp;
+            localChamp.hp = serverChamp.hp;  // single assignment (FIX: removed duplicate)
+
+            // Death particle burst (restored)
             if (localChamp.is_alive && !serverChamp.is_alive) {
                 if (!STATE.particles) STATE.particles = [];
                 const tarSize = getCanvasCoords(localChamp.targetX, localChamp.targetY);
@@ -129,8 +131,6 @@ export function syncTickData(data) {
                     });
                 }
             }
-
-            localChamp.hp = serverChamp.hp;
             localChamp.mana = serverChamp.mana;
             localChamp.shield = serverChamp.shield || 0;
             localChamp.is_alive = serverChamp.is_alive;
@@ -298,14 +298,16 @@ export function handleCombatEnd(serverResult) {
         });
 
     } else {
-        // --- 3. NẾU CHƯA AI ĐƯỢC 10 ĐIỂM THÌ ĐÁNH TIẾP ---
+        // --- 3. Continue to next round ---
         STATE.currentRound++;
         updateRoundUI();
 
-        let baseIncome = (STATE.currentRound * 5) + 5;
+        // FIX: Capped income formula — base increases per round but caps at 35 gold.
+        // Old formula (round * 5 + 5) caused runaway snowballing late game.
+        const rawIncome  = STATE.currentRound * 3 + 5;
+        const baseIncome = Math.min(rawIncome, 35);
         updateGold(baseIncome);
-        let notifMsg = `Round ${STATE.currentRound} Start: +${baseIncome} Gold`;
-        showNotification(notifMsg);
+        showNotification(`Round ${STATE.currentRound} Start: +${baseIncome} Gold`);
 
         if (findBtn) findBtn.style.display = 'none';
         if (readyBtn) {
@@ -319,17 +321,20 @@ export function handleCombatEnd(serverResult) {
 }
 
 function resetBoardForNextRound() {
-    // Chỉ giữ lại những tướng gốc của người chơi (có originalX)
+    // Keep only the player's own units (have originalX set)
     STATE.champions = STATE.champions.filter(c => c.originalX !== undefined);
     STATE.champions.forEach(champ => {
-        champ.hp = champ.max_hp;
-        champ.mana = 0;
-        champ.shield = 0;
+        champ.hp       = champ.max_hp;
+        champ.mana     = 0;
+        champ.shield   = 0;
         champ.is_alive = true;
-        champ.team = 'Team1'; // Trả lại đội hình gốc lỡ bị mind_control hay soul_swap
+        champ.team     = 'Team1'; // Restore from mind_control / soul_swap
 
-        // ---> THÊM DÒNG NÀY ĐỂ DỌN SẠCH CÁNH, KIẾM, ĐẦU LÂU KHI HẾT TRẬN <---
-        champ.buffs = [];
+        // FIX: Reset attack and speed to base values so buff leakage does not carry into next round
+        if (champ.base_attack !== undefined) champ.attack = champ.base_attack;
+        if (champ.base_speed  !== undefined) champ.speed  = champ.base_speed;
+
+        champ.buffs        = [];
         champ.buff_details = [];
 
         if (champ.originalX !== undefined && champ.originalY !== undefined) {
@@ -340,7 +345,7 @@ function resetBoardForNextRound() {
     });
 
     STATE.activeProjectiles = [];
-    STATE.hitEffects = []; // (Dòng dọn vùng độc ở bước trước vẫn giữ nguyên nhé)
+    STATE.hitEffects        = [];
 }
 export function updateRoundUI() {
     const roundText = document.getElementById('roundText');

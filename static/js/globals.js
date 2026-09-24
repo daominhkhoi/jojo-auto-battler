@@ -27,8 +27,8 @@ export const STATE = {
     particles: [],
     floatingTexts: [],
     isCombatPhase: false,
-    playerLP: 100, 
-    botLP: 100,   
+    playerLP: 0,   // FIX: was 100 — score starts at 0, win condition is 10
+    botLP: 0,      // FIX: same
     currentRound: 1
 };
 
