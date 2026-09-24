@@ -36,28 +36,18 @@ export const STATE = {
 export { CHAMPION_POOL };
 
 export const IMAGE_CACHE = {};
+CHAMPION_POOL.forEach(champ => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = champ.img;
+    IMAGE_CACHE[champ.name] = img;
+});
 
-/**
- * Preload ALL champion images (and background) up-front.
- * Call this once after CHAMPION_POOL is populated (in entities.js).
- * Returns a Promise that resolves when every image has loaded (or failed).
- */
-export function preloadImages() {
-    const promises = Object.entries(IMAGES).map(([name, src]) => {
-        // Re-use existing cache entry if already loading/loaded
-        if (IMAGE_CACHE[name]) return Promise.resolve();
-
-        return new Promise(resolve => {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload  = () => resolve();
-            img.onerror = () => resolve(); // Don't block on a missing file
-            img.src = src;
-            IMAGE_CACHE[name] = img;
-        });
-    });
-
-    return Promise.all(promises);
+if (IMAGES["Background"]) {
+    const bgImg = new Image();
+    bgImg.crossOrigin = "anonymous";
+    bgImg.src = IMAGES["Background"];
+    IMAGE_CACHE["Background"] = bgImg;
 }
 
 // Hàm ma thuật tự động chuyển tọa độ lưới sang vị trí Pixel chính xác trên màn hình
