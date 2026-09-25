@@ -366,7 +366,7 @@ export function renderBoard(ctx, canvas) {
         const dx = proj.targetX - proj.x;
         const dy = proj.targetY - proj.y;
         const angle = proj.angle !== undefined ? proj.angle : Math.atan2(dy, dx);
-        const isCrit = proj.isCrit || (proj.damage && proj.damage >= 8000);
+        const isCrit = !!proj.isCrit;
 
         ctx.save();
         ctx.translate(proj.x, proj.y);
@@ -913,16 +913,11 @@ export function renderBoard(ctx, canvas) {
             const scale = t.scale || 1.0;
             ctx.scale(scale, scale);
 
-            if (t.glow && STATE.floatingTexts.length <= 15) {
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = t.glowColor || t.color;
-            }
-
             ctx.font = t.font || '900 21px "Segoe UI", Arial, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
-            // Viền đen đậm nổi bật
+            // Viền đen dày tương phản cao (Không dùng shadowBlur để duy trì 60 FPS)
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 4.5;
             ctx.lineJoin = 'round';

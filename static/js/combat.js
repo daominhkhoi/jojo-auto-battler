@@ -14,30 +14,22 @@ export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
 
     let color = '#ffffff';
     let baseScale = 1.0;
-    let glow = false;
-    let glowColor = '';
-    let font = 'bold 20px "Segoe UI", Arial, sans-serif';
+    let font = 'bold 19px "Segoe UI", Arial, sans-serif';
 
     switch (type) {
         case 'crit':
             color = '#ff3838';
             baseScale = 1.45;
-            glow = true;
-            glowColor = '#ff3838';
             font = '900 24px "Segoe UI", Arial, sans-serif';
             break;
         case 'skill':
             color = '#ffa502';
             baseScale = 1.35;
-            glow = true;
-            glowColor = '#ffa502';
             font = 'bold 22px "Segoe UI", Arial, sans-serif';
             break;
         case 'heal':
             color = '#2ecc71';
             baseScale = 1.2;
-            glow = true;
-            glowColor = '#2ecc71';
             font = 'bold 20px "Segoe UI", Arial, sans-serif';
             break;
         case 'shield':
@@ -48,14 +40,11 @@ export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
         case 'status':
             color = options.color || '#f1c40f';
             baseScale = options.scale || 1.3;
-            glow = true;
-            glowColor = options.glowColor || color;
             font = '900 21px "Segoe UI", Arial, sans-serif';
             break;
         case 'reflect':
             color = '#e056fd';
             baseScale = 1.15;
-            glow = false; // No heavy shadowBlur on rapid reflect hits
             font = '900 18px "Segoe UI", Arial, sans-serif';
             break;
         case 'normal':
@@ -70,7 +59,7 @@ export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
     if (options.scale) baseScale = options.scale;
 
     // Strict cap to avoid performance death when many units attack simultaneously
-    if (STATE.floatingTexts.length >= 25) {
+    if (STATE.floatingTexts.length >= 14) {
         STATE.floatingTexts.shift();
     }
 
@@ -81,13 +70,11 @@ export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
         vy: 2.2,
         text: text,
         color: color,
-        life: 48,
-        maxLife: 48,
+        life: 35,
+        maxLife: 35,
         baseScale: baseScale,
         scale: baseScale * 1.35,
         scaleProgress: 0,
-        glow: glow,
-        glowColor: glowColor,
         font: font
     });
 }
@@ -122,7 +109,7 @@ export function updatePhysics() {
             proj.lifeTime--;
             if (proj.lifeTime === 5) {
                 const target = STATE.champions.find(c => c.id === proj.targetId);
-                const isCrit = proj.isCrit || (proj.damage && proj.damage >= 8000);
+                const isCrit = proj.isCrit || (proj.damage && proj.damage >= 12000);
                 if (target) {
                     target.shakeTimer = 8;
                     target.hitFlashTimer = 3;
@@ -130,7 +117,11 @@ export function updatePhysics() {
                     if (dmg > 0) {
                         spawnFloatingText(proj.targetX, proj.targetY, (isCrit ? `💥 CRIT! -${dmg.toLocaleString()}` : `-${dmg.toLocaleString()}`), isCrit ? 'crit' : 'normal');
                         if (isCrit) {
-                            STATE.screenShake = Math.max(STATE.screenShake || 0, 4);
+                            const now = performance.now();
+                            if (!STATE._lastCritShake || (now - STATE._lastCritShake > 160)) {
+                                STATE.screenShake = Math.max(STATE.screenShake || 0, 3.5);
+                                STATE._lastCritShake = now;
+                            }
                         }
                     }
                 }
@@ -168,7 +159,7 @@ export function updatePhysics() {
 
             if (dist < proj.speed) {
                 const target = STATE.champions.find(c => c.id === proj.targetId);
-                const isCrit = proj.isCrit || (proj.damage && proj.damage >= 8000);
+                const isCrit = proj.isCrit || (proj.damage && proj.damage >= 12000);
                 if (target) {
                     target.shakeTimer = 8;
                     target.hitFlashTimer = 3;
@@ -176,7 +167,11 @@ export function updatePhysics() {
                     if (dmg > 0) {
                         spawnFloatingText(proj.targetX, proj.targetY, (isCrit ? `💥 CRIT! -${dmg.toLocaleString()}` : `-${dmg.toLocaleString()}`), isCrit ? 'crit' : 'normal');
                         if (isCrit) {
-                            STATE.screenShake = Math.max(STATE.screenShake || 0, 4);
+                            const now = performance.now();
+                            if (!STATE._lastCritShake || (now - STATE._lastCritShake > 160)) {
+                                STATE.screenShake = Math.max(STATE.screenShake || 0, 3.5);
+                                STATE._lastCritShake = now;
+                            }
                         }
                     }
                 }
@@ -497,7 +492,7 @@ export function syncTickData(data) {
             const isRanged = attacker.attack_range > 1.5;
             const angle = Math.atan2(tarCenterY - attCenterY, tarCenterX - attCenterX);
             const dmg = event.damage || 0;
-            const isCrit = dmg >= 8000;
+            const isCrit = event.is_crit || dmg >= 12000 || (attacker.raw_attack && dmg >= attacker.raw_attack * 1.6);
 
             STATE.activeProjectiles.push({
                 x: attCenterX,
