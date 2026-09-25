@@ -97,8 +97,9 @@ function handlePointerDown(e) {
             
             if (sellZone && isTouchDevice) sellZone.style.display = 'block';
         } else {
+            hoveredChamp = touchedChamp;
+            showDisplayInfo('champ', touchedChamp);
             if (isTouchDevice) {
-                showDisplayInfo('champ', touchedChamp);
                 const infoPanel = document.getElementById('infoPanel');
                 if (infoPanel) {
                     infoPanel.classList.add('show');
@@ -109,6 +110,7 @@ function handlePointerDown(e) {
         }
     } else {
         if (isTouchDevice) {
+            hoveredChamp = null;
             const infoPanel = document.getElementById('infoPanel');
             if (infoPanel) infoPanel.classList.remove('show');
         }

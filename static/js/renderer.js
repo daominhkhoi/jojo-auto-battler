@@ -94,6 +94,12 @@ export function renderBoard(ctx, canvas) {
             }
         }
 
+        // HIT REACTION: Flash white briefly when taking damage
+        if (champ.hitFlashTimer && champ.hitFlashTimer > 0) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
+            ctx.fillRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
+        }
+
         // Xác định team của người chơi hiện tại dựa trên các tướng có originalX
         const localTeam = STATE.champions.find(c => c.originalX !== undefined)?.team || 'Team1';
         const isAlly = (champ.team === localTeam);
@@ -359,44 +365,119 @@ export function renderBoard(ctx, canvas) {
     STATE.activeProjectiles.forEach((proj) => {
         const dx = proj.targetX - proj.x;
         const dy = proj.targetY - proj.y;
-        const angle = Math.atan2(dy, dx);
+        const angle = proj.angle !== undefined ? proj.angle : Math.atan2(dy, dx);
+        const isCrit = proj.isCrit || (proj.damage && proj.damage >= 8000);
 
         ctx.save();
         ctx.translate(proj.x, proj.y);
         ctx.rotate(angle);
 
         if (proj.type === 'melee') {
-            const progress = 1 - (proj.lifeTime / 15);
-            // Vẽ vệt chém (Slash) hoặc cú đấm mờ ảo
+            const maxL = proj.maxLife || 10;
+            const progress = 1 - (proj.lifeTime / maxL);
+            const fade = Math.sin(progress * Math.PI); // Smooth in & out fade
+            const slashDist = 15 + progress * 35;
+
+            ctx.save();
+            ctx.translate(slashDist, 0);
+
+            // A. Expanding Compressed Shockwave Arc
             ctx.beginPath();
-            ctx.arc(15 + progress * 20, 0, 25, -Math.PI/2, Math.PI/2);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${1 - progress})`;
-            ctx.lineWidth = 8;
+            ctx.arc(10, 0, 15 + progress * 25, -Math.PI * 0.4, Math.PI * 0.4);
+            ctx.strokeStyle = isCrit ? `rgba(255, 215, 0, ${fade * 0.5})` : `rgba(255, 255, 255, ${fade * 0.4})`;
+            ctx.lineWidth = Math.max(1, 2 * (1 - progress));
             ctx.stroke();
-            
+
+            // B. Dynamic Crescent Slash Blade (Lưỡi liềm sắc nhọn cong vút)
+            // Outer radiant flame/blade (Multi-layer glow, zero shadowBlur!)
             ctx.beginPath();
-            ctx.arc(10 + progress * 30, 0, 15, -Math.PI/2, Math.PI/2);
-            ctx.strokeStyle = `rgba(231, 76, 60, ${1 - progress})`;
-            ctx.lineWidth = 4;
+            ctx.moveTo(-15, -35);
+            ctx.quadraticCurveTo(18, 0, -15, 35);
+            ctx.quadraticCurveTo(8, 0, -15, -35);
+            ctx.closePath();
+            ctx.fillStyle = isCrit ? `rgba(241, 196, 15, ${fade * 0.85})` : `rgba(231, 76, 60, ${fade * 0.85})`;
+            ctx.fill();
+
+            // Inner razor white core
+            ctx.beginPath();
+            ctx.moveTo(-8, -25);
+            ctx.quadraticCurveTo(15, 0, -8, 25);
+            ctx.quadraticCurveTo(7, 0, -8, -25);
+            ctx.closePath();
+            ctx.fillStyle = `rgba(255, 255, 255, ${fade * 0.95})`;
+            ctx.fill();
+
+            // C. Speed cutting lines (Vệt chém xé gió)
+            ctx.beginPath();
+            ctx.moveTo(-20, -18); ctx.lineTo(12, -22);
+            ctx.moveTo(-20, 18);  ctx.lineTo(12, 22);
+            ctx.strokeStyle = isCrit ? `rgba(255, 242, 0, ${fade * 0.8})` : `rgba(255, 255, 255, ${fade * 0.7})`;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
+
+            ctx.restore();
         } else {
-            // Đạn bay xa - sao chổi năng lượng
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = '#00ffff';
+            // A. Aero-Ribbon Tail (Đuôi dải lụa năng lượng vuốt nhọn không đứt đoạn)
+            const tailLen = 42;
+            const tailGrad = ctx.createLinearGradient(0, 0, -tailLen, 0);
+            if (isCrit) {
+                tailGrad.addColorStop(0, 'rgba(255, 215, 0, 0.95)');
+                tailGrad.addColorStop(0.4, 'rgba(243, 156, 18, 0.6)');
+                tailGrad.addColorStop(1, 'rgba(231, 76, 60, 0)');
+            } else {
+                tailGrad.addColorStop(0, 'rgba(0, 255, 255, 0.95)');
+                tailGrad.addColorStop(0.4, 'rgba(30, 144, 255, 0.6)');
+                tailGrad.addColorStop(1, 'rgba(10, 61, 98, 0)');
+            }
 
-            // Đuôi sao chổi
-            const gradient = ctx.createLinearGradient(0, 0, -40, 0);
-            gradient.addColorStop(0, 'rgba(0, 255, 255, 1)');
-            gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
-            
+            // Tapered aerodynamic ribbon
             ctx.beginPath();
-            ctx.moveTo(0, 0); ctx.lineTo(-40, 0);
-            ctx.strokeStyle = gradient; ctx.lineWidth = 6; ctx.lineCap = 'round';
+            ctx.moveTo(0, -4.5);
+            ctx.lineTo(-tailLen, 0);
+            ctx.lineTo(0, 4.5);
+            ctx.closePath();
+            ctx.fillStyle = tailGrad;
+            ctx.fill();
+
+            // Inner white high-speed core streak
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-tailLen * 0.65, 0);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
             ctx.stroke();
 
-            // Đầu đạn
-            ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff'; ctx.fill();
+            // B. Orbiting Plasma Sparks (2 Hạt quang năng xoắn ốc DNA)
+            const spiralAngle = timeNow * 24;
+            const orbY1 = Math.sin(spiralAngle) * 7.5;
+            const orbY2 = Math.sin(spiralAngle + Math.PI) * 6;
+
+            ctx.beginPath();
+            ctx.arc(0, orbY1, 2.2, 0, Math.PI * 2);
+            ctx.fillStyle = isCrit ? '#ffffff' : '#00ffff';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(-8, orbY2, 1.8, 0, Math.PI * 2);
+            ctx.fillStyle = isCrit ? '#ffd700' : '#70a1ff';
+            ctx.fill();
+
+            // C. Multi-layer Glowing Energy Head (Zero shadowBlur - blazing fast!)
+            ctx.beginPath();
+            ctx.arc(0, 0, 7.5, 0, Math.PI * 2);
+            ctx.fillStyle = isCrit ? 'rgba(241, 196, 15, 0.45)' : 'rgba(0, 255, 255, 0.45)';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
+            ctx.fillStyle = isCrit ? '#ffd700' : '#00d2d3';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
         }
         ctx.restore();
     });
@@ -410,16 +491,68 @@ export function renderBoard(ctx, canvas) {
             const currentAlpha = hit.lifeTime < 30 ? (hit.lifeTime / 30) : 1.0;
             const pixelRadius = (hit.radius || 1.5) * CONFIG.BOARD_CELL_WIDTH;
 
-            if (!hit.effectType || hit.effectType === 'damage') {
-                ctx.globalAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.0);
-                const sz = 15 + progress * 25;
+            if (!hit.effectType || hit.effectType === 'damage' || hit.effectType === 'attack_hit') {
+                const isCrit = hit.isCrit;
+                const isRanged = hit.hitType === 'ranged';
+                const alpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.2);
+
+                // 1. Expanding Shockwave Ring (Vòng sóng nén khí mở rộng)
+                const ringRadius = (isCrit ? 10 : 6) + progress * (isCrit ? 36 : 22);
+                const ringAlpha = (1 - progress) * (isCrit ? 0.95 : 0.7);
                 ctx.beginPath();
-                ctx.moveTo(-sz, -sz); ctx.lineTo(sz, sz);
-                ctx.moveTo(sz, -sz); ctx.lineTo(-sz, sz);
-                ctx.strokeStyle = `rgba(255, 255, 255, ${1 - progress})`;
-                ctx.lineWidth = 8 * (1 - progress);
-                ctx.lineCap = 'round';
+                ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = isCrit
+                    ? `rgba(255, 215, 0, ${ringAlpha})`
+                    : (isRanged ? `rgba(0, 255, 255, ${ringAlpha})` : `rgba(255, 71, 87, ${ringAlpha})`);
+                ctx.lineWidth = Math.max(1, (1 - progress) * (isCrit ? 4.5 : 2.5));
                 ctx.stroke();
+
+                // 2. 4-Point Radiant Diamond Star (Ngôi sao phát quang 4 cánh)
+                const starSize = (isCrit ? 28 : 18) * (1 - progress * 0.7);
+                const starInner = starSize * 0.22;
+
+                ctx.beginPath();
+                ctx.moveTo(0, -starSize);
+                ctx.lineTo(starInner, -starInner);
+                ctx.lineTo(starSize, 0);
+                ctx.lineTo(starInner, starInner);
+                ctx.lineTo(0, starSize);
+                ctx.lineTo(-starInner, starInner);
+                ctx.lineTo(-starSize, 0);
+                ctx.lineTo(-starInner, -starInner);
+                ctx.closePath();
+                ctx.fillStyle = isCrit
+                    ? `rgba(243, 156, 18, ${alpha * 0.85})`
+                    : (isRanged ? `rgba(0, 210, 211, ${alpha * 0.85})` : `rgba(235, 77, 75, ${alpha * 0.85})`);
+                ctx.fill();
+
+                // Inner Star Core (Brilliant White)
+                const innerSz = starSize * 0.55;
+                const innerCore = innerSz * 0.22;
+                ctx.beginPath();
+                ctx.moveTo(0, -innerSz);
+                ctx.lineTo(innerCore, -innerCore);
+                ctx.lineTo(innerSz, 0);
+                ctx.lineTo(innerCore, innerCore);
+                ctx.lineTo(0, innerSz);
+                ctx.lineTo(-innerCore, innerCore);
+                ctx.lineTo(-innerSz, 0);
+                ctx.lineTo(-innerCore, -innerCore);
+                ctx.closePath();
+                ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.fill();
+
+                // 3. Diagonal Sparks for Crit (Tia chớp chí mạng)
+                if (isCrit) {
+                    const rayLen = starSize * 1.35;
+                    ctx.beginPath();
+                    ctx.moveTo(-rayLen, -rayLen); ctx.lineTo(rayLen, rayLen);
+                    ctx.moveTo(rayLen, -rayLen);  ctx.lineTo(-rayLen, rayLen);
+                    ctx.strokeStyle = `rgba(255, 242, 0, ${alpha * 0.9})`;
+                    ctx.lineWidth = Math.max(1, 2.5 * (1 - progress));
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                }
             }
             else if (hit.effectType === 'aoe_dot') {
                 ctx.globalAlpha = 1.0;
@@ -737,14 +870,35 @@ export function renderBoard(ctx, canvas) {
         });
     }   
 
-    // 5. VẼ CÁC HẠT (PARTICLES) NHỎ LITI (Tia lửa, máu)
+    // 5. VẼ CÁC HẠT (PARTICLES) NHỎ LITI (Tia lửa xé gió, mảnh vụn tốc độ cao)
     if (STATE.particles) {
         STATE.particles.forEach(p => {
-            ctx.globalAlpha = Math.min(1.0, Math.max(0, p.life / 25)); // Giả sử max life quanh 50
-            ctx.fillStyle = p.color;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fill();
+            const alpha = Math.min(1.0, Math.max(0, p.life / 18));
+            ctx.globalAlpha = alpha;
+            const speed = Math.hypot(p.vx || 0, p.vy || 0);
+
+            if (speed > 0.8) {
+                // Velocity-stretched needle spark (Tia lửa kéo vệt định hướng xé gió)
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x - p.vx * 1.6, p.y - p.vy * 1.6);
+                ctx.strokeStyle = p.color;
+                ctx.lineWidth = Math.max(1, p.size * 0.7);
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                // Bright core head
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, Math.max(0.8, p.size * 0.38), 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // Floating ember / wisp (Đốm năng lượng trôi chậm)
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
             ctx.globalAlpha = 1.0;
         });
     }

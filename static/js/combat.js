@@ -105,6 +105,7 @@ export function updatePhysics() {
         champ.pixelY += (targetCoords.y - champ.pixelY) * 0.12;
 
         if (champ.shakeTimer > 0) champ.shakeTimer--;
+        if (champ.hitFlashTimer > 0) champ.hitFlashTimer--;
 
         // Ghost HP bar smoothly drains towards current HP
         if (champ.ghostHp === undefined || champ.ghostHp < champ.hp) {
@@ -119,29 +120,43 @@ export function updatePhysics() {
 
         if (proj.type === 'melee') {
             proj.lifeTime--;
-            if (proj.lifeTime === 8) {
+            if (proj.lifeTime === 5) {
                 const target = STATE.champions.find(c => c.id === proj.targetId);
+                const isCrit = proj.isCrit || (proj.damage && proj.damage >= 8000);
                 if (target) {
-                    target.shakeTimer = 12;
+                    target.shakeTimer = 8;
+                    target.hitFlashTimer = 3;
                     const dmg = proj.damage || 0;
                     if (dmg > 0) {
-                        const isCrit = dmg >= 10000;
-                        spawnFloatingText(proj.targetX, proj.targetY, (isCrit ? `CRIT! -${dmg.toLocaleString()}` : `-${dmg.toLocaleString()}`), isCrit ? 'crit' : 'normal');
+                        spawnFloatingText(proj.targetX, proj.targetY, (isCrit ? `💥 CRIT! -${dmg.toLocaleString()}` : `-${dmg.toLocaleString()}`), isCrit ? 'crit' : 'normal');
                         if (isCrit) {
-                            STATE.screenShake = Math.max(STATE.screenShake || 0, 5);
+                            STATE.screenShake = Math.max(STATE.screenShake || 0, 4);
                         }
                     }
                 }
-                STATE.hitEffects.push({ x: proj.targetX, y: proj.targetY, lifeTime: 8, maxLife: 8 });
+                STATE.hitEffects.push({
+                    x: proj.targetX,
+                    y: proj.targetY,
+                    lifeTime: 8,
+                    maxLife: 8,
+                    effectType: 'attack_hit',
+                    hitType: 'melee',
+                    isCrit: isCrit,
+                    angle: proj.angle || 0
+                });
 
-                // Spawn blood & impact sparks
+                // Spawn 4 directional sparks (velocity-oriented)
                 if (!STATE.particles) STATE.particles = [];
-                for (let p = 0; p < 8; p++) {
+                const sparkColor = isCrit ? '#ffd700' : '#ff4757';
+                for (let p = 0; p < 4; p++) {
+                    const spd = Math.random() * 9 + 4;
+                    const sparkAngle = (proj.angle || 0) + (Math.random() - 0.5) * 1.5;
                     STATE.particles.push({
                         x: proj.targetX, y: proj.targetY,
-                        vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12,
-                        color: Math.random() < 0.6 ? '#e74c3c' : '#f39c12',
-                        size: Math.random() * 3 + 1, life: 15 + Math.random() * 10
+                        vx: Math.cos(sparkAngle) * spd, vy: Math.sin(sparkAngle) * spd,
+                        color: Math.random() < 0.4 ? '#ffffff' : sparkColor,
+                        size: Math.random() * 2 + 1.5,
+                        life: 10 + Math.random() * 4
                     });
                 }
             }
@@ -151,41 +166,45 @@ export function updatePhysics() {
             const dy = proj.targetY - proj.y;
             const dist = Math.hypot(dx, dy);
 
-            // Spawn luminous energy trail particles for ranged
-            if (Math.random() < 0.6) {
-                if (!STATE.particles) STATE.particles = [];
-                STATE.particles.push({
-                    x: proj.x, y: proj.y,
-                    vx: -dx / dist * 2 + (Math.random() - 0.5), vy: -dy / dist * 2 + (Math.random() - 0.5),
-                    color: Math.random() < 0.5 ? '#00ffff' : '#ffffff',
-                    size: Math.random() * 2.5 + 1, life: 12
-                });
-            }
-
             if (dist < proj.speed) {
                 const target = STATE.champions.find(c => c.id === proj.targetId);
+                const isCrit = proj.isCrit || (proj.damage && proj.damage >= 8000);
                 if (target) {
-                    target.shakeTimer = 12;
+                    target.shakeTimer = 8;
+                    target.hitFlashTimer = 3;
                     const dmg = proj.damage || 0;
                     if (dmg > 0) {
-                        const isCrit = dmg >= 10000;
-                        spawnFloatingText(proj.targetX, proj.targetY, (isCrit ? `CRIT! -${dmg.toLocaleString()}` : `-${dmg.toLocaleString()}`), isCrit ? 'crit' : 'normal');
+                        spawnFloatingText(proj.targetX, proj.targetY, (isCrit ? `💥 CRIT! -${dmg.toLocaleString()}` : `-${dmg.toLocaleString()}`), isCrit ? 'crit' : 'normal');
                         if (isCrit) {
-                            STATE.screenShake = Math.max(STATE.screenShake || 0, 5);
+                            STATE.screenShake = Math.max(STATE.screenShake || 0, 4);
                         }
                     }
                 }
 
-                STATE.hitEffects.push({ x: proj.targetX, y: proj.targetY, lifeTime: 12, maxLife: 12 });
+                STATE.hitEffects.push({
+                    x: proj.targetX,
+                    y: proj.targetY,
+                    lifeTime: 8,
+                    maxLife: 8,
+                    effectType: 'attack_hit',
+                    hitType: 'ranged',
+                    isCrit: isCrit,
+                    angle: proj.angle || 0
+                });
                 STATE.activeProjectiles.splice(i, 1);
 
-                // Spawn impact spark explosion
+                // Spawn 4 impact sparks
                 if (!STATE.particles) STATE.particles = [];
-                for (let p = 0; p < 10; p++) {
+                const sparkColor = isCrit ? '#ffd700' : '#00ffff';
+                for (let p = 0; p < 4; p++) {
+                    const spd = Math.random() * 9 + 4;
+                    const sparkAngle = Math.random() * Math.PI * 2;
                     STATE.particles.push({
                         x: proj.targetX, y: proj.targetY,
-                        vx: (Math.random() - 0.5) * 14, vy: (Math.random() - 0.5) * 14,
-                        color: '#00ffff', size: Math.random() * 4 + 1, life: 20 + Math.random() * 10
+                        vx: Math.cos(sparkAngle) * spd, vy: Math.sin(sparkAngle) * spd,
+                        color: Math.random() < 0.4 ? '#ffffff' : sparkColor,
+                        size: Math.random() * 2 + 1.5,
+                        life: 10 + Math.random() * 4
                     });
                 }
             } else {
@@ -199,19 +218,22 @@ export function updatePhysics() {
         STATE.hitEffects[i].lifeTime--;
         if (STATE.hitEffects[i].lifeTime <= 0) STATE.hitEffects.splice(i, 1);
     }
-    if (STATE.hitEffects.length > 20) {
-        STATE.hitEffects.splice(0, STATE.hitEffects.length - 20);
+    if (STATE.hitEffects.length > 15) {
+        STATE.hitEffects.splice(0, STATE.hitEffects.length - 15);
     }
 
     if (!STATE.particles) STATE.particles = [];
     for (let i = STATE.particles.length - 1; i >= 0; i--) {
         const p = STATE.particles[i];
-        p.x += p.vx; p.y += p.vy;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.92;
+        p.vy *= 0.92;
         p.life--;
         if (p.life <= 0) STATE.particles.splice(i, 1);
     }
-    if (STATE.particles.length > 80) {
-        STATE.particles.splice(0, STATE.particles.length - 80);
+    if (STATE.particles.length > 40) {
+        STATE.particles.splice(0, STATE.particles.length - 40);
     }
 
     if (!STATE.floatingTexts) STATE.floatingTexts = [];
@@ -279,12 +301,22 @@ export function syncTickData(data) {
             }
             localChamp.mana = serverChamp.mana;
             localChamp.shield = serverChamp.shield || 0;
+            localChamp.max_hp = serverChamp.max_hp !== undefined ? serverChamp.max_hp : localChamp.max_hp;
+            localChamp.raw_hp = serverChamp.raw_hp !== undefined ? serverChamp.raw_hp : localChamp.raw_hp;
             localChamp.attack = serverChamp.attack !== undefined ? serverChamp.attack : localChamp.attack;
             localChamp.base_attack = serverChamp.base_attack !== undefined ? serverChamp.base_attack : localChamp.base_attack;
+            localChamp.raw_attack = serverChamp.raw_attack !== undefined ? serverChamp.raw_attack : localChamp.raw_attack;
             localChamp.speed = serverChamp.speed !== undefined ? serverChamp.speed : localChamp.speed;
             localChamp.base_speed = serverChamp.base_speed !== undefined ? serverChamp.base_speed : localChamp.base_speed;
+            localChamp.raw_speed = serverChamp.raw_speed !== undefined ? serverChamp.raw_speed : localChamp.raw_speed;
+            localChamp.attack_range = serverChamp.attack_range !== undefined ? serverChamp.attack_range : localChamp.attack_range;
+            localChamp.raw_range = serverChamp.raw_range !== undefined ? serverChamp.raw_range : localChamp.raw_range;
+            localChamp.max_mana = serverChamp.max_mana !== undefined ? serverChamp.max_mana : localChamp.max_mana;
             localChamp.is_alive = serverChamp.is_alive;
             localChamp.team = serverChamp.team;
+            localChamp.skill = serverChamp.skill || localChamp.skill;
+            localChamp.raw_skill = serverChamp.raw_skill || localChamp.raw_skill;
+            localChamp.applied_traits = serverChamp.applied_traits || localChamp.applied_traits || [];
             localChamp.buffs = serverChamp.buffs || [];
             localChamp.buff_details = serverChamp.buff_details || [];
         } else {
@@ -299,17 +331,24 @@ export function syncTickData(data) {
                 targetY: serverChamp.y,
                 hp: serverChamp.hp,
                 max_hp: serverChamp.max_hp,
+                raw_hp: serverChamp.raw_hp !== undefined ? serverChamp.raw_hp : serverChamp.max_hp,
                 ghostHp: serverChamp.hp,
                 mana: serverChamp.mana,
                 max_mana: serverChamp.max_mana,
                 shield: serverChamp.shield || 0,
                 attack: serverChamp.attack !== undefined ? serverChamp.attack : template.attack,
                 base_attack: serverChamp.base_attack !== undefined ? serverChamp.base_attack : (template.attack || 0),
+                raw_attack: serverChamp.raw_attack !== undefined ? serverChamp.raw_attack : (serverChamp.base_attack || template.attack || 0),
                 speed: serverChamp.speed !== undefined ? serverChamp.speed : template.speed,
                 base_speed: serverChamp.base_speed !== undefined ? serverChamp.base_speed : (template.speed || 1.0),
+                raw_speed: serverChamp.raw_speed !== undefined ? serverChamp.raw_speed : (template.speed || 1.0),
                 attack_range: serverChamp.attack_range || template.attack_range,
+                raw_range: serverChamp.raw_range !== undefined ? serverChamp.raw_range : (template.attack_range || 1.0),
                 is_alive: serverChamp.is_alive,
                 shakeTimer: 0,
+                skill: serverChamp.skill || template.skill,
+                raw_skill: serverChamp.raw_skill || template.skill,
+                applied_traits: serverChamp.applied_traits || [],
                 buffs: serverChamp.buffs || [],
                 buff_details: serverChamp.buff_details || []
             });
@@ -440,16 +479,31 @@ export function syncTickData(data) {
 
             const attSize = getCanvasCoords(attacker.targetX, attacker.targetY);
             const tarSize = getCanvasCoords(target.targetX, target.targetY);
+            const attCenterX = attacker.pixelX + attSize.w / 2;
+            const attCenterY = attacker.pixelY + attSize.h / 2;
+            const tarCenterX = target.pixelX + tarSize.w / 2;
+            const tarCenterY = target.pixelY + tarSize.h / 2;
+
             const isRanged = attacker.attack_range > 1.5;
+            const angle = Math.atan2(tarCenterY - attCenterY, tarCenterX - attCenterX);
+            const dmg = event.damage || 0;
+            const isCrit = dmg >= 8000;
 
             STATE.activeProjectiles.push({
-                x: attacker.pixelX + attSize.w / 2, y: attacker.pixelY + attSize.h / 2,
-                targetX: target.pixelX + tarSize.w / 2, targetY: target.pixelY + tarSize.h / 2,
+                x: attCenterX,
+                y: attCenterY,
+                startX: attCenterX,
+                startY: attCenterY,
+                targetX: tarCenterX,
+                targetY: tarCenterY,
                 targetId: event.targetId,
-                damage: event.damage || 0,
+                damage: dmg,
+                isCrit: isCrit,
+                angle: angle,
                 type: isRanged ? 'projectile' : 'melee',
-                speed: isRanged ? 16 : 0,
-                lifeTime: isRanged ? 0 : 15
+                speed: isRanged ? 22 : 0,
+                lifeTime: isRanged ? 0 : 10,
+                maxLife: isRanged ? 0 : 10
             });
         }
         else if (['evasion', 'reflect', 'damage_link_proc', 'revive'].includes(event.type)) {
@@ -592,15 +646,27 @@ function resetBoardForNextRound() {
     // Keep only the player's own units (have originalX set)
     STATE.champions = STATE.champions.filter(c => c.originalX !== undefined);
     STATE.champions.forEach(champ => {
-        champ.hp       = champ.max_hp;
+        if (champ.raw_hp !== undefined) {
+            champ.max_hp = champ.raw_hp;
+            champ.hp     = champ.raw_hp;
+        } else {
+            champ.hp     = champ.max_hp;
+        }
         champ.mana     = 0;
         champ.shield   = 0;
         champ.is_alive = true;
         champ.team     = 'Team1'; // Restore from mind_control / soul_swap
 
-        // FIX: Reset attack and speed to base values so buff leakage does not carry into next round
-        if (champ.base_attack !== undefined) champ.attack = champ.base_attack;
-        if (champ.base_speed  !== undefined) champ.speed  = champ.base_speed;
+        // FIX: Reset attack, speed, range, skill to raw baseline so buffs do not leak
+        if (champ.raw_attack !== undefined) champ.attack = champ.raw_attack;
+        else if (champ.base_attack !== undefined) champ.attack = champ.base_attack;
+
+        if (champ.raw_speed !== undefined) champ.speed = champ.raw_speed;
+        else if (champ.base_speed !== undefined) champ.speed = champ.base_speed;
+
+        if (champ.raw_range !== undefined) champ.attack_range = champ.raw_range;
+        if (champ.raw_skill !== undefined) champ.skill = champ.raw_skill;
+        champ.applied_traits = [];
 
         champ.buffs        = [];
         champ.buff_details = [];

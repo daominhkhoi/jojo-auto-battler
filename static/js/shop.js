@@ -470,6 +470,66 @@ export function showDisplayInfo(type, data, shopContext = null) {
             `;
         }
 
+        const starMult = 1.8 ** (currentStar - 1);
+        const skillPowerMult = 1.6 ** (currentStar - 1);
+
+        // --- HP & Synergy calculation ---
+        const rawHp = Math.round(data.raw_hp !== undefined ? data.raw_hp : ((template.hp || 1000) * starMult));
+        const maxHp = Math.round(data.max_hp !== undefined ? data.max_hp : rawHp);
+        const curHp = Math.round(data.hp !== undefined ? data.hp : maxHp);
+        let hpBonusHTML = '';
+        if (maxHp > rawHp) {
+            hpBonusHTML = ` <span style="color:#2ecc71; font-weight:800; font-size:13px; text-shadow:0 0 6px rgba(46,204,113,0.5);">(+${(maxHp - rawHp).toLocaleString()} Synergy)</span>`;
+        }
+
+        // --- Attack & Synergy calculation ---
+        const rawAtk = Math.round(data.raw_attack !== undefined ? data.raw_attack : ((template.attack || 100) * starMult));
+        const curAtk = Math.round(data.attack !== undefined ? data.attack : rawAtk);
+        let atkDisplay = `<b>${curAtk.toLocaleString()}</b>`;
+        if (curAtk > rawAtk) {
+            atkDisplay += ` <span style="color:#2ecc71; font-weight:800; font-size:13px; text-shadow:0 0 6px rgba(46,204,113,0.5);">(+${(curAtk - rawAtk).toLocaleString()})</span>`;
+        } else if (curAtk < rawAtk) {
+            atkDisplay += ` <span style="color:#e74c3c; font-weight:800; font-size:13px;">(-${(rawAtk - curAtk).toLocaleString()})</span>`;
+        }
+
+        // --- Speed & Synergy calculation ---
+        const rawSpd = data.raw_speed !== undefined ? data.raw_speed : (template.speed !== undefined ? template.speed : 1.0);
+        const curSpd = data.speed !== undefined ? data.speed : rawSpd;
+        let spdDisplay = `<b>${curSpd.toFixed(2)}</b>`;
+        if (curSpd > rawSpd + 0.01) {
+            spdDisplay += ` <span style="color:#2ecc71; font-weight:800; font-size:13px; text-shadow:0 0 6px rgba(46,204,113,0.5);">(+${(curSpd - rawSpd).toFixed(2)})</span>`;
+        } else if (curSpd < rawSpd - 0.01) {
+            spdDisplay += ` <span style="color:#e74c3c; font-weight:800; font-size:13px;">(-${(rawSpd - curSpd).toFixed(2)})</span>`;
+        }
+
+        // --- Range & Synergy calculation ---
+        const rawRng = data.raw_range !== undefined ? data.raw_range : (template.attack_range !== undefined ? template.attack_range : 1.0);
+        const curRng = data.attack_range !== undefined ? data.attack_range : rawRng;
+        let rngDisplay = `<b>${curRng.toFixed(1)}</b>`;
+        if (curRng > rawRng + 0.05) {
+            rngDisplay += ` <span style="color:#2ecc71; font-weight:800; font-size:13px; text-shadow:0 0 6px rgba(46,204,113,0.5);">(+${(curRng - rawRng).toFixed(1)})</span>`;
+        }
+
+        // --- Active Synergies Badge in Combat ---
+        let activeSynergiesHTML = '';
+        if (data.applied_traits && data.applied_traits.length > 0) {
+            activeSynergiesHTML = `
+                <div style="background: rgba(46, 204, 113, 0.15); border: 1px solid rgba(46, 204, 113, 0.4); border-left: 4px solid #2ecc71; padding: 7px 10px; margin: 8px 0; border-radius: 6px;">
+                    <p style="margin: 0 0 5px 0; color: #2ecc71; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">⚡ Active Synergies (In Combat):</p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                        ${data.applied_traits.map(t => `<span style="background: linear-gradient(135deg, #27ae60, #2ecc71); color: #ffffff; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">✓ ${t}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Mana & starting mana indicator ---
+        const maxMana = data.max_mana || template.max_mana || 200;
+        let manaExtra = '';
+        if (data.start_mana && data.start_mana > 0) {
+            manaExtra = ` <span style="color: #3498db; font-size: 12px; font-weight: 700;">(Start: ${data.start_mana})</span>`;
+        }
+
         let skillHTML = '';
         if (data.skill || template.skill) {
             const s = data.skill || template.skill;
@@ -481,37 +541,43 @@ export function showDisplayInfo(type, data, shopContext = null) {
             const scaledRadius = s.radius ? s.radius : 1.5;
             const scaledPercent = s.percent ? s.percent : 0.5;
 
+            // Check if skill power was boosted by synergy
+            const baseSkillPower = Math.round((template.skill && template.skill.power ? template.skill.power : 0) * skillPowerMult);
+            const isSkillAmped = scaledPower > baseSkillPower && baseSkillPower > 0;
+            const skillAmpDiff = isSkillAmped ? (scaledPower - baseSkillPower) : 0;
+            const powerDisplay = isSkillAmped ? `${scaledPower.toLocaleString()} <span style="color:#2ecc71; font-weight:800;">(+${skillAmpDiff.toLocaleString()} Synergy)</span>` : scaledPower.toLocaleString();
+
             switch (s.type) {
-                case 'damage': skillDesc = `Deals <b>${scaledPower.toLocaleString()}</b> burst damage to the nearest enemy.`; break;
+                case 'damage': skillDesc = `Deals <b>${powerDisplay}</b> burst damage to the nearest enemy.`; break;
                 case 'time_stop': skillDesc = `Freezes time for all enemies for <b>${scaledDuration.toFixed(1)}s</b>. Self gains massive Attack Speed.`; break;
                 case 'return_to_zero': skillDesc = `Reverts all enemies' actions to zero, wiping their Mana and purging all active buffs instantly.`; break;
-                case 'blink_strike': skillDesc = `Teleports behind the furthest enemy and deals <b>${scaledPower.toLocaleString()}</b> damage.`; break;
-                case 'execute': skillDesc = `Instantly executes targets below 20% HP. Otherwise, deals <b>${scaledPower.toLocaleString()}</b> physical damage.`; break;
+                case 'blink_strike': skillDesc = `Teleports behind the furthest enemy and deals <b>${powerDisplay}</b> damage.`; break;
+                case 'execute': skillDesc = `Instantly executes targets below 20% HP. Otherwise, deals <b>${powerDisplay}</b> physical damage.`; break;
                 case 'banish': skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'submerge': skillDesc = `Submerges into shadows, becoming untargetable for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'mana_battery': skillDesc = `Channels <b>${scaledPower.toLocaleString()}</b> Mana/s to the lowest-Mana ally for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'pull': skillDesc = `Erases space, pulling all enemies to self and dealing <b>${scaledPower.toLocaleString()}</b> damage.`; break;
+                case 'mana_battery': skillDesc = `Channels <b>${powerDisplay}</b> Mana/s to the lowest-Mana ally for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'pull': skillDesc = `Erases space, pulling all enemies to self and dealing <b>${powerDisplay}</b> damage.`; break;
                 case 'mind_control': skillDesc = `Brainwashes the target to fight for your team for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'polymorph': skillDesc = `Transforms the target into a harmless creature for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'stat_steal': skillDesc = `Steals <b>${scaledPower.toLocaleString()}</b> Attack from the target for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'stat_steal': skillDesc = `Steals <b>${powerDisplay}</b> Attack from the target for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'soul_swap': skillDesc = `Permanently swaps the strongest enemy with the weakest ally. Max 1 time per round.`; break;
                 case 'hp_shield': skillDesc = `Activates a barrier absorbing <b>${Math.round(scaledPercent * 100)}%</b> of Max HP in damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'damage_link': skillDesc = `Links lifeforce with the target. Target absorbs your damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'life_tether': skillDesc = `Drains <b>${scaledPower.toLocaleString()}</b> HP/s from tethered target to heal yourself for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'life_tether': skillDesc = `Drains <b>${powerDisplay}</b> HP/s from tethered target to heal yourself for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'evasion': skillDesc = `Dodges all incoming damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'revive': skillDesc = `Upon taking lethal damage, instantly revives with <b>100% HP</b>.`; break;
-                case 'ricochet': skillDesc = `Fires a projectile bouncing ${Math.round(scaledRadius)} times, dealing <b>${scaledPower.toLocaleString()}</b> per hit.`; break;
-                case 'dot': skillDesc = `Inflicts <b>${scaledPower.toLocaleString()}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'aoe_dot': skillDesc = `Toxic zone (Radius <b>${scaledRadius}</b>) dealing <b>${scaledPower.toLocaleString()}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'ricochet': skillDesc = `Fires a projectile bouncing ${Math.round(scaledRadius)} times, dealing <b>${powerDisplay}</b> per hit.`; break;
+                case 'dot': skillDesc = `Inflicts <b>${powerDisplay}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'aoe_dot': skillDesc = `Toxic zone (Radius <b>${scaledRadius}</b>) dealing <b>${powerDisplay}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'global_slow': skillDesc = `Slows all enemies' Attack Speed by <b>50%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'mana_lock': skillDesc = `Silences the target, preventing Mana gain for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'stun': skillDesc = `Stuns the target for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'heal': skillDesc = `Heals the most wounded ally for <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'aoe_heal': skillDesc = `Heals allies in radius (<b>${scaledRadius}</b>) for <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'regen': skillDesc = `Regenerates <b>${scaledPower.toLocaleString()}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'buff_atk': skillDesc = `Increases Attack by <b>+${scaledPower.toLocaleString()}</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'speed_buff': skillDesc = `Boosts Attack Speed by <b>+${scaledPower.toLocaleString()}%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'swap': skillDesc = `Swaps positions with the target and deals <b>${scaledPower.toLocaleString()}</b> damage.`; break;
+                case 'heal': skillDesc = `Heals the most wounded ally for <b>${powerDisplay}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'aoe_heal': skillDesc = `Heals allies in radius (<b>${scaledRadius}</b>) for <b>${powerDisplay}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'regen': skillDesc = `Regenerates <b>${powerDisplay}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'buff_atk': skillDesc = `Increases Attack by <b>+${powerDisplay}</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'speed_buff': skillDesc = `Boosts Attack Speed by <b>+${powerDisplay}%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'swap': skillDesc = `Swaps positions with the target and deals <b>${powerDisplay}</b> damage.`; break;
                 case 'clone': skillDesc = `Creates a Shadow Clone with <b>${Math.round(scaledPercent * 100)}%</b> of original stats.`; break;
                 default: skillDesc = 'Casts a unique and powerful Stand ability.';
             }
@@ -528,29 +594,14 @@ export function showDisplayInfo(type, data, shopContext = null) {
 
             skillHTML = `
                 <div style="background: rgba(142, 68, 173, 0.2); border-left: 4px solid #9b59b6; padding: 10px; margin: 10px 0; border-radius: 4px;">
-                    <p style="margin: 0; color: #e8daef; font-size: 15px; text-shadow: 1px 1px 2px black;">✨ <b>SKILL: ${skillName}</b></p>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <p style="margin: 0; color: #e8daef; font-size: 15px; text-shadow: 1px 1px 2px black;">✨ <b>SKILL: ${skillName}</b></p>
+                        ${isSkillAmped ? `<span style="background:linear-gradient(135deg,#27ae60,#2ecc71); color:#fff; font-size:11px; font-weight:800; padding:2px 7px; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.4);">⚡ AMPED</span>` : ''}
+                    </div>
                     <p style="margin: 2px 0 5px 0; color: #e74c3c; font-size: 13px;">🎯 <b>Target:</b> ${targetStr}</p>
                     <p style="margin: 5px 0 0 0; color: #d2b4de; font-size: 14px; font-style: italic;">${skillDesc}</p>
                 </div>
             `;
-        }
-
-        const baseAtk = Math.round(data.base_attack !== undefined ? data.base_attack : (template.attack || 0));
-        const curAtk = Math.round(data.attack !== undefined ? data.attack : baseAtk);
-        let atkDisplay = `<b>${curAtk.toLocaleString()}</b>`;
-        if (curAtk > baseAtk) {
-            atkDisplay += ` <span style="color:#2ecc71; font-weight:800; font-size:13px;">(+${(curAtk - baseAtk).toLocaleString()})</span>`;
-        } else if (curAtk < baseAtk) {
-            atkDisplay += ` <span style="color:#e74c3c; font-weight:800; font-size:13px;">(-${(baseAtk - curAtk).toLocaleString()})</span>`;
-        }
-
-        const baseSpd = data.base_speed !== undefined ? data.base_speed : (template.speed || 1.0);
-        const curSpd = data.speed !== undefined ? data.speed : baseSpd;
-        let spdDisplay = `<b>${curSpd.toFixed(2)}</b>`;
-        if (curSpd > baseSpd + 0.01) {
-            spdDisplay += ` <span style="color:#2ecc71; font-weight:800; font-size:13px;">(+${(curSpd - baseSpd).toFixed(2)})</span>`;
-        } else if (curSpd < baseSpd - 0.01) {
-            spdDisplay += ` <span style="color:#e74c3c; font-weight:800; font-size:13px;">(-${(baseSpd - curSpd).toFixed(2)})</span>`;
         }
 
         panel.innerHTML = `
@@ -558,14 +609,15 @@ export function showDisplayInfo(type, data, shopContext = null) {
             <h3 class="panel-title">${data.name} ${'⭐'.repeat(currentStar)}</h3>
             ${imgSrc ? `<img src="${imgSrc}" style="width:100%; height:300px; object-fit:cover; border-radius:8px; border:2px solid #f39c12; margin-bottom:10px;">` : ''}
             <div class="card-stats">
+                ${activeSynergiesHTML}
                 ${traitsHTML}
                 ${skillHTML}
-                <p>❤️ HP: <b>${hp.toLocaleString()} / ${(data.max_hp || template.hp || 0).toLocaleString()}</b></p>
+                <p>❤️ HP: <b>${curHp.toLocaleString()} / ${maxHp.toLocaleString()}</b>${hpBonusHTML}</p>
                 ${data.shield > 0 ? `<p>🛡️ Shield: <b style="color: #ecf0f1;">${Math.round(data.shield).toLocaleString()}</b></p>` : ''}
                 <p>⚔️ Attack: ${atkDisplay}</p>
-                <p>🎯 Range: <b>${(data.attack_range !== undefined ? data.attack_range : template.attack_range).toFixed(1)}</b></p>
+                <p>🎯 Range: ${rngDisplay}</p>
                 <p>⚡ Speed: ${spdDisplay}</p>
-                <p>💧 Mana: <b>${data.mana || 0} / ${data.max_mana || template.max_mana}</b></p>
+                <p>💧 Mana: <b>${data.mana || 0} / ${maxMana}</b>${manaExtra}</p>
                 <p style="margin-top: 10px; border-top: 1px dashed #7f8c8d; padding-top: 10px;">🪙 Cost: <b>${champCost} Gold</b></p>
             </div>
         `;

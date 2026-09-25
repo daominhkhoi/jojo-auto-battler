@@ -163,6 +163,13 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
         if 'percent' in final_skill and final_skill['percent']:
             final_skill['percent'] = min(0.85, round(final_skill['percent'] * skill_pct_mult, 2))
 
+        # Store pre-trait baseline stats (scaled strictly by star level)
+        raw_hp = base_hp
+        raw_attack = base_atk
+        raw_range = round(float(template.get('attack_range', 1.0)), 2)
+        raw_speed = round(float(template.get('speed', 1.0)), 2)
+        raw_skill = dict(final_skill)
+
         final_buffs  = []
 
         # === FACTIONS ===
@@ -257,6 +264,19 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
             elif tc >= 4: final_hp *= 1.7
             elif tc >= 2: final_hp *= 1.3
 
+        applied_traits = []
+        if global_hp_buff > 0:
+            if trait_counts.get("Utility", 0) >= 2:
+                applied_traits.append(f"Utility ({trait_counts['Utility']})")
+            if trait_counts.get("Team Bucciarati", 0) >= 2:
+                applied_traits.append(f"Team Bucciarati ({trait_counts['Team Bucciarati']})")
+
+        for t in traits:
+            if t == "Requiem" and trait_counts.get("Requiem", 0) >= 1:
+                applied_traits.append(f"Requiem ({trait_counts['Requiem']})")
+            elif trait_counts.get(t, 0) >= 2:
+                applied_traits.append(f"{t} ({trait_counts[t]})")
+
         result.append({
             'id':           c['id'],
             'name':         name,
@@ -270,7 +290,13 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
             'max_mana':     template.get('max_mana', 200),
             'start_mana':   final_mana,
             'skill':        final_skill,
+            'raw_skill':    raw_skill,
             'active_buffs': final_buffs,
+            'raw_hp':       raw_hp,
+            'raw_attack':   raw_attack,
+            'raw_range':    raw_range,
+            'raw_speed':    raw_speed,
+            'applied_traits': list(dict.fromkeys(applied_traits)),
         })
 
     return result
@@ -487,8 +513,14 @@ def handle_submit_board(data):
             max_mana=champ['max_mana'],
             star=champ.get('star', 1),
             skill=champ.get('skill'),
+            raw_skill=champ.get('raw_skill'),
             start_mana=champ.get('start_mana', 0),
-            active_buffs=champ.get('active_buffs', [])
+            active_buffs=champ.get('active_buffs', []),
+            raw_hp=champ.get('raw_hp'),
+            raw_attack=champ.get('raw_attack'),
+            raw_range=champ.get('raw_range'),
+            raw_speed=champ.get('raw_speed'),
+            applied_traits=champ.get('applied_traits', [])
         )
         game['board_state'].append(new_champ)
 
@@ -526,8 +558,14 @@ def handle_submit_board(data):
                 max_mana=champ['max_mana'],
                 star=champ.get('star', 1),
                 skill=champ.get('skill'),
+                raw_skill=champ.get('raw_skill'),
                 start_mana=champ.get('start_mana', 0),
-                active_buffs=champ.get('active_buffs', [])
+                active_buffs=champ.get('active_buffs', []),
+                raw_hp=champ.get('raw_hp'),
+                raw_attack=champ.get('raw_attack'),
+                raw_range=champ.get('raw_range'),
+                raw_speed=champ.get('raw_speed'),
+                applied_traits=champ.get('applied_traits', [])
             )
             game['board_state'].append(new_champ)
 

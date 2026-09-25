@@ -21,7 +21,9 @@ def get_champion_cost(name):
 
 class Champion:
     def __init__(self, id, name, team, x, y, hp, attack, attack_range, speed, max_mana,
-                 star=1, skill=None, start_mana=0, active_buffs=None):
+                 star=1, skill=None, start_mana=0, active_buffs=None,
+                 raw_hp=None, raw_attack=None, raw_range=None, raw_speed=None,
+                 raw_skill=None, applied_traits=None):
         self.id = id
         self.name = name
         self.team = team
@@ -29,18 +31,24 @@ class Champion:
         self.y = y
         self.hp = hp
         self.max_hp = hp
+        self.raw_hp = raw_hp if raw_hp is not None else hp
         self.attack = attack
         self.base_attack = attack
+        self.raw_attack = raw_attack if raw_attack is not None else attack
         self.attack_range = attack_range
+        self.raw_range = raw_range if raw_range is not None else attack_range
         self.speed = speed
         self.base_speed = speed
+        self.raw_speed = raw_speed if raw_speed is not None else speed
         self.mana = start_mana
         self.max_mana = max_mana if max_mana > 0 else 100
         self.is_alive = True
         self.star = star
         self.attack_cooldown = 0
         self.skill = skill if skill else {'type': 'damage', 'power': 50, 'duration': 0, 'target': 'enemy_closest'}
+        self.raw_skill = raw_skill if raw_skill is not None else self.skill
         self.active_buffs = active_buffs if active_buffs else []
+        self.applied_traits = applied_traits if applied_traits is not None else []
 
         # Trạng thái khống chế & đặc biệt — ALL reset at start of update_buffs tick
         self.is_stunned = False
@@ -511,8 +519,15 @@ class Champion:
             'attack': self.attack, 'speed': self.speed,
             'base_attack': getattr(self, 'base_attack', self.attack),
             'base_speed': getattr(self, 'base_speed', self.speed),
+            'raw_hp': getattr(self, 'raw_hp', self.max_hp),
+            'raw_attack': getattr(self, 'raw_attack', self.base_attack),
+            'raw_range': getattr(self, 'raw_range', self.attack_range),
+            'raw_speed': getattr(self, 'raw_speed', self.base_speed),
             'attack_range': self.attack_range,
             'is_alive': self.is_alive, 'star': getattr(self, 'star', 1),
+            'skill': getattr(self, 'skill', None),
+            'raw_skill': getattr(self, 'raw_skill', None),
+            'applied_traits': getattr(self, 'applied_traits', []),
             'buffs': [b['type'] for b in self.active_buffs],
             'buff_details': safe_buffs
         }
