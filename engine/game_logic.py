@@ -94,15 +94,18 @@ class Champion:
 
         # 2.5 Giáp phản đòn (Reflect Shield)
         # FIX: Use take_damage on the attacker so their revive/shield/evasion applies.
-        # Guard with a flag to prevent infinite reflect recursion.
-        if attacker and attacker.is_alive and not getattr(attacker, '_in_reflect', False):
-            for buff in self.active_buffs:
-                if buff['type'] == 'reflect_shield':
-                    reflect_dmg = actual_damage * buff.get('power', 0)
+        # Guard with a flag to prevent infinite reflect recursion and only reflect when actual damage > 0.
+        if attacker and attacker.is_alive and not getattr(attacker, '_in_reflect', False) and actual_damage > 0:
+            reflect_buffs = [b for b in self.active_buffs if b.get('type') == 'reflect_shield']
+            if reflect_buffs:
+                best_power = max((b.get('power', 0) for b in reflect_buffs), default=0)
+                reflect_dmg = actual_damage * best_power
+                if reflect_dmg > 0:
                     attacker._in_reflect = True
                     ref_dmg, ref_evs = attacker.take_damage(reflect_dmg, None, board_state)
                     attacker._in_reflect = False
-                    events.append({'type': 'reflect', 'targetId': attacker.id, 'damage': ref_dmg})
+                    if ref_dmg > 0:
+                        events.append({'type': 'reflect', 'targetId': attacker.id, 'defenderId': self.id, 'damage': ref_dmg})
                     events.extend(ref_evs)
 
         # 3. Damage Link
@@ -238,7 +241,7 @@ class Champion:
 
         # 4. EXECUTE
         elif s_type == 'execute' and target:
-            if target.hp / target.max_hp < 0.3:
+            if target.hp / target.max_hp < 0.2:
                 dmg, evs = target.take_damage(999999, self, board_state)
             else:
                 dmg, evs = target.take_damage(s_power, self, board_state)

@@ -52,6 +52,12 @@ export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
             glowColor = options.glowColor || color;
             font = '900 21px "Segoe UI", Arial, sans-serif';
             break;
+        case 'reflect':
+            color = '#e056fd';
+            baseScale = 1.15;
+            glow = false; // No heavy shadowBlur on rapid reflect hits
+            font = '900 18px "Segoe UI", Arial, sans-serif';
+            break;
         case 'normal':
         default:
             color = options.color || '#ffffff';
@@ -62,6 +68,11 @@ export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
 
     if (options.color) color = options.color;
     if (options.scale) baseScale = options.scale;
+
+    // Strict cap to avoid performance death when many units attack simultaneously
+    if (STATE.floatingTexts.length >= 25) {
+        STATE.floatingTexts.shift();
+    }
 
     STATE.floatingTexts.push({
         x: startX,
@@ -188,6 +199,9 @@ export function updatePhysics() {
         STATE.hitEffects[i].lifeTime--;
         if (STATE.hitEffects[i].lifeTime <= 0) STATE.hitEffects.splice(i, 1);
     }
+    if (STATE.hitEffects.length > 20) {
+        STATE.hitEffects.splice(0, STATE.hitEffects.length - 20);
+    }
 
     if (!STATE.particles) STATE.particles = [];
     for (let i = STATE.particles.length - 1; i >= 0; i--) {
@@ -195,6 +209,9 @@ export function updatePhysics() {
         p.x += p.vx; p.y += p.vy;
         p.life--;
         if (p.life <= 0) STATE.particles.splice(i, 1);
+    }
+    if (STATE.particles.length > 80) {
+        STATE.particles.splice(0, STATE.particles.length - 80);
     }
 
     if (!STATE.floatingTexts) STATE.floatingTexts = [];
@@ -442,22 +459,42 @@ export function syncTickData(data) {
             const tarCenterX = target.pixelX + tarSize.w / 2;
             const tarCenterY = target.pixelY + tarSize.h / 2;
 
-            STATE.hitEffects.push({
-                x: tarCenterX,
-                y: tarCenterY,
-                lifeTime: 30,
-                maxLife: 30,
-                effectType: event.type,
-                damage: event.damage
-            });
+            if (event.type === 'reflect') {
+                const now = Date.now();
+                if (!STATE.lastReflectText) STATE.lastReflectText = {};
+                const lastTime = STATE.lastReflectText[target.id] || 0;
 
-            if (event.type === 'evasion') {
-                spawnFloatingText(tarCenterX, tarCenterY - 20, 'MISS!', 'status', { color: '#ced6e0', scale: 1.1 });
-            } else if (event.type === 'reflect') {
-                spawnFloatingText(tarCenterX, tarCenterY - 20, `💥 REFLECT -${Math.round(event.damage || 0).toLocaleString()}`, 'skill', { color: '#9b59b6' });
-            } else if (event.type === 'revive') {
-                STATE.screenFlash = { color: 'rgba(241, 196, 15, 0.45)', alpha: 1.0, decay: 0.035 };
-                spawnFloatingText(tarCenterX, tarCenterY - 30, '🌟 REVIVED!', 'status', { color: '#ffd700', scale: 1.4 });
+                // Throttle reflect text to at most 1 per 250ms per champion
+                if (now - lastTime > 250) {
+                    STATE.lastReflectText[target.id] = now;
+                    spawnFloatingText(tarCenterX, tarCenterY - 20, `💥 -${Math.round(event.damage || 0).toLocaleString()}`, 'reflect');
+                }
+
+                // Snappy 8-frame Crystal Ricochet Spark (0.13s)
+                STATE.hitEffects.push({
+                    x: tarCenterX,
+                    y: tarCenterY,
+                    lifeTime: 8,
+                    maxLife: 8,
+                    effectType: 'reflect',
+                    damage: event.damage
+                });
+            } else {
+                STATE.hitEffects.push({
+                    x: tarCenterX,
+                    y: tarCenterY,
+                    lifeTime: 30,
+                    maxLife: 30,
+                    effectType: event.type,
+                    damage: event.damage
+                });
+
+                if (event.type === 'evasion') {
+                    spawnFloatingText(tarCenterX, tarCenterY - 20, 'MISS!', 'status', { color: '#ced6e0', scale: 1.1 });
+                } else if (event.type === 'revive') {
+                    STATE.screenFlash = { color: 'rgba(241, 196, 15, 0.45)', alpha: 1.0, decay: 0.035 };
+                    spawnFloatingText(tarCenterX, tarCenterY - 30, '🌟 REVIVED!', 'status', { color: '#ffd700', scale: 1.4 });
+                }
             }
         }
     });

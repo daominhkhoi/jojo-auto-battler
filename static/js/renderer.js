@@ -223,14 +223,32 @@ export function renderBoard(ctx, canvas) {
         }
 
         if (activeBuffs.includes('reflect_shield')) {
-            const radius = currentSize.w / 2 + 5;
+            const hRadius = currentSize.w / 2 + 5;
+            const pulse = 0.55 + Math.sin(timeNow * 4) * 0.25;
+            ctx.save();
             ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(155, 89, 182, ${0.5 + Math.sin(timeNow*5)*0.3})`; // Màu Tím
-            ctx.lineWidth = 5;
+            // Draw sleek 6-point crystal hexagon barrier
+            for (let side = 0; side < 6; side++) {
+                const angle = (Math.PI / 3) * side - Math.PI / 6;
+                const hx = centerX + hRadius * Math.cos(angle);
+                const hy = centerY + (hRadius * 1.1) * Math.sin(angle);
+                if (side === 0) ctx.moveTo(hx, hy);
+                else ctx.lineTo(hx, hy);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = `rgba(162, 155, 254, ${pulse})`;
+            ctx.lineWidth = 2.5;
             ctx.stroke();
-            ctx.fillStyle = `rgba(155, 89, 182, 0.2)`;
-            ctx.fill();
+
+            // 6 glowing vertex crystals (tiny 3px diamond points)
+            ctx.fillStyle = '#ffffff';
+            for (let side = 0; side < 6; side++) {
+                const angle = (Math.PI / 3) * side - Math.PI / 6;
+                const hx = centerX + hRadius * Math.cos(angle);
+                const hy = centerY + (hRadius * 1.1) * Math.sin(angle);
+                ctx.fillRect(hx - 1.5, hy - 1.5, 3, 3);
+            }
+            ctx.restore();
         }
 
         if (activeBuffs.includes('stun')) {
@@ -692,12 +710,28 @@ export function renderBoard(ctx, canvas) {
                 }
             }
             else if (hit.effectType === 'reflect') {
-                ctx.globalAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.0);
+                const alpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 1.8);
+                ctx.globalAlpha = alpha;
+                const d = progress * 28;
+
+                // 4 Sharp Crystal Spikes erupting outward
                 ctx.beginPath();
-                ctx.arc(0, 0, progress * 40, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(231, 76, 60, ${1 - progress})`;
-                ctx.lineWidth = 8;
+                ctx.moveTo(-d, -d); ctx.lineTo(d, d);
+                ctx.moveTo(d, -d); ctx.lineTo(-d, d);
+                ctx.strokeStyle = `rgba(224, 86, 253, ${alpha})`;
+                ctx.lineWidth = 3.5 * (1 - progress);
                 ctx.stroke();
+
+                // Center diamond ricochet spark
+                const sparkSz = (1 - progress) * 8;
+                ctx.beginPath();
+                ctx.moveTo(0, -sparkSz);
+                ctx.lineTo(sparkSz, 0);
+                ctx.lineTo(0, sparkSz);
+                ctx.lineTo(-sparkSz, 0);
+                ctx.closePath();
+                ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.fill();
             }
             ctx.restore();
         });
@@ -725,8 +759,8 @@ export function renderBoard(ctx, canvas) {
             const scale = t.scale || 1.0;
             ctx.scale(scale, scale);
 
-            if (t.glow) {
-                ctx.shadowBlur = 12;
+            if (t.glow && STATE.floatingTexts.length <= 15) {
+                ctx.shadowBlur = 10;
                 ctx.shadowColor = t.glowColor || t.color;
             }
 

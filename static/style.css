@@ -317,42 +317,38 @@ button:hover {
 
 .game-notification {
     position: fixed;
-    top: 20%;
+    top: 72px;
     left: 50%;
-    transform: translateX(-50%);
-    background: linear-gradient(135deg, #2c3e50, #000);
+    transform: translate(-50%, -10px) scale(0.96);
+    opacity: 0;
+    background: linear-gradient(135deg, rgba(24, 34, 52, 0.96), rgba(12, 17, 26, 0.96));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     color: #ffd700;
-    padding: 20px 40px;
-    border-radius: 50px;
-    border: 2px solid #ffd700;
-    font-size: 24px;
-    font-weight: bold;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    padding: 8px 22px;
+    border-radius: 30px;
+    border: 1.5px solid rgba(255, 215, 0, 0.65);
+    font-size: 14.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 14px rgba(255, 215, 0, 0.18);
     z-index: 9999;
     pointer-events: none;
-    animation: slideDown 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    max-width: 90vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes slideDown {
-    from {
-        top: -100px;
-        opacity: 0;
-    }
-
-    to {
-        top: 20%;
-        opacity: 1;
-    }
+.game-notification.showing {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
 }
 
-@keyframes fadeOut {
-    from {
-        opacity: 1;
-    }
-
-    to {
-        opacity: 0;
-    }
+.game-notification.hiding {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.96);
 }
 
 .name-input {
@@ -705,8 +701,9 @@ button:hover {
 
     /* ---- NOTIFICATION ---- */
     .game-notification {
-        font-size: 16px;
-        padding: 12px 24px;
+        top: 60px;
+        font-size: 13px;
+        padding: 6px 16px;
     }
 }
 
