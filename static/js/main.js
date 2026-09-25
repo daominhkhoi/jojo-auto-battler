@@ -4,7 +4,7 @@ import { buyXp, refreshShop, updateGold, updateUnitCount, sellChampion, showDisp
 import { renderBoard } from './renderer.js';
 import { updatePhysics } from './combat.js';
 import { showNotification } from './notifications.js';
-import { findMatch, declareReady } from './network.js';
+import { findMatch, playVsBot, declareReady } from './network.js';
 
 const canvas = document.getElementById('gameBoard');
 const ctx = canvas.getContext('2d');
@@ -14,6 +14,7 @@ const ctx = canvas.getContext('2d');
 // ==========================================
 document.getElementById('buyXpBtn').addEventListener('click', buyXp);
 document.getElementById('findMatchBtn').addEventListener('click', findMatch);
+document.getElementById('vsBotBtn')?.addEventListener('click', playVsBot);
 document.getElementById('readyBtn').addEventListener('click', declareReady);
 
 document.getElementById('rollBtn').addEventListener('click', () => {

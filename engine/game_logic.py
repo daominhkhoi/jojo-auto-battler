@@ -217,7 +217,7 @@ class Champion:
                         elif bt == 'banish':               c.is_banished   = False
                         elif bt == 'submerge':             c.is_submerged  = False
                         elif bt == 'stat_steal_victim':    c.attack += buff['power']
-                        elif bt == 'stat_steal_beneficiary': c.attack -= buff['power']
+                        elif bt == 'stat_steal_beneficiary': c.attack = max(0, c.attack - buff['power'])
                         c.active_buffs.remove(buff)
 
         # 2. BLINK STRIKE
@@ -397,11 +397,12 @@ class Champion:
 
         elif s_type == 'stat_steal' and target:
             actual_steal = s_power
-            target.attack -= actual_steal
+            amount_drained = min(max(0, target.attack), actual_steal)
+            target.attack = max(0, target.attack - actual_steal)
             self.attack   += actual_steal
             steal_dur = s_duration if s_duration > 0 else 5.0
-            target.active_buffs.append({'type': 'stat_steal_victim',       'power': actual_steal, 'duration': steal_dur})
-            self.active_buffs.append(  {'type': 'stat_steal_beneficiary',  'power': actual_steal, 'duration': steal_dur})
+            target.active_buffs.append({'type': 'stat_steal_victim',       'power': amount_drained, 'duration': steal_dur, 'caster_id': self.id})
+            self.active_buffs.append(  {'type': 'stat_steal_beneficiary',  'power': actual_steal,  'duration': steal_dur, 'target_id': target.id})
 
         elif s_type == 'banish' and target:
             target.is_banished = True
@@ -487,7 +488,7 @@ class Champion:
                 elif bt == 'banish':                pass  # is_banished already reset at top of next tick
                 elif bt == 'submerge':              pass  # is_submerged already reset at top of next tick
                 elif bt == 'stat_steal_victim':     self.attack  += buff['power']
-                elif bt == 'stat_steal_beneficiary': self.attack -= buff['power']
+                elif bt == 'stat_steal_beneficiary': self.attack = max(0, self.attack - buff['power'])
                 elif bt == 'hp_shield':             self.shield   = 0
                 self.active_buffs.remove(buff)
 
@@ -505,6 +506,8 @@ class Champion:
             'shield': getattr(self, 'shield', 0),
             'max_hp': self.max_hp, 'max_mana': self.max_mana,
             'attack': self.attack, 'speed': self.speed,
+            'base_attack': getattr(self, 'base_attack', self.attack),
+            'base_speed': getattr(self, 'base_speed', self.speed),
             'attack_range': self.attack_range,
             'is_alive': self.is_alive, 'star': getattr(self, 'star', 1),
             'buffs': [b['type'] for b in self.active_buffs],

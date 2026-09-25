@@ -295,6 +295,44 @@ export function renderBoard(ctx, canvas) {
             ctx.beginPath(); ctx.arc(centerX, centerY, currentSize.w/2 + 2, 0, Math.PI*2); ctx.stroke();
             ctx.setLineDash([]);
         }
+
+        if (activeBuffs.includes('stat_steal_beneficiary')) {
+            const pulse = 0.5 + Math.sin(timeNow * 8) * 0.3;
+            ctx.save();
+            ctx.shadowBlur = 14;
+            ctx.shadowColor = '#e74c3c';
+            ctx.beginPath();
+            ctx.ellipse(centerX, centerY + currentSize.h / 2 - 4, currentSize.w / 2 + 6, 12, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(231, 76, 60, ${pulse})`;
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            ctx.fillStyle = `rgba(155, 89, 182, 0.25)`;
+            ctx.fill();
+
+            ctx.fillStyle = '#f1c40f';
+            ctx.font = 'bold 12px "Segoe UI", Arial, sans-serif';
+            ctx.fillText('⚔️+ATK', centerX, pY - 8);
+            ctx.restore();
+        }
+
+        if (activeBuffs.includes('stat_steal_victim')) {
+            const pulse = 0.4 + Math.sin(timeNow * 6) * 0.25;
+            ctx.save();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#c0392b';
+            ctx.beginPath();
+            ctx.ellipse(centerX, centerY + currentSize.h / 2 - 4, currentSize.w / 2 + 4, 10, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(192, 57, 43, ${pulse})`;
+            ctx.lineWidth = 3;
+            ctx.setLineDash([6, 6]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = '#ff4757';
+            ctx.font = 'bold 12px "Segoe UI", Arial, sans-serif';
+            ctx.fillText('🔻-ATK', centerX, pY - 8);
+            ctx.restore();
+        }
         
         ctx.restore();
     });
@@ -508,10 +546,82 @@ export function renderBoard(ctx, canvas) {
                 ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 8; ctx.stroke();
             }
             else if (hit.effectType === 'stat_steal') {
-                ctx.globalAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.0);
-                ctx.beginPath();
-                ctx.arc(0, -progress * 50, 15, 0, Math.PI * 2);
-                ctx.fillStyle = '#3498db'; ctx.fill();
+                const caster = STATE.champions.find(c => c.id === hit.casterId);
+                const target = STATE.champions.find(c => c.id === hit.targetId);
+
+                if (caster && target) {
+                    const cSize = getCanvasCoords(caster.targetX, caster.targetY);
+                    const tSize = getCanvasCoords(target.targetX, target.targetY);
+                    const cX = caster.pixelX + cSize.w / 2;
+                    const cY = caster.pixelY + cSize.h / 2;
+                    const tX = target.pixelX + tSize.w / 2;
+                    const tY = target.pixelY + tSize.h / 2;
+
+                    const beamAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.5);
+
+                    ctx.save();
+                    // 1. Siphon Energy Laser Beam (connecting target -> caster)
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#e74c3c';
+                    ctx.beginPath();
+                    ctx.moveTo(tX, tY);
+                    ctx.lineTo(cX, cY);
+                    ctx.strokeStyle = `rgba(155, 89, 182, ${beamAlpha * 0.75})`;
+                    ctx.lineWidth = 10;
+                    ctx.stroke();
+
+                    // Inner bright core
+                    ctx.beginPath();
+                    ctx.moveTo(tX, tY);
+                    ctx.lineTo(cX, cY);
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${beamAlpha * 0.9})`;
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    // 2. Draining orbs moving along beam from target to caster
+                    const orbCount = 4;
+                    for (let i = 0; i < orbCount; i++) {
+                        const orbT = ((progress * 3.5) + (i / orbCount)) % 1.0;
+                        const orbX = tX + (cX - tX) * orbT;
+                        const orbY = tY + (cY - tY) * orbT;
+
+                        ctx.beginPath();
+                        ctx.arc(orbX, orbY, 7, 0, Math.PI * 2);
+                        ctx.fillStyle = '#f1c40f';
+                        ctx.shadowColor = '#f39c12';
+                        ctx.shadowBlur = 12;
+                        ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.arc(orbX, orbY, 3.5, 0, Math.PI * 2);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fill();
+                    }
+
+                    // 3. Target collapsing drain spiral
+                    ctx.beginPath();
+                    ctx.arc(tX, tY, (1 - progress) * 45 + 15, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(231, 76, 60, ${beamAlpha * 0.8})`;
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([8, 8]);
+                    ctx.stroke();
+
+                    // 4. Caster aura burst
+                    ctx.beginPath();
+                    ctx.arc(cX, cY, progress * 50 + 10, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(241, 196, 15, ${1 - progress})`;
+                    ctx.lineWidth = 5;
+                    ctx.setLineDash([]);
+                    ctx.stroke();
+
+                    ctx.restore();
+                } else {
+                    ctx.globalAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.0);
+                    ctx.beginPath();
+                    ctx.arc(0, -progress * 50, 18, 0, Math.PI * 2);
+                    ctx.fillStyle = '#9b59b6';
+                    ctx.fill();
+                }
             }
             else if (hit.effectType === 'mana_battery') {
                 ctx.globalAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.0);

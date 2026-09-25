@@ -535,6 +535,24 @@ export function showDisplayInfo(type, data, shopContext = null) {
             `;
         }
 
+        const baseAtk = Math.round(data.base_attack !== undefined ? data.base_attack : (template.attack || 0));
+        const curAtk = Math.round(data.attack !== undefined ? data.attack : baseAtk);
+        let atkDisplay = `<b>${curAtk.toLocaleString()}</b>`;
+        if (curAtk > baseAtk) {
+            atkDisplay += ` <span style="color:#2ecc71; font-weight:800; font-size:13px;">(+${(curAtk - baseAtk).toLocaleString()})</span>`;
+        } else if (curAtk < baseAtk) {
+            atkDisplay += ` <span style="color:#e74c3c; font-weight:800; font-size:13px;">(-${(baseAtk - curAtk).toLocaleString()})</span>`;
+        }
+
+        const baseSpd = data.base_speed !== undefined ? data.base_speed : (template.speed || 1.0);
+        const curSpd = data.speed !== undefined ? data.speed : baseSpd;
+        let spdDisplay = `<b>${curSpd.toFixed(2)}</b>`;
+        if (curSpd > baseSpd + 0.01) {
+            spdDisplay += ` <span style="color:#2ecc71; font-weight:800; font-size:13px;">(+${(curSpd - baseSpd).toFixed(2)})</span>`;
+        } else if (curSpd < baseSpd - 0.01) {
+            spdDisplay += ` <span style="color:#e74c3c; font-weight:800; font-size:13px;">(-${(baseSpd - curSpd).toFixed(2)})</span>`;
+        }
+
         panel.innerHTML = `
             ${actionHeaderHTML}
             <h3 class="panel-title">${data.name} ${'⭐'.repeat(currentStar)}</h3>
@@ -544,9 +562,9 @@ export function showDisplayInfo(type, data, shopContext = null) {
                 ${skillHTML}
                 <p>❤️ HP: <b>${hp.toLocaleString()} / ${(data.max_hp || template.hp || 0).toLocaleString()}</b></p>
                 ${data.shield > 0 ? `<p>🛡️ Shield: <b style="color: #ecf0f1;">${Math.round(data.shield).toLocaleString()}</b></p>` : ''}
-                <p>⚔️ Attack: <b>${Math.round(data.attack !== undefined ? data.attack : template.attack).toLocaleString()}</b></p>
+                <p>⚔️ Attack: ${atkDisplay}</p>
                 <p>🎯 Range: <b>${(data.attack_range !== undefined ? data.attack_range : template.attack_range).toFixed(1)}</b></p>
-                <p>⚡ Speed: <b>${(data.speed !== undefined ? data.speed : template.speed).toFixed(2)}</b></p>
+                <p>⚡ Speed: ${spdDisplay}</p>
                 <p>💧 Mana: <b>${data.mana || 0} / ${data.max_mana || template.max_mana}</b></p>
                 <p style="margin-top: 10px; border-top: 1px dashed #7f8c8d; padding-top: 10px;">🪙 Cost: <b>${champCost} Gold</b></p>
             </div>

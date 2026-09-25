@@ -1,9 +1,22 @@
+import sys
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, join_room, leave_room
 from engine.game_logic import (
     Champion, find_closest_target, calculate_distance, move_towards,
     register_champion_costs
 )
+from engine.bot_ai import SmartBot
 import os
 import time
 import pandas as pd
@@ -288,11 +301,41 @@ def get_champions_api():
 # ==========================================
 # 1. MATCHMAKING & DISCONNECTION SYSTEM
 # ==========================================
+def _create_bot_game(player_id, player_name):
+    """Instantiate a SmartBot game room for solo play or fallback."""
+    bot = SmartBot()
+    room_name = f"room_{player_id[:5]}_bot"
+    try:
+        join_room(room_name, sid=player_id)
+    except KeyError:
+        return
+
+    games[room_name] = {
+        'player1': player_id, 'p1_name': player_name,
+        'player2': f"bot_{player_id[:5]}", 'p2_name': bot.name,
+        'board_state': [], 'ready_count': 0,
+        'p1_lp': 0, 'p2_lp': 0,
+        'aborted': False,
+        'bot': bot,
+    }
+
+    socketio.emit('match_found', {
+        'room': room_name,
+        'opponentName': bot.name,
+        'isBot': True
+    }, to=player_id)
+    try:
+        print(f"[BOT MATCH] {player_name} matched with {bot.name} in {room_name}")
+    except Exception:
+        print(f"[BOT MATCH] {player_name} matched in {room_name}")
+
+
 @socketio.on('find_match')
 def handle_find_match(data=None):
-    data      = data or {}
-    player_id = request.sid
+    data        = data or {}
+    player_id   = request.sid
     player_name = data.get('name', 'Player')
+    vs_bot      = data.get('vs_bot', False)
 
     with _matchmaking_lock:
         global waiting_players
@@ -303,18 +346,24 @@ def handle_find_match(data=None):
         rooms_to_delete = []
         for room_name, game in games.items():
             if game['player1'] == player_id or game['player2'] == player_id:
-                game['aborted'] = True   # FIX: signal running game loop to stop
+                game['aborted'] = True   # signal running game loop to stop
                 leave_room(room_name, sid=player_id)
                 other = game['player2'] if game['player1'] == player_id else game['player1']
-                socketio.emit('opponent_disconnected', to=other)
+                if not str(other).startswith('bot_'):
+                    socketio.emit('opponent_disconnected', to=other)
                 rooms_to_delete.append(room_name)
         for r in rooms_to_delete:
             del games[r]
 
+        # 1. Direct VS BOT request
+        if vs_bot:
+            _create_bot_game(player_id, player_name)
+            return
+
+        # 2. PVP Queue
         waiting_players.append({'sid': player_id, 'name': player_name})
         print(f"[SEARCH] {player_name} is searching for a match...")
 
-        # FIX: changed while → if to prevent over-popping in concurrent calls
         if len(waiting_players) >= 2:
             p1 = waiting_players.pop(0)
             p2 = waiting_players.pop(0)
@@ -332,11 +381,23 @@ def handle_find_match(data=None):
                 'player2': p2['sid'], 'p2_name': p2['name'],
                 'board_state': [], 'ready_count': 0,
                 'p1_lp': 0, 'p2_lp': 0,
-                'aborted': False,   # FIX: abort flag
+                'aborted': False,
             }
 
             socketio.emit('match_found', {'room': room_name, 'opponentName': p2['name']}, to=p1['sid'])
             socketio.emit('match_found', {'room': room_name, 'opponentName': p1['name']}, to=p2['sid'])
+        else:
+            # Auto-fallback to smart bot after 3.5s so players never wait forever alone
+            def bot_fallback_timer(pid, pname):
+                socketio.sleep(3.5)
+                with _matchmaking_lock:
+                    global waiting_players
+                    match_candidate = next((p for p in waiting_players if p['sid'] == pid), None)
+                    if match_candidate:
+                        waiting_players = [p for p in waiting_players if p['sid'] != pid]
+                        _create_bot_game(pid, pname)
+
+            socketio.start_background_task(bot_fallback_timer, player_id, player_name)
 
 
 @socketio.on('disconnect')
@@ -433,6 +494,45 @@ def handle_submit_board(data):
 
     game['ready_count'] += 1
 
+    # IF THIS IS A BOT GAME: auto-deploy SmartBot's intelligent composition
+    if game.get('bot') and game['ready_count'] == 1:
+        bot = game['bot']
+        bot.prev_player_champs = board_only
+        bot_team_raw = bot.build_team(_CHAMPION_DATA, _CHAMPION_TRAITS)
+
+        # Count bot traits
+        bot_counted = set()
+        bot_traits = {}
+        for c in bot_team_raw:
+            if c['name'] not in bot_counted:
+                bot_counted.add(c['name'])
+                for t in _CHAMPION_TRAITS.get(c['name'], []):
+                    bot_traits[t] = bot_traits.get(t, 0) + 1
+
+        buffed_bot = _compute_trait_buffs(bot_team_raw, bot_traits)
+
+        for champ in buffed_bot:
+            # Mirror Bot's coordinates (Team 2 facing Player 1)
+            final_x = 4 - float(champ['x'])
+            final_y = 5 - float(champ['y'])
+
+            new_champ = Champion(
+                id=champ['id'], name=champ['name'], team="Team2",
+                x=final_x, y=final_y,
+                hp=champ['max_hp'],
+                attack=champ['attack'],
+                attack_range=champ['attack_range'],
+                speed=champ['speed'],
+                max_mana=champ['max_mana'],
+                star=champ.get('star', 1),
+                skill=champ.get('skill'),
+                start_mana=champ.get('start_mana', 0),
+                active_buffs=champ.get('active_buffs', [])
+            )
+            game['board_state'].append(new_champ)
+
+        game['ready_count'] += 1
+
     if game['ready_count'] == 2:
         print(f"[LOCK] BOTH READY! Starting 5s inspection for {room_name}")
         socketio.emit('match_locked', to=room_name)
@@ -446,19 +546,20 @@ def handle_submit_board(data):
             "opponent_lp": game.get('p2_lp', 0)
         }, to=game['player1'])
 
-        # Player 2 gets mirrored coordinates
-        p2_champions = []
-        for c in base_champions:
-            c_copy = c.copy()
-            c_copy['x'] = 4 - float(c_copy['x'])
-            c_copy['y'] = 5 - float(c_copy['y'])
-            p2_champions.append(c_copy)
+        # Player 2 (if human) gets mirrored coordinates
+        if not game.get('bot'):
+            p2_champions = []
+            for c in base_champions:
+                c_copy = c.copy()
+                c_copy['x'] = 4 - float(c_copy['x'])
+                c_copy['y'] = 5 - float(c_copy['y'])
+                p2_champions.append(c_copy)
 
-        socketio.emit('sync_tick', {
-            "champions": p2_champions,
-            "events":    [],
-            "opponent_lp": game.get('p1_lp', 0)
-        }, to=game['player2'])
+            socketio.emit('sync_tick', {
+                "champions": p2_champions,
+                "events":    [],
+                "opponent_lp": game.get('p1_lp', 0)
+            }, to=game['player2'])
 
         def delay_start():
             socketio.sleep(5)
@@ -542,20 +643,23 @@ def run_game_loop(room_name):
 
         socketio.emit('sync_tick', {
             "champions": base_champions,
-            "events":    all_tick_events
+            "events":    all_tick_events,
+            "opponent_lp": game.get('p2_lp', 0)
         }, to=game['player1'])
 
-        p2_champions = []
-        for c in base_champions:
-            c_copy = c.copy()
-            c_copy['x'] = 4 - float(c_copy['x'])
-            c_copy['y'] = 5 - float(c_copy['y'])
-            p2_champions.append(c_copy)
+        if not game.get('bot'):
+            p2_champions = []
+            for c in base_champions:
+                c_copy = c.copy()
+                c_copy['x'] = 4 - float(c_copy['x'])
+                c_copy['y'] = 5 - float(c_copy['y'])
+                p2_champions.append(c_copy)
 
-        socketio.emit('sync_tick', {
-            "champions": p2_champions,
-            "events":    all_tick_events
-        }, to=game['player2'])
+            socketio.emit('sync_tick', {
+                "champions": p2_champions,
+                "events":    all_tick_events,
+                "opponent_lp": game.get('p1_lp', 0)
+            }, to=game['player2'])
 
         # Check end conditions
         team1_alive = any(c.team == 'Team1' and c.is_alive for c in game['board_state'])
@@ -582,15 +686,24 @@ def run_game_loop(room_name):
             else:
                 winner = 'Draw'
 
+            if winner == 'Team1':
+                game['p1_lp'] = game.get('p1_lp', 0) + 1
+            elif winner == 'Team2':
+                game['p2_lp'] = game.get('p2_lp', 0) + 1
+
+            if game.get('bot'):
+                game['bot'].on_round_end(winner=winner, player_board=base_champions)
+
             # Reset for next round
             game['ready_count'] = 0
             game['board_state'] = []
 
             p1_result = 'win' if winner == 'Team1' else ('loss' if winner == 'Team2' else 'draw')
-            p2_result = 'win' if winner == 'Team2' else ('loss' if winner == 'Team1' else 'draw')
-
             socketio.emit('combat_end', {'result': p1_result}, to=game['player1'])
-            socketio.emit('combat_end', {'result': p2_result}, to=game['player2'])
+
+            if not game.get('bot'):
+                p2_result = 'win' if winner == 'Team2' else ('loss' if winner == 'Team1' else 'draw')
+                socketio.emit('combat_end', {'result': p2_result}, to=game['player2'])
 
             # FIX: Room stays in games{} for the next round (players are still connected).
             # It will be deleted when either player disconnects or finds a new match.

@@ -262,6 +262,10 @@ export function syncTickData(data) {
             }
             localChamp.mana = serverChamp.mana;
             localChamp.shield = serverChamp.shield || 0;
+            localChamp.attack = serverChamp.attack !== undefined ? serverChamp.attack : localChamp.attack;
+            localChamp.base_attack = serverChamp.base_attack !== undefined ? serverChamp.base_attack : localChamp.base_attack;
+            localChamp.speed = serverChamp.speed !== undefined ? serverChamp.speed : localChamp.speed;
+            localChamp.base_speed = serverChamp.base_speed !== undefined ? serverChamp.base_speed : localChamp.base_speed;
             localChamp.is_alive = serverChamp.is_alive;
             localChamp.team = serverChamp.team;
             localChamp.buffs = serverChamp.buffs || [];
@@ -282,12 +286,15 @@ export function syncTickData(data) {
                 mana: serverChamp.mana,
                 max_mana: serverChamp.max_mana,
                 shield: serverChamp.shield || 0,
-                attack: serverChamp.attack || template.attack,
-                speed: serverChamp.speed || template.speed,
+                attack: serverChamp.attack !== undefined ? serverChamp.attack : template.attack,
+                base_attack: serverChamp.base_attack !== undefined ? serverChamp.base_attack : (template.attack || 0),
+                speed: serverChamp.speed !== undefined ? serverChamp.speed : template.speed,
+                base_speed: serverChamp.base_speed !== undefined ? serverChamp.base_speed : (template.speed || 1.0),
                 attack_range: serverChamp.attack_range || template.attack_range,
                 is_alive: serverChamp.is_alive,
                 shakeTimer: 0,
-                buffs: serverChamp.buffs || []
+                buffs: serverChamp.buffs || [],
+                buff_details: serverChamp.buff_details || []
             });
         }
     });
@@ -318,6 +325,16 @@ export function syncTickData(data) {
                     path: event.bounce_path || [targetChamp.id],
                     casterId: caster.id,
                     lifeTime: 30, maxLife: 30
+                });
+            } else if (event.skill_type === 'stat_steal') {
+                STATE.hitEffects.push({
+                    x: 0, y: 0,
+                    effectType: 'stat_steal',
+                    casterId: caster.id,
+                    targetId: targetChamp.id,
+                    power: event.power || 0,
+                    lifeTime: Math.min(fxLife, 50),
+                    maxLife: Math.min(fxLife, 50)
                 });
             } else {
                 STATE.hitEffects.push({
@@ -363,6 +380,36 @@ export function syncTickData(data) {
                 spawnFloatingText(tarCenterX, tarCenterY - 25, '💔 CHARMED!', 'status', { color: '#ff6b81' });
             } else if (event.skill_type === 'banish') {
                 spawnFloatingText(tarCenterX, tarCenterY - 25, '🌀 BANISHED!', 'status', { color: '#70a1ff' });
+            } else if (event.skill_type === 'stat_steal') {
+                if (target) target.shakeTimer = 25;
+                STATE.screenShake = Math.max(STATE.screenShake || 0, 7);
+                const casSize = getCanvasCoords(caster.targetX, caster.targetY);
+                const casCenterX = caster.pixelX + casSize.w / 2;
+                const casCenterY = caster.pixelY + casSize.h / 2;
+                const stealPwr = event.power ? event.power.toLocaleString() : 'ATK';
+
+                // Floating text on Target (drained)
+                spawnFloatingText(tarCenterX, tarCenterY - 20, `🔻 -${stealPwr} ATK`, 'status', { color: '#ff4757', glowColor: '#c0392b', scale: 1.4 });
+                spawnFloatingText(tarCenterX, tarCenterY - 45, 'DRAINED!', 'status', { color: '#ff6b81', glowColor: '#962d22', scale: 1.15 });
+
+                // Floating text on Caster (buffed)
+                spawnFloatingText(casCenterX, casCenterY - 20, `🔺 +${stealPwr} ATK`, 'status', { color: '#f1c40f', glowColor: '#9b59b6', scale: 1.45 });
+                spawnFloatingText(casCenterX, casCenterY - 45, '⚡ STOLEN!', 'status', { color: '#e056fd', glowColor: '#be2edd', scale: 1.2 });
+
+                // Spawn energy stream particles from target to caster
+                if (!STATE.particles) STATE.particles = [];
+                for (let p = 0; p < 15; p++) {
+                    const angle = Math.atan2(casCenterY - tarCenterY, casCenterX - tarCenterX) + (Math.random() - 0.5) * 0.7;
+                    const spd = Math.random() * 8 + 3;
+                    STATE.particles.push({
+                        x: tarCenterX, y: tarCenterY,
+                        vx: Math.cos(angle) * spd,
+                        vy: Math.sin(angle) * spd,
+                        color: Math.random() < 0.5 ? '#9b59b6' : '#e74c3c',
+                        size: Math.random() * 4 + 2,
+                        life: 25 + Math.random() * 15
+                    });
+                }
             } else if (event.skill_type === 'blink_strike') {
                 STATE.screenShake = Math.max(STATE.screenShake || 0, 6);
                 const dmgStr = event.power ? `⚡ -${event.power.toLocaleString()}` : '⚡ BLINK STRIKE';

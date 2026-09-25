@@ -29,6 +29,9 @@ socket.on('match_found', (data) => {
     const findBtn = document.getElementById('findMatchBtn');
     if (findBtn) findBtn.style.display = 'none';
 
+    const botBtn = document.getElementById('vsBotBtn');
+    if (botBtn) botBtn.style.display = 'none';
+
     const bottomBar = document.getElementById('bottomBar');
     if (bottomBar) bottomBar.style.display = 'flex';
 
@@ -51,6 +54,13 @@ socket.on('opponent_disconnected', () => {
         findBtn.style.display = 'inline-block';
         findBtn.innerText = "FIND MATCH";
         findBtn.disabled = false;
+    }
+
+    const botBtn = document.getElementById('vsBotBtn');
+    if (botBtn) {
+        botBtn.style.display = 'inline-block';
+        botBtn.innerText = "VS BOT 🤖";
+        botBtn.disabled = false;
     }
 
     const nameInput = document.getElementById('playerNameInput');
@@ -141,12 +151,35 @@ export function findMatch() {
 
     if (nameInput) nameInput.disabled = true;
 
-    socket.emit('find_match', { name: pName });
+    socket.emit('find_match', { name: pName, vs_bot: false });
 
     const btn = document.getElementById('findMatchBtn');
     if (btn) {
         btn.innerText = "SEARCHING...";
         btn.disabled = true;
+    }
+    const botBtn = document.getElementById('vsBotBtn');
+    if (botBtn) {
+        botBtn.disabled = true;
+    }
+}
+
+export function playVsBot() {
+    const nameInput = document.getElementById('playerNameInput');
+    const pName = nameInput && nameInput.value.trim() !== "" ? nameInput.value : "Player";
+
+    if (nameInput) nameInput.disabled = true;
+
+    socket.emit('find_match', { name: pName, vs_bot: true });
+
+    const btn = document.getElementById('findMatchBtn');
+    if (btn) {
+        btn.disabled = true;
+    }
+    const botBtn = document.getElementById('vsBotBtn');
+    if (botBtn) {
+        botBtn.innerText = "MATCHING...";
+        botBtn.disabled = true;
     }
 }
 
