@@ -1,5 +1,24 @@
-﻿/* =========================================
-   CSS Tá»”NG THá»‚ & FULLSCREEN
+/* =========================================
+   GLOBAL SCROLLBAR SUPPRESSION
+   Hide all scrollbars completely on all browsers while keeping touch/wheel scroll
+   ========================================= */
+*,
+*::before,
+*::after {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+::-webkit-scrollbar,
+*::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+}
+
+/* =========================================
+   GLOBAL STYLES & FULLSCREEN LAYOUT
    ========================================= */
 body,
 html {
@@ -174,7 +193,7 @@ button:hover {
 }
 
 /* =========================================
-   THÃ”NG TIN THáºº BÃ€I (Báº£ng TrÃ¡i)
+   CHAMPION INFO PANEL (Left)
    ========================================= */
 .side-panel img {
     width: 100%;
@@ -207,7 +226,7 @@ button:hover {
 }
 
 /* =========================================
-   Tá»˜C / Há»† (Báº£ng Pháº£i)
+   SYNERGIES PANEL (Right)
    ========================================= */
 .synergy-item {
     background: #2c3e50;
@@ -236,11 +255,12 @@ button:hover {
 }
 
 /* =========================================
-   SHOP MUA TÆ¯á»šNG (Bottom Bar)
+   SHOP MUA (Bottom Bar)
    ========================================= */
 .bottom-bar {
     padding-bottom: 2vh;
-    display: flex;
+    display: none;
+    /* Mặc định ẩn, chỉ hiện khi đã ghép trận */
     justify-content: center;
 }
 
@@ -422,19 +442,24 @@ button:hover {
 @media (max-width: 768px) {
 
     /* ---- Root ---- */
-    html, body {
-        overflow: hidden;
-        height: 100%;
+    html,
+    body {
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+        min-height: 100%;
+        height: auto !important;
         width: 100%;
-        touch-action: pan-y;
     }
 
     .fullscreen-wrapper {
         display: flex;
         flex-direction: column;
-        height: 100dvh; /* dvh = dynamic viewport height, accounts for browser chrome */
+        min-height: 100dvh;
+        height: auto !important;
         width: 100vw;
-        overflow: hidden;
+        overflow-x: hidden;
+        overflow-y: visible !important;
     }
 
     /* ---- TOP BAR ---- */
@@ -460,11 +485,26 @@ button:hover {
         border-radius: 6px;
     }
 
-    .gold-display  { font-size: 12px; }
-    .level-display { font-size: 11px; }
-    .unit-display  { font-size: 11px; }
-    .round-display { font-size: 11px; }
-    .lp-display    { font-size: 11px; margin-left: 0; }
+    .gold-display {
+        font-size: 12px;
+    }
+
+    .level-display {
+        font-size: 11px;
+    }
+
+    .unit-display {
+        font-size: 11px;
+    }
+
+    .round-display {
+        font-size: 11px;
+    }
+
+    .lp-display {
+        font-size: 11px;
+        margin-left: 0;
+    }
 
     .name-input {
         width: 100px;
@@ -496,7 +536,7 @@ button:hover {
 
     /* ---- GAME LAYOUT ---- */
     .game-layout {
-        flex: 1;
+        flex: 1 0 auto;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -505,7 +545,7 @@ button:hover {
         padding: 0;
         gap: 0;
         width: 100vw;
-        overflow: hidden;
+        overflow: visible !important;
     }
 
     /* ---- CANVAS ---- */
@@ -517,6 +557,8 @@ button:hover {
         max-height: none;
         display: block;
         flex-shrink: 0;
+        touch-action: pan-y;
+        /* Cho phép vuốt cuộn dọc trang web trên canvas khi không kéo tướng */
     }
 
     /* ---- SIDE PANELS â€” full-width slide-up drawers ---- */
@@ -539,12 +581,22 @@ button:hover {
     }
 
     @keyframes slideUp {
-        from { transform: translateY(100%); }
-        to   { transform: translateY(0);    }
+        from {
+            transform: translateY(100%);
+        }
+
+        to {
+            transform: translateY(0);
+        }
     }
 
-    #infoPanel    { border-top-color: #3498db; }
-    #synergyPanel { border-top-color: #f1c40f; }
+    #infoPanel {
+        border-top-color: #3498db;
+    }
+
+    #synergyPanel {
+        border-top-color: #f1c40f;
+    }
 
     .side-panel.show {
         display: block;
@@ -567,14 +619,18 @@ button:hover {
     /* ---- BOTTOM BAR / SHOP ---- */
     .bottom-bar {
         flex-shrink: 0;
-        display: flex !important;  /* always visible on mobile */
-        padding: 4px 0 env(safe-area-inset-bottom, 4px);
+        display: none; /* Hidden by default until match_found */
+        padding: 5px 0 env(safe-area-inset-bottom, 8px);
         background-color: #0f1923;
         border-top: 1px solid #2c3e50;
         width: 100vw;
+        max-width: 100vw;
         overflow-x: auto;
+        overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
         box-sizing: border-box;
+        overscroll-behavior-x: contain;
     }
 
     .shop-container {
@@ -583,19 +639,32 @@ button:hover {
         flex-wrap: nowrap;
         justify-content: flex-start;
         align-items: stretch;
-        gap: 4px;
-        padding: 2px 6px;
-        min-width: max-content; /* allow horizontal scroll */
+        gap: 6px;
+        padding: 4px 12px 6px 12px;
+        width: max-content;
+        min-width: max-content;
+        box-sizing: border-box;
     }
 
     .shop-card {
-        flex: 0 0 auto;
-        width: 70px;
-        padding: 5px 4px;
+        flex: 0 0 68px;
+        width: 68px;
+        min-width: 68px;
+        padding: 4px 3px;
         border-radius: 8px;
         text-align: center;
         cursor: pointer;
         box-sizing: border-box;
+    }
+
+    /* Generous padding for the last shop card so it can be scrolled fully into view */
+    .shop-card:last-child {
+        margin-right: 60px !important;
+    }
+
+    /* Đảm bảo thẻ cuối cùng có khoảng đệm 40px bên phải để trượt thấy trọn vẹn 100% */
+    .shop-card:last-child {
+        margin-right: 40px !important;
     }
 
     .shop-card img {
@@ -639,4 +708,170 @@ button:hover {
         font-size: 16px;
         padding: 12px 24px;
     }
+}
+
+/* ==========================================================================
+   MOBILE DRAWER ACTION BAR & PREMIUM BUTTONS (BUY & BACK)
+   ========================================================================== */
+.info-action-bar {
+    position: sticky;
+    top: -12px;
+    margin: -12px -12px 14px -12px;
+    padding: 10px 14px 12px 14px;
+    background: linear-gradient(180deg, rgba(13, 22, 34, 0.98) 0%, rgba(15, 25, 35, 0.96) 85%, rgba(15, 25, 35, 0.85) 100%);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px 14px 0 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.info-drawer-pill {
+    width: 38px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    margin: 0 auto 2px auto;
+}
+
+.info-buttons-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+/* NÚT BACK - Thiết kế Glassmorphism Tinh Tế & Hiện Đại */
+.info-btn-back {
+    flex: 0 0 auto;
+    height: 44px;
+    padding: 0 16px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 10px;
+    color: #f1f5f9;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+.info-btn-back:hover,
+.info-btn-back:focus-visible {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.08) 100%);
+    border-color: rgba(255, 255, 255, 0.38);
+    color: #ffffff;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+}
+
+.info-btn-back:active {
+    transform: scale(0.96);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* NÚT BUY - Rực rỡ, Gold / Amber Glow, Hiệu ứng Gaming đỉnh cao */
+.info-btn-buy {
+    flex: 1;
+    height: 44px;
+    padding: 0 14px;
+    background: linear-gradient(135deg, #f59e0b 0%, #ea580c 50%, #c2410c 100%);
+    border: 1px solid rgba(254, 215, 170, 0.65);
+    border-radius: 10px;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(234, 88, 12, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.55);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    animation: buyGlow 2.5s infinite ease-in-out;
+}
+
+@keyframes buyGlow {
+
+    0%,
+    100% {
+        box-shadow: 0 4px 15px rgba(234, 88, 12, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.5);
+        border-color: rgba(254, 215, 170, 0.5);
+    }
+
+    50% {
+        box-shadow: 0 4px 24px rgba(245, 158, 11, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.75);
+        border-color: rgba(255, 237, 213, 0.95);
+    }
+}
+
+.info-btn-buy:active {
+    transform: scale(0.97);
+    filter: brightness(1.15);
+}
+
+.buy-main-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    white-space: nowrap;
+}
+
+.buy-sparkle {
+    font-size: 16px;
+    filter: drop-shadow(0 0 5px #fde047);
+}
+
+.buy-cost-badge {
+    background: rgba(0, 0, 0, 0.45);
+    padding: 4px 10px;
+    border-radius: 7px;
+    font-weight: 800;
+    font-size: 13px;
+    color: #fef08a;
+    border: 1px solid rgba(254, 240, 138, 0.4);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+    white-space: nowrap;
+}
+
+/* Shake animation khi mua thất bại */
+@keyframes btnShake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    20%,
+    60% {
+        transform: translateX(-5px);
+    }
+
+    40%,
+    80% {
+        transform: translateX(5px);
+    }
+}
+
+.btn-shake {
+    animation: btnShake 0.35s ease-in-out !important;
 }

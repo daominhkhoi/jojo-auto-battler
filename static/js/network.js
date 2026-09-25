@@ -5,7 +5,7 @@ import { showNotification } from './notifications.js';
 export const socket = io();
 
 // ==========================================
-// CÁC SỰ KIỆN LẮNG NGHE TỪ SERVER
+// SERVER EVENT LISTENERS
 // ==========================================
 socket.on('connect', () => {
     console.log('Connected to Server!');
@@ -41,8 +41,7 @@ socket.on('opponent_disconnected', () => {
     STATE.champions = [];
 
     const bottomBar = document.getElementById('bottomBar');
-    const isMobile = window.matchMedia('(max-width: 768px)').matches;
-    if (bottomBar && !isMobile) bottomBar.style.display = 'none';
+    if (bottomBar) bottomBar.style.display = 'none';
 
     const readyBtn = document.getElementById('readyBtn');
     if (readyBtn) readyBtn.style.display = 'none';
@@ -134,7 +133,7 @@ socket.on('combat_end', (data) => {
 });
 
 // ==========================================
-// CÁC HÀM GỬI LỆNH LÊN SERVER
+// CLIENT EMIT FUNCTIONS
 // ==========================================
 export function findMatch() {
     const nameInput = document.getElementById('playerNameInput');

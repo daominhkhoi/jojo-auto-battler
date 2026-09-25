@@ -10,7 +10,7 @@ const canvas = document.getElementById('gameBoard');
 const ctx = canvas.getContext('2d');
 
 // ==========================================
-// ĐĂNG KÝ SỰ KIỆN GIAO DIỆN (UI BUTTONS)
+// REGISTER UI BUTTON EVENTS
 // ==========================================
 document.getElementById('buyXpBtn').addEventListener('click', buyXp);
 document.getElementById('findMatchBtn').addEventListener('click', findMatch);
@@ -30,15 +30,15 @@ document.getElementById('rollBtn').addEventListener('click', () => {
 });
 
 // ==========================================
-// HỆ THỐNG KÉO THẢ THẺ BÀI & HOVER
+// DRAG AND DROP & HOVER SYSTEM
 // ==========================================
 let isDragging = false;
 let draggedChamp = null;
 let originalX = null;
 let originalY = null;
-let hoveredChamp = null; // Biến lưu vết thẻ đang được trỏ chuột
+let hoveredChamp = null; // Hovered champion tracker
 
-// Hàm tính tọa độ chuột chuẩn xác khi Canvas bị thu phóng bằng CSS
+// Calculate accurate canvas coordinates during CSS scaling
 function getMousePos(evt) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -65,7 +65,7 @@ function getMousePos(evt) {
 
 const sellZone = document.getElementById('sellZone');
 
-// 1. SỰ KIỆN NHẤN CHUỘT XUỐNG (Bắt đầu kéo)
+// 1. POINTER DOWN (Start drag)
 function handlePointerDown(e) {
     const mP = getMousePos(e);
     let touchedChamp = null;
@@ -119,12 +119,12 @@ canvas.addEventListener('touchstart', (e) => {
     if (isDragging) e.preventDefault();
 }, { passive: false });
 
-// 2. SỰ KIỆN DI CHUYỂN CHUỘT (Kéo thẻ & Xem thông tin)
+// 2. POINTER MOVE (Drag champion & inspect info)
 function handlePointerMove(e) {
     const mP = getMousePos(e);
 
     if (isDragging && draggedChamp) {
-        if (e.type === 'touchmove') e.preventDefault(); // Ngăn cuộn trang
+        if (e.type === 'touchmove') e.preventDefault(); // Prevent page scroll when dragging champion
 
         const size = getCanvasCoords(draggedChamp.targetX, draggedChamp.targetY);
         draggedChamp.pixelX = mP.x - size.w / 2;
@@ -161,7 +161,7 @@ function handlePointerMove(e) {
 canvas.addEventListener('mousemove', handlePointerMove);
 canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
 
-// 3. SỰ KIỆN NHẢ CHUỘT (Thả thẻ xuống ô)
+// 3. POINTER UP (Drop champion onto grid)
 function handlePointerUp(e) {
     if (isDragging && draggedChamp) {
         const mP = getMousePos(e);
@@ -260,7 +260,7 @@ document.getElementById('toggleSynergyBtn')?.addEventListener('click', () => {
     if (infoPanel) infoPanel.classList.remove('show');
 });
 
-// 4. SỰ KIỆN CLICK CHUỘT PHẢI (Bán tướng)
+// 4. RIGHT CLICK (Sell champion)
 canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     if (STATE.isCombatPhase) return;
@@ -274,13 +274,13 @@ canvas.addEventListener('contextmenu', (e) => {
 
     if (clickedChamp) {
         sellChampion(clickedChamp);
-        // Reset bảng thông tin về rỗng sau khi bán thẻ
+        // Reset info panel after selling
         hoveredChamp = null;
         showDisplayInfo(null);
     }
 });
 
-// 5. MẤT HOVER KHI CHUỘT RỜI CANVAS
+// 5. RESET HOVER ON CANVAS LEAVE
 canvas.addEventListener('mouseleave', () => {
     if (!isDragging) {
         hoveredChamp = null;
@@ -289,13 +289,13 @@ canvas.addEventListener('mouseleave', () => {
 });
 
 // ==========================================
-// VÒNG LẶP RENDER (GAME LOOP)
+// RENDER LOOP (GAME LOOP)
 // ==========================================
 function animationLoop() {
     updatePhysics();
     renderBoard(ctx, canvas);
     
-    // Liên tục cập nhật thông tin panel nếu đang trong trận để hiện HP/Mana thời gian thực
+    // Keep info panel updated in real-time during combat
     if (STATE.isCombatPhase && hoveredChamp) {
         showDisplayInfo('champ', hoveredChamp);
     }
@@ -304,39 +304,37 @@ function animationLoop() {
 }
 
 // ==========================================
-// TỰ ĐỘNG KHÔI PHỤC VÀ TÌM TRẬN (SAU KHI F5 TỪ GAME OVER)
+// AUTO-RECONNECT / MATCHFINDING AFTER GAME OVER
 // ==========================================
-// 1. Kiểm tra xem ván trước có để lại lệnh "tự tìm trận" không
+// 1. Check auto-find match flag
 if (sessionStorage.getItem('autoFindMatch') === 'true') {
 
-    // 2. Lấy tên đã cất ra và gán lại vào ô input
+    // 2. Restore saved player name
     const savedName = sessionStorage.getItem('savedPlayerName');
     const nameInput = document.getElementById('playerNameInput');
     if (nameInput && savedName) {
         nameInput.value = savedName;
     }
 
-    // Xóa thư đi để nếu user tự bấm F5 bằng tay thì nó không tự tìm trận nữa
+    // Clear flag so manual refresh will not auto-find
     sessionStorage.removeItem('autoFindMatch');
     sessionStorage.removeItem('savedPlayerName');
 
-    // 3. Tự động giả lập cú Click vào nút FIND MATCH
+    // 3. Trigger FIND MATCH
     const findBtn = document.getElementById('findMatchBtn');
     if (findBtn) {
         setTimeout(() => {
             findBtn.click();
-        }, 500); // Đợi 500ms cho socket kết nối rồi mới click
+        }, 500); // Wait for socket connection before auto-clicking
     }
 }
 
-// Khởi chạy game
+// Launch game
 refreshShop();
 updateUnitCount();
 
-// On mobile: always show the shop bar so players can buy champs from the start
-if (window.matchMedia('(max-width: 768px)').matches) {
-    const bb = document.getElementById('bottomBar');
-    if (bb) bb.style.display = 'flex';
-}
+// Shop bar stays hidden until a match is found
+const bb = document.getElementById('bottomBar');
+if (bb) bb.style.display = 'none';
 
 animationLoop();

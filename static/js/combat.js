@@ -173,15 +173,15 @@ export function syncTickData(data) {
             const targetChamp = target || caster;
             const tarSize = getCanvasCoords(targetChamp.targetX, targetChamp.targetY);
 
-            // TỰ ĐỘNG CHUYỂN GIÂY (DURATION) THÀNH FRAME CANCHÚA (60 FPS)
-            let fxLife = 30; // Mặc định 0.5s cho kỹ năng bộc phá ngay lập tức
+            // Automatically convert duration into animation frames (60 FPS)
+            let fxLife = 30; // Default 0.5s for burst skill
             if (event.duration && event.duration > 0) {
                 fxLife = Math.round(event.duration * 60);
             }
 
             if (event.skill_type === 'ricochet') {
                 STATE.hitEffects.push({
-                    x: 0, y: 0, // Dùng tọa độ thực khi vẽ
+                    x: 0, y: 0, // Use real canvas coordinates when rendering
                     effectType: 'ricochet_chain',
                     path: event.bounce_path || [targetChamp.id],
                     casterId: caster.id,
@@ -194,7 +194,7 @@ export function syncTickData(data) {
                     lifeTime: fxLife,
                     maxLife: fxLife,
                     effectType: event.skill_type,
-                    radius: event.radius || 1.5 // Nhận bán kính ô cờ từ Server gửi xuống
+                    radius: event.radius || 1.5 // Receive cell radius from server
                 });
             }
 
@@ -238,7 +238,7 @@ export function syncTickData(data) {
 export function handleCombatEnd(serverResult) {
     if (!STATE.isCombatPhase) return;
 
-    // --- 1. DÙNG KẾT QUẢ TỪ TRỌNG TÀI SERVER ĐỂ PHÂN ĐỊNH ---
+    // --- 1. USE SERVER REFEREE RESULT ---
     if (serverResult === 'draw') {
         showNotification("TIME UP! IT'S A DRAW! No points awarded.");
     } else if (serverResult === 'win') {
@@ -257,24 +257,27 @@ export function handleCombatEnd(serverResult) {
     const readyBtn = document.getElementById('readyBtn');
     const findBtn = document.getElementById('findMatchBtn');
 
-    // --- 2. KIỂM TRA ĐIỀU KIỆN CHẠM MỐC 10 ĐIỂM ---
+    // --- 2. CHECK 10-POINT WIN CONDITION ---
     if (STATE.playerLP >= 10 || STATE.botLP >= 10) {
         stopPrepTimer();
+        const bottomBar = document.getElementById('bottomBar');
+        if (bottomBar) bottomBar.style.display = 'none';
+
         const isWinner = STATE.playerLP >= 10;
         const resultMsg = isWinner ? "🏆 YOU WON THE MATCH! 🏆" : "💀 YOU LOST THE MATCH! 💀";
 
-        // TẠO MÀN HÌNH GAME OVER ĐEN MỜ ĐÈ LÊN TOÀN BỘ TRÒ CHƠI
+        // Create full-screen game over overlay
         const overlay = document.createElement('div');
         overlay.style.position = 'fixed';
         overlay.style.top = '0'; overlay.style.left = '0';
         overlay.style.width = '100vw'; overlay.style.height = '100vh';
-        overlay.style.backgroundColor = 'rgba(0,0,0,0.85)'; // Nền đen mờ 85%
+        overlay.style.backgroundColor = 'rgba(0,0,0,0.85)'; // 85% opacity dark backdrop
         overlay.style.color = isWinner ? '#f1c40f' : '#e74c3c';
         overlay.style.display = 'flex';
         overlay.style.flexDirection = 'column';
         overlay.style.justifyContent = 'center';
         overlay.style.alignItems = 'center';
-        overlay.style.zIndex = '9999'; // Đảm bảo đè lên mọi thứ
+        overlay.style.zIndex = '9999'; // High z-index overlay
 
         overlay.innerHTML = `
             <h1 style="font-size: 70px; margin-bottom: 20px; text-shadow: 0 0 20px ${isWinner ? '#f1c40f' : '#e74c3c'};">${resultMsg}</h1>
@@ -283,17 +286,17 @@ export function handleCombatEnd(serverResult) {
         `;
         document.body.appendChild(overlay);
 
-        // Chức năng cho nút chơi ván mới (Lưu tên -> F5)
+        // Play again button handler (Save name -> Reload)
         document.getElementById('restartBtn').addEventListener('click', () => {
-            // 1. Lấy tên người chơi hiện tại trên ô input
+            // 1. Read current player name
             const nameInput = document.getElementById('playerNameInput');
             const currentPlayerName = nameInput && nameInput.value.trim() !== "" ? nameInput.value : "Player1";
 
-            // 2. Cất tên và trạng thái muốn tự động tìm trận vào bộ nhớ tạm
+            // 2. Save auto-find match preference to session storage
             sessionStorage.setItem('savedPlayerName', currentPlayerName);
             sessionStorage.setItem('autoFindMatch', 'true');
 
-            // 3. F5 Refresh lại trang Web
+            // 3. Reload game page
             window.location.reload();
         });
 
@@ -356,7 +359,7 @@ export function updateLpUI() {
     const playerText = document.getElementById('playerLpText');
     const botText = document.getElementById('botLpText');
     if (playerText && botText) {
-        // Hiển thị dạng "Điểm hiện tại / 10"
+        // Display score format: current / 10
         playerText.innerText = `${STATE.playerLP}/10`;
         botText.innerText = `${STATE.botLP}/10`;
     }

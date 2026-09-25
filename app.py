@@ -270,7 +270,7 @@ def get_champions_api():
 
 
 # ==========================================
-# 1. HỆ THỐNG TÌM TRẬN & NGẮT KẾT NỐI
+# 1. MATCHMAKING & DISCONNECTION SYSTEM
 # ==========================================
 @socketio.on('find_match')
 def handle_find_match(data=None):
@@ -296,7 +296,7 @@ def handle_find_match(data=None):
             del games[r]
 
         waiting_players.append({'sid': player_id, 'name': player_name})
-        print(f"[SEARCH] {player_name} đang tìm trận...")
+        print(f"[SEARCH] {player_name} is searching for a match...")
 
         # FIX: changed while → if to prevent over-popping in concurrent calls
         if len(waiting_players) >= 2:
@@ -342,11 +342,11 @@ def handle_disconnect():
         for r in rooms_to_delete:
             del games[r]
 
-    print(f"[ERR] Client {player_id} ngắt kết nối.")
+    print(f"[ERR] Client {player_id} disconnected.")
 
 
 # ==========================================
-# 2. XỬ LÝ SẴN SÀNG & KHỞI ĐỘNG SOI BÀI
+# 2. READY STATE & PRE-COMBAT INSPECTION
 # ==========================================
 @socketio.on('submit_board')
 def handle_submit_board(data):
@@ -418,7 +418,7 @@ def handle_submit_board(data):
     game['ready_count'] += 1
 
     if game['ready_count'] == 2:
-        print(f"[LOCK] CẢ 2 ĐÃ SẴN SÀNG! Khởi động 5 giây soi đội hình cho {room_name}")
+        print(f"[LOCK] BOTH READY! Starting 5s inspection for {room_name}")
         socketio.emit('match_locked', to=room_name)
 
         base_champions = [c.to_dict() for c in game['board_state']]
@@ -448,7 +448,7 @@ def handle_submit_board(data):
             socketio.sleep(5)
             if game.get('aborted'):
                 return
-            print(f"[FIRE] HẾT GIỜ SOI BÀI! BẮT ĐẦU CHIẾN ĐẤU tại {room_name}")
+            print(f"[FIRE] INSPECTION OVER! COMBAT STARTED at {room_name}")
             socketio.emit('combat_start', to=room_name)
             socketio.start_background_task(run_game_loop, room_name)
 
@@ -456,7 +456,7 @@ def handle_submit_board(data):
 
 
 # ==========================================
-# 3. VÒNG LẶP CHIẾN ĐẤU (TRỌNG TÀI)
+# 3. COMBAT LOOP (SERVER REFEREE)
 # ==========================================
 def run_game_loop(room_name):
     game = games.get(room_name)

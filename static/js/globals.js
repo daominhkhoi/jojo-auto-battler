@@ -2,15 +2,15 @@ import { CHAMPION_POOL } from './entities.js';
 import { IMAGES } from './assets.js';
 
 export const CONFIG = {
-    BOARD_COLS: 5,            // 5 cột ngang trên sân
-    BOARD_ROWS: 6,            // 6 hàng dọc tổng cộng (3 hàng phe mình, 3 hàng phe địch)
-    BOARD_CELL_WIDTH: 108,    // Rộng ô bàn cờ (540 / 5)
-    BOARD_CELL_HEIGHT: 130,   // Cao ô bàn cờ (Siêu to)
+    BOARD_COLS: 5,            // 5 board columns
+    BOARD_ROWS: 6,            // 6 rows total (3 player rows, 3 enemy rows)
+    BOARD_CELL_WIDTH: 108,    // Cell width (540 / 5)
+    BOARD_CELL_HEIGHT: 130,   // Cell height
 
-    BENCH_SLOTS: 9,           // 9 ô hàng chờ giữ nguyên
-    BENCH_CELL_WIDTH: 60,     // Rộng ô hàng chờ (540 / 9)
-    BENCH_CELL_HEIGHT: 90,    // Cao ô hàng chờ
-    BENCH_START_Y: 780        // Vị trí bắt đầu hàng chờ (6 hàng sân đấu * 130px)
+    BENCH_SLOTS: 9,           // 9 bench slots
+    BENCH_CELL_WIDTH: 60,     // Bench slot width
+    BENCH_CELL_HEIGHT: 90,    // Bench slot height
+    BENCH_START_Y: 780        // Bench Y start position (6 rows * 130px)
 };
 
 
@@ -50,16 +50,16 @@ if (IMAGES["Background"]) {
     IMAGE_CACHE["Background"] = bgImg;
 }
 
-// Hàm ma thuật tự động chuyển tọa độ lưới sang vị trí Pixel chính xác trên màn hình
+// Convert grid coordinates to canvas pixel coordinates
 export function getCanvasCoords(gridX, gridY) {
-    if (gridY >= 6) { // Nếu nằm ở hàng chờ (Y = 6)
+    if (gridY >= 6) { // Bench slot (Y = 6)
         return {
             x: gridX * CONFIG.BENCH_CELL_WIDTH,
             y: CONFIG.BENCH_START_Y,
             w: CONFIG.BENCH_CELL_WIDTH,
             h: CONFIG.BENCH_CELL_HEIGHT
         };
-    } else { // Nếu nằm trên sân đấu (Y từ 0 đến 5)
+    } else { // Board slot (Y 0 to 5)
         return {
             x: gridX * CONFIG.BOARD_CELL_WIDTH,
             y: gridY * CONFIG.BOARD_CELL_HEIGHT,

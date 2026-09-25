@@ -1,9 +1,9 @@
 // static/js/assets.js
 
-// Khai báo đường dẫn gốc tới thư mục ảnh trên GitHub của bạn
+// Base asset URL path
 const GITHUB_BASE_URL = "https://raw.githubusercontent.com/daominhkhoi/SelfLearning/main/img/";
 
-// BỘ SƯU TẬP FULL STAND VŨ TRỤ JOJO (.PNG)
+// FULL CHAMPION STAND SPRITE COLLECTION (.PNG)
 export const IMAGES = {
     "Achtung Baby": `${GITHUB_BASE_URL}Achtung Baby.png`,
     "Aerosmith": `${GITHUB_BASE_URL}Aerosmith.png`,
@@ -114,6 +114,6 @@ export const IMAGES = {
     "Yellow Temperance": `${GITHUB_BASE_URL}Yellow Temperance.png`,
     "Yo-Yo Ma": `${GITHUB_BASE_URL}Yo-Yo Ma.png`,
 
-    // Nút, Icon hoặc ảnh nền sau này bạn có thể quản lý luôn ở đây
+    // UI icons and background assets
     "Background": `${GITHUB_BASE_URL}bg_board.png`
 };

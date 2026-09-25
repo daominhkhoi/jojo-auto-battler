@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Minh Khoi - Auto Battler</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2.0">
+    <style>
+        *, *::before, *::after {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+        }
+        ::-webkit-scrollbar, *::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            background: transparent !important;
+        }
+    </style>
 </head>
 <body>
     <div class="fullscreen-wrapper">
@@ -55,8 +67,8 @@
             <div id="sellZone" class="sell-zone">SELL</div>
         </div>
 
-        <!-- Shop bar: JS controls display on desktop; CSS forces display on mobile -->
-        <div class="bottom-bar" id="bottomBar">
+        <!-- Shop bar: hidden until match is found -->
+        <div class="bottom-bar" id="bottomBar" style="display: none;">
             <div class="shop-container" id="shopContainer"></div>
         </div>
     </div>

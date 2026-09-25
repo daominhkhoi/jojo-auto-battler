@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Quản lý Chỉ số Tướng - Auto Battler</title>
+    <title>Champion Stats Manager - Auto Battler</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -102,30 +102,30 @@
 </head>
 <body>
 
-    <h1>📊 BẢNG QUẢN LÝ CHỈ SỐ TƯỚNG</h1>
+    <h1>📊 CHAMPION STATS MANAGEMENT</h1>
 
     <div class="controls">
         <div>
-            <strong>Tổng số tướng:</strong> <span id="totalChamps" style="color: #e74c3c; font-size: 18px; font-weight: bold;">0</span>
+            <strong>Total Champions:</strong> <span id="totalChamps" style="color: #e74c3c; font-size: 18px; font-weight: bold;">0</span>
         </div>
-        <button id="exportBtn">📥 XUẤT FILE EXCEL (.CSV)</button>
+        <button id="exportBtn">📥 EXPORT EXCEL (.CSV)</button>
     </div>
 
     <table id="champTable">
         <thead>
             <tr>
-                <th>Tên Tướng</th>
-                <th>Vàng</th>
-                <th>Máu (HP)</th>
-                <th>Sát Thương (ATK)</th>
-                <th>Tầm Đánh</th>
-                <th>Tốc Độ</th>
+                <th>Champion Name</th>
+                <th>Cost</th>
+                <th>HP</th>
+                <th>Attack (ATK)</th>
+                <th>Range</th>
+                <th>Speed</th>
                 <th>Mana</th>
-                <th>Tộc / Hệ</th>
-                <th>Loại Kỹ Năng</th>
-                <th>Chỉ Số Kỹ Năng</th>
-                <th>Bán kính</th>
-                <th>Thời Gian (s)</th>
+                <th>Traits</th>
+                <th>Skill Type</th>
+                <th>Skill Value</th>
+                <th>Radius</th>
+                <th>Duration (s)</th>
             </tr>
         </thead>
         <tbody>
@@ -149,7 +149,7 @@
             let skillPowerDisplay = '';
             if (skill.power) skillPowerDisplay = skill.power.toLocaleString();
             else if (skill.percent) skillPowerDisplay = `${skill.percent * 100}%`;
-            else if (skill.radius) skillPowerDisplay = `Bán kính: ${skill.radius}`;
+            else if (skill.radius) skillPowerDisplay = `Radius: ${skill.radius}`;
 
             tr.innerHTML = `
                 <td style="text-align: left; font-weight: bold;">${champ.name}</td>
@@ -173,7 +173,7 @@
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
 
             // THÊM "Bán Kính" VÀO TIÊU ĐỀ
-            csvContent += "Tên Tướng;Vàng;Máu (HP);Sát Thương (ATK);Tầm Đánh;Tốc Độ;Mana;Tộc / Hệ;Loại Kỹ Năng;Chỉ Số Kỹ Năng;Bán Kính;Thời Gian Kỹ Năng\n";
+            csvContent += "Champion Name;Cost;HP;Attack (ATK);Range;Speed;Mana;Traits;Skill Type;Skill Value;Radius;Skill Duration\n";
 
             CHAMPION_POOL.forEach(champ => {
                 const skill = champ.skill || {};
@@ -202,7 +202,7 @@
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "ThongSoTuong_AutoBattler.csv");
+            link.setAttribute("download", "Champion_Stats_AutoBattler.csv");
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
