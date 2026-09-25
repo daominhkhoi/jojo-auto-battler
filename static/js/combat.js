@@ -609,23 +609,41 @@ export function handleCombatEnd(serverResult) {
         overlay.style.zIndex = '9999'; // High z-index overlay
 
         overlay.innerHTML = `
-            <h1 style="font-size: 70px; margin-bottom: 20px; text-shadow: 0 0 20px ${isWinner ? '#f1c40f' : '#e74c3c'};">${resultMsg}</h1>
-            <p style="font-size: 30px; color: white; margin-bottom: 50px;">Final Score: <span style="color:#2ecc71">${STATE.playerLP}</span> - <span style="color:#e74c3c">${STATE.botLP}</span></p>
-            <button id="restartBtn" style="padding: 15px 40px; font-size: 24px; font-weight: bold; cursor: pointer; background: #3498db; color: #fff; border: none; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5);">FIND NEW MATCH</button>
+            <div style="background: rgba(20, 24, 33, 0.95); border: 2px solid ${isWinner ? '#f1c40f' : '#e74c3c'}; border-radius: 16px; padding: 40px 50px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.8); max-width: 90%;">
+                <h1 style="font-size: 52px; margin: 0 0 15px 0; font-weight: 900; text-shadow: 0 0 25px ${isWinner ? '#f1c40f' : '#e74c3c'};">${resultMsg}</h1>
+                <p style="font-size: 24px; color: #ecf0f1; margin: 0 0 35px 0;">Final Score: <span style="color:#2ecc71; font-weight:800;">${STATE.playerLP}</span> - <span style="color:#e74c3c; font-weight:800;">${STATE.botLP}</span></p>
+                
+                <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+                    <button id="returnLobbyBtn" style="padding: 14px 32px; font-size: 18px; font-weight: bold; cursor: pointer; background: linear-gradient(135deg, #2c3e50, #34495e); color: #fff; border: 1px solid #7f8c8d; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);">
+                        🏠 VỀ SẢNH CHÍNH
+                    </button>
+                    <button id="rematchBotBtn" style="padding: 14px 32px; font-size: 18px; font-weight: bold; cursor: pointer; background: linear-gradient(135deg, #8e44ad, #9b59b6); color: #fff; border: 1px solid #a29bfe; border-radius: 10px; box-shadow: 0 4px 15px rgba(142, 68, 173, 0.4);">
+                        🤖 CHƠI TIẾP VỚI BOT
+                    </button>
+                </div>
+            </div>
         `;
         document.body.appendChild(overlay);
 
-        // Play again button handler (Save name -> Reload)
-        document.getElementById('restartBtn').addEventListener('click', () => {
-            // 1. Read current player name
+        const saveCurrentName = () => {
             const nameInput = document.getElementById('playerNameInput');
-            const currentPlayerName = nameInput && nameInput.value.trim() !== "" ? nameInput.value : "Player1";
+            const currentName = nameInput && nameInput.value.trim() !== "" ? nameInput.value.trim() : "Player";
+            try { localStorage.setItem('savedPlayerName', currentName); } catch (e) {}
+        };
 
-            // 2. Save auto-find match preference to session storage
-            sessionStorage.setItem('savedPlayerName', currentPlayerName);
-            sessionStorage.setItem('autoFindMatch', 'true');
+        // 1. Về sảnh chính (giữ nguyên tên, dừng lại ở sảnh chờ để người chơi tự chọn)
+        document.getElementById('returnLobbyBtn').addEventListener('click', () => {
+            saveCurrentName();
+            sessionStorage.removeItem('autoFindMatch');
+            sessionStorage.removeItem('autoPlayBot');
+            window.location.reload();
+        });
 
-            // 3. Reload game page
+        // 2. Chơi tiếp với bot ngay lập tức
+        document.getElementById('rematchBotBtn').addEventListener('click', () => {
+            saveCurrentName();
+            sessionStorage.removeItem('autoFindMatch');
+            sessionStorage.setItem('autoPlayBot', 'true');
             window.location.reload();
         });
 

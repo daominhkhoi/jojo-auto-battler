@@ -307,28 +307,33 @@ function animationLoop() {
 }
 
 // ==========================================
-// AUTO-RECONNECT / MATCHFINDING AFTER GAME OVER
+// PERSISTENT PLAYER NAME & MATCH CONTROLS
 // ==========================================
-// 1. Check auto-find match flag
-if (sessionStorage.getItem('autoFindMatch') === 'true') {
-
-    // 2. Restore saved player name
-    const savedName = sessionStorage.getItem('savedPlayerName');
-    const nameInput = document.getElementById('playerNameInput');
-    if (nameInput && savedName) {
-        nameInput.value = savedName;
+const nameInput = document.getElementById('playerNameInput');
+if (nameInput) {
+    const savedName = localStorage.getItem('savedPlayerName');
+    if (savedName && savedName.trim() !== '') {
+        nameInput.value = savedName.trim();
     }
+    nameInput.addEventListener('input', () => {
+        const val = nameInput.value.trim();
+        if (val) {
+            try { localStorage.setItem('savedPlayerName', val); } catch (e) {}
+        }
+    });
+}
 
-    // Clear flag so manual refresh will not auto-find
-    sessionStorage.removeItem('autoFindMatch');
-    sessionStorage.removeItem('savedPlayerName');
+// Clean up legacy auto-find match flag so it NEVER auto-clicks Find Match
+sessionStorage.removeItem('autoFindMatch');
 
-    // 3. Trigger FIND MATCH
-    const findBtn = document.getElementById('findMatchBtn');
-    if (findBtn) {
+// Check if user explicitly clicked "Play Again with Bot"
+if (sessionStorage.getItem('autoPlayBot') === 'true') {
+    sessionStorage.removeItem('autoPlayBot');
+    const vsBotBtn = document.getElementById('vsBotBtn');
+    if (vsBotBtn) {
         setTimeout(() => {
-            findBtn.click();
-        }, 500); // Wait for socket connection before auto-clicking
+            vsBotBtn.click();
+        }, 500);
     }
 }
 

@@ -147,7 +147,8 @@ socket.on('combat_end', (data) => {
 // ==========================================
 export function findMatch() {
     const nameInput = document.getElementById('playerNameInput');
-    const pName = nameInput && nameInput.value.trim() !== "" ? nameInput.value : "Player";
+    const pName = nameInput && nameInput.value.trim() !== "" ? nameInput.value.trim() : "Player";
+    try { localStorage.setItem('savedPlayerName', pName); } catch (e) {}
 
     if (nameInput) nameInput.disabled = true;
 
@@ -166,7 +167,8 @@ export function findMatch() {
 
 export function playVsBot() {
     const nameInput = document.getElementById('playerNameInput');
-    const pName = nameInput && nameInput.value.trim() !== "" ? nameInput.value : "Player";
+    const pName = nameInput && nameInput.value.trim() !== "" ? nameInput.value.trim() : "Player";
+    try { localStorage.setItem('savedPlayerName', pName); } catch (e) {}
 
     if (nameInput) nameInput.disabled = true;
 
