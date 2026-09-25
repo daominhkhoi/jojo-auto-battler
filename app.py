@@ -133,7 +133,23 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
         final_range  = template.get('attack_range', 1.0)
         final_speed  = template.get('speed', 1.0)
         final_mana   = 0
-        final_skill  = dict(template.get('skill', {'type': 'damage', 'power': 50, 'duration': 0}))
+
+        # Star scaling for skill attributes (power, duration, radius, percent)
+        skill_power_mult = 1.6 ** (star - 1)
+        skill_dur_mult   = 1.2 ** (star - 1)
+        skill_rad_mult   = 1.2 ** (star - 1)
+        skill_pct_mult   = 1.3 ** (star - 1)
+
+        final_skill = dict(template.get('skill', {'type': 'damage', 'power': 50, 'duration': 0}))
+        if 'power' in final_skill and final_skill['power']:
+            final_skill['power'] = round(final_skill['power'] * skill_power_mult)
+        if 'duration' in final_skill and final_skill['duration']:
+            final_skill['duration'] = round(final_skill['duration'] * skill_dur_mult, 1)
+        if 'radius' in final_skill and final_skill['radius']:
+            final_skill['radius'] = round(final_skill['radius'] * skill_rad_mult, 1)
+        if 'percent' in final_skill and final_skill['percent']:
+            final_skill['percent'] = min(0.85, round(final_skill['percent'] * skill_pct_mult, 2))
+
         final_buffs  = []
 
         # === FACTIONS ===
@@ -151,9 +167,9 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
 
         if "Morioh" in traits:
             tc = trait_counts.get("Morioh", 0)
-            if tc >= 6:   final_hp += 120000
-            elif tc >= 4: final_hp += 60000
-            elif tc >= 2: final_hp += 25000
+            if tc >= 6:   final_hp *= 2.2
+            elif tc >= 4: final_hp *= 1.6
+            elif tc >= 2: final_hp *= 1.25
 
         if "Bucciarati" in traits:
             tc = trait_counts.get("Bucciarati", 0)
@@ -164,9 +180,9 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
 
         if "La Squadra" in traits:
             tc = trait_counts.get("La Squadra", 0)
-            if tc >= 6:   final_attack += 80000
-            elif tc >= 4: final_attack += 40000
-            elif tc >= 2: final_attack += 15000
+            if tc >= 6:   final_attack *= 2.2
+            elif tc >= 4: final_attack *= 1.6
+            elif tc >= 2: final_attack *= 1.25
 
         if "Unita Speciale" in traits:
             tc = trait_counts.get("Unita Speciale", 0)
@@ -188,8 +204,8 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
 
         if "Requiem" in traits:
             tc = trait_counts.get("Requiem", 0)
-            if tc >= 2:   final_hp += 100000; final_attack += 30000
-            elif tc >= 1: final_attack += 30000
+            if tc >= 2:   final_hp *= 1.8; final_attack *= 2.0
+            elif tc >= 1: final_attack *= 1.5
 
         # === CLASSES ===
         if "Power Type" in traits:

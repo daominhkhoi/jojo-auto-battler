@@ -190,7 +190,7 @@ class Champion:
         event = {
             'type': 'skill', 'skill_type': s_type,
             'casterId': self.id, 'targetId': target.id if target else self.id,
-            'radius': s_radius, 'duration': s_duration
+            'radius': s_radius, 'duration': s_duration, 'power': s_power
         }
 
         # 1. TIME STOP

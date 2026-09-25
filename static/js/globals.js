@@ -26,6 +26,9 @@ export const STATE = {
     activeProjectiles: [],
     particles: [],
     floatingTexts: [],
+    hitEffects: [],
+    screenShake: 0,
+    screenFlash: null,
     isCombatPhase: false,
     playerLP: 0,   // FIX: was 100 — score starts at 0, win condition is 10
     botLP: 0,      // FIX: same
@@ -90,9 +93,9 @@ export const TRAITS_INFO = {
     "Morioh": {
         desc: "Protectors of the crazy, noisy, bizarre town (Part 4).",
         thresholds: [
-            { req: 2, effect: "+25.000 HP" },
-            { req: 4, effect: "+60.000 HP" },
-            { req: 6, effect: "+120.000 HP" }
+            { req: 2, effect: "+25% Max HP" },
+            { req: 4, effect: "+60% Max HP" },
+            { req: 6, effect: "+120% Max HP" }
         ]
     },
     "Bucciarati": {
@@ -106,9 +109,9 @@ export const TRAITS_INFO = {
     "La Squadra": {
         desc: "The execution squad (Part 5).",
         thresholds: [
-            { req: 2, effect: "+15.000 Attack" },
-            { req: 4, effect: "+40.000 Attack" },
-            { req: 6, effect: "+80.000 Attack" }
+            { req: 2, effect: "+25% Attack" },
+            { req: 4, effect: "+60% Attack" },
+            { req: 6, effect: "+120% Attack" }
         ]
     },
     "Unita Speciale": {
@@ -129,8 +132,8 @@ export const TRAITS_INFO = {
     "Requiem": {
         desc: "Pierced by the Stand Arrow.",
         thresholds: [
-            { req: 1, effect: "+30.000 Attack" },
-            { req: 2, effect: "+100.000 HP & +30.000 Attack" }
+            { req: 1, effect: "+50% Attack" },
+            { req: 2, effect: "+80% Max HP & +100% Attack" }
         ]
     },
 

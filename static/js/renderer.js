@@ -5,6 +5,15 @@ export function renderBoard(ctx, canvas) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const timeNow = Date.now() / 1000;
 
+    ctx.save();
+    // Screen Shake effect
+    if (STATE.screenShake && STATE.screenShake > 0) {
+        const shakeX = (Math.random() - 0.5) * STATE.screenShake;
+        const shakeY = (Math.random() - 0.5) * STATE.screenShake;
+        ctx.translate(shakeX, shakeY);
+        STATE.screenShake = Math.max(0, STATE.screenShake - 0.5);
+    }
+
     if (IMAGE_CACHE["Background"] && IMAGE_CACHE["Background"].complete && IMAGE_CACHE["Background"].naturalHeight) {
         const bg = IMAGE_CACHE["Background"];
         const scale = canvas.height / bg.naturalHeight;
@@ -89,6 +98,43 @@ export function renderBoard(ctx, canvas) {
         const localTeam = STATE.champions.find(c => c.originalX !== undefined)?.team || 'Team1';
         const isAlly = (champ.team === localTeam);
 
+        // VẼ HÀO QUANG CHO TƯỚNG 2⭐ VÀ 3⭐ (GODLY STAR AURA)
+        const starCount = champ.star || 1;
+        if (starCount >= 2) {
+            ctx.save();
+            if (starCount === 2) {
+                // 2⭐: Hào quang Lục Bảo nhẹ nhàng pulsing
+                const glowAlpha = 0.5 + Math.sin(timeNow * 4 + pX * 0.1) * 0.3;
+                ctx.shadowBlur = 14;
+                ctx.shadowColor = '#2ecc71';
+                ctx.strokeStyle = `rgba(46, 204, 113, ${glowAlpha})`;
+                ctx.lineWidth = 3.5;
+                ctx.strokeRect(pX + 1, pY + 1, currentSize.w - 2, currentSize.h - 2);
+            } else if (starCount >= 3) {
+                // 3⭐: HÀO QUANG THẦN THOẠI (GOLDEN FLAME & ORBITING ORBS)
+                const pulse = 0.65 + Math.sin(timeNow * 6 + pY * 0.1) * 0.35;
+                ctx.shadowBlur = 22;
+                ctx.shadowColor = '#ffd700';
+                ctx.strokeStyle = `rgba(255, 215, 0, ${pulse})`;
+                ctx.lineWidth = 4.5;
+                ctx.strokeRect(pX, pY, currentSize.w, currentSize.h);
+
+                // 4 Hạt ánh sáng thần thoại xoay quanh tướng 3⭐
+                for (let orb = 0; orb < 4; orb++) {
+                    const orbAngle = (timeNow * 3.5) + (orb * Math.PI / 2);
+                    const rx = (currentSize.w / 2 + 8) * Math.cos(orbAngle);
+                    const ry = (currentSize.h / 2 + 8) * Math.sin(orbAngle);
+                    ctx.beginPath();
+                    ctx.arc(centerX + rx, centerY + ry, 3.5, 0, Math.PI * 2);
+                    ctx.fillStyle = orb % 2 === 0 ? '#ffffff' : '#ffd700';
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = '#ffd700';
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
+
         ctx.strokeStyle = isAlly ? '#4facfe' : '#ff0844';
         ctx.lineWidth = champ.targetY >= 6 ? 2 : 3.5;
         ctx.strokeRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
@@ -105,10 +151,19 @@ export function renderBoard(ctx, canvas) {
         ctx.lineWidth = 1.5;
         ctx.strokeRect(pX + 4 - 1, barY - 1, barW + 2, totalBarHeight + 2);
 
-        // Thanh Máu
+        // Thanh Máu Nền Đen
+        ctx.fillStyle = '#111111';
+        ctx.fillRect(pX + 4, barY, barW, barHeight);
+
+        // Ghost HP (Thanh máu bóng mờ tụt dần phía sau)
+        const ghostHpP = Math.max(0, Math.min(1, (champ.ghostHp || champ.hp) / champ.max_hp));
+        ctx.fillStyle = '#ffecb3';
+        ctx.fillRect(pX + 4, barY, barW * ghostHpP, barHeight);
+
+        // Thanh Máu Thực
         const hpP = Math.max(0, Math.min(1, champ.hp / champ.max_hp));
-        ctx.fillStyle = 'red'; ctx.fillRect(pX + 4, barY, barW, barHeight);
-        ctx.fillStyle = '#00ff00'; ctx.fillRect(pX + 4, barY, barW * hpP, barHeight);
+        ctx.fillStyle = isAlly ? '#2ecc71' : '#e74c3c';
+        ctx.fillRect(pX + 4, barY, barW * hpP, barHeight);
 
         // Giáp ảo (Shield) - Vẽ đè lên thanh máu
         if (champ.shield && champ.shield > 0) {
@@ -117,12 +172,27 @@ export function renderBoard(ctx, canvas) {
             ctx.fillRect(pX + 4, barY, barW * shP, barHeight);
         }
 
-        // Thanh Mana
+        // Thanh Mana & Sẵn Sàng Chiêu Cuối (NEON CYAN SURGE)
         const mnP = Math.max(0, Math.min(1, (champ.mana || 0) / champ.max_mana));
         const isManaLocked = (champ.buffs && champ.buffs.includes('mana_lock'));
-        ctx.fillStyle = '#444'; ctx.fillRect(pX + 4, barY + barHeight + barSpacing, barW, barHeight);
-        ctx.fillStyle = isManaLocked ? '#7f8c8d' : '#00aaff';
-        ctx.fillRect(pX + 4, barY + barHeight + barSpacing, barW * mnP, barHeight);
+        const isUltimateReady = !isManaLocked && (champ.mana >= champ.max_mana);
+
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(pX + 4, barY + barHeight + barSpacing, barW, barHeight);
+
+        if (isUltimateReady) {
+            // PULSING NEON CYAN-WHITE (ULTIMATE READY!)
+            const readyGlow = 0.75 + Math.sin(timeNow * 10) * 0.25;
+            ctx.save();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00ffff';
+            ctx.fillStyle = `rgba(0, 255, 255, ${readyGlow})`;
+            ctx.fillRect(pX + 4, barY + barHeight + barSpacing, barW, barHeight);
+            ctx.restore();
+        } else {
+            ctx.fillStyle = isManaLocked ? '#7f8c8d' : '#00aaff';
+            ctx.fillRect(pX + 4, barY + barHeight + barSpacing, barW * mnP, barHeight);
+        }
     });
 
     // 2.5 LỚP HIỆU ỨNG BUFF/DEBUFF (ĐÈ LÊN MẶT LÁ BÀI VÀ CÁC HIỆU ỨNG ĐẶC BIỆT)
@@ -354,31 +424,71 @@ export function renderBoard(ctx, canvas) {
                 ctx.stroke();
             }
             else if (hit.effectType === 'time_stop' || hit.effectType === 'global_slow') {
-                // Sóng âm đồng hồ ngưng đọng thời gian hoặc làm chậm
+                // Sóng âm đồng hồ ngưng đọng thời gian với mặt đồng hồ La Mã
                 ctx.globalAlpha = 1.0;
+                const r = progress * canvas.width * 0.9;
                 ctx.beginPath();
-                ctx.arc(0, 0, progress * canvas.width, 0, Math.PI * 2);
-                ctx.strokeStyle = hit.effectType === 'time_stop' ? `rgba(189, 195, 199, ${1 - progress})` : `rgba(135, 54, 0, ${1 - progress})`;
-                ctx.lineWidth = 20;
+                ctx.arc(0, 0, r, 0, Math.PI * 2);
+                ctx.strokeStyle = hit.effectType === 'time_stop' ? `rgba(0, 255, 255, ${1 - progress})` : `rgba(230, 126, 34, ${1 - progress})`;
+                ctx.lineWidth = 14 * (1 - progress);
                 ctx.stroke();
+
+                if (hit.effectType === 'time_stop' && r > 40) {
+                    ctx.save();
+                    ctx.font = 'bold 22px "Times New Roman", serif';
+                    ctx.fillStyle = `rgba(255, 255, 255, ${(1 - progress) * 0.9})`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    const clockR = r * 0.72;
+                    ctx.fillText('XII', 0, -clockR);
+                    ctx.fillText('III', clockR, 0);
+                    ctx.fillText('VI', 0, clockR);
+                    ctx.fillText('IX', -clockR, 0);
+                    // Kim đồng hồ xoay
+                    ctx.rotate(timeNow * 8);
+                    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -clockR * 0.8);
+                    ctx.strokeStyle = `rgba(0, 255, 255, ${1 - progress})`;
+                    ctx.lineWidth = 4; ctx.stroke();
+                    ctx.restore();
+                }
             }
-            else if (hit.effectType === 'blink_strike' || hit.effectType === 'execute') {
+            else if (hit.effectType === 'execute') {
+                ctx.globalAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.5);
+                const sz = progress * 100;
+                // Vết chém chéo đỏ máu khổng lồ (Crimson Cross Slashes)
+                ctx.save();
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#ff4757';
+                ctx.beginPath();
+                ctx.moveTo(-sz, -sz); ctx.lineTo(sz, sz);
+                ctx.moveTo(sz, -sz); ctx.lineTo(-sz, sz);
+                ctx.strokeStyle = '#ff4757';
+                ctx.lineWidth = 12 * (1 - progress);
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(-sz * 0.7, -sz * 0.7); ctx.lineTo(sz * 0.7, sz * 0.7);
+                ctx.moveTo(sz * 0.7, -sz * 0.7); ctx.lineTo(-sz * 0.7, sz * 0.7);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 4 * (1 - progress);
+                ctx.stroke();
+                ctx.restore();
+            }
+            else if (hit.effectType === 'blink_strike') {
                 ctx.globalAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.0);
                 const sz = progress * 80;
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#f1c40f';
                 ctx.beginPath();
                 ctx.moveTo(-sz, 0); ctx.lineTo(sz, 0);
-                if(hit.effectType === 'execute') {
-                    ctx.moveTo(0, -sz); ctx.lineTo(0, sz);
-                    ctx.moveTo(-sz, -sz); ctx.lineTo(sz, sz);
-                    ctx.moveTo(sz, -sz); ctx.lineTo(-sz, sz);
-                } else {
-                    ctx.moveTo(0, -sz); ctx.lineTo(0, sz);
-                }
-                ctx.strokeStyle = hit.effectType === 'execute' ? `rgba(192, 57, 43, ${1 - progress})` : `rgba(241, 196, 15, ${1 - progress})`;
+                ctx.moveTo(0, -sz); ctx.lineTo(0, sz);
+                ctx.strokeStyle = `rgba(241, 196, 15, ${1 - progress})`;
                 ctx.lineWidth = 10 * (1 - progress);
                 ctx.stroke();
                 ctx.beginPath(); ctx.arc(0, 0, sz / 2, 0, Math.PI * 2);
                 ctx.fillStyle = `rgba(255, 255, 255, ${1 - progress})`; ctx.fill();
+                ctx.restore();
             }
             else if (hit.effectType === 'pull' || hit.effectType === 'swap') {
                 ctx.globalAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.0);
@@ -495,27 +605,40 @@ export function renderBoard(ctx, canvas) {
         });
     }
 
-    // 6. VẼ CHỮ NỔI SÁT THƯƠNG (FLOATING TEXTS)
+    // 6. VẼ CHỮ NỔI SÁT THƯƠNG & TRẠNG THÁI (FLOATING COMBAT TEXTS)
     if (STATE.floatingTexts) {
         STATE.floatingTexts.forEach(t => {
             ctx.save();
-            ctx.globalAlpha = Math.max(0, t.life / t.maxLife);
+            const alpha = Math.max(0, Math.min(1.0, t.life / (t.maxLife * 0.35)));
+            ctx.globalAlpha = alpha;
             ctx.translate(t.x, t.y);
-            ctx.scale(t.scale || 1.0, t.scale || 1.0);
-            
-            ctx.font = 'bold 22px Arial';
-            ctx.fillStyle = t.color;
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 4;
+            const scale = t.scale || 1.0;
+            ctx.scale(scale, scale);
+
+            if (t.glow) {
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = t.glowColor || t.color;
+            }
+
+            ctx.font = t.font || '900 21px "Segoe UI", Arial, sans-serif';
             ctx.textAlign = 'center';
-            
+            ctx.textBaseline = 'middle';
+
+            // Viền đen đậm nổi bật
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 4.5;
+            ctx.lineJoin = 'round';
             ctx.strokeText(t.text, 0, 0);
+
+            // Chữ bên trong
+            ctx.fillStyle = t.color;
             ctx.fillText(t.text, 0, 0);
+
             ctx.restore();
         });
     }
 
-    // 7. LỚP TRÊN CÙNG (TOP LAYER): VẼ SỐ SAO
+    // 7. LỚP TRÊN CÙNG (TOP LAYER): VẼ SỐ SAO VỚI ÁNH KIM HÀO QUANG
     STATE.champions.forEach(champ => {
         if (!champ.is_alive && champ.hp <= 0) return;
 
@@ -524,13 +647,44 @@ export function renderBoard(ctx, canvas) {
 
         ctx.save();
         ctx.globalAlpha = 1.0;
-        ctx.shadowBlur = 0;
-
-        ctx.fillStyle = '#f1c40f';
-        ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
 
-        ctx.fillText('⭐'.repeat(starCount), champ.pixelX + currentSize.w / 2, champ.pixelY - 6);
+        const starX = champ.pixelX + currentSize.w / 2;
+        const starY = champ.pixelY - 7;
+
+        if (starCount >= 3) {
+            ctx.shadowBlur = 14;
+            ctx.shadowColor = '#ffd700';
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 18px Arial';
+            ctx.fillText('⭐⭐⭐', starX, starY);
+        } else if (starCount === 2) {
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#2ecc71';
+            ctx.fillStyle = '#f1c40f';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('⭐⭐', starX, starY);
+        } else {
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#f1c40f';
+            ctx.font = 'bold 15px Arial';
+            ctx.fillText('⭐', starX, starY);
+        }
         ctx.restore();
     });
+
+    // KHÔI PHỤC TỌA ĐỘ SAU RUNG MÀN HÌNH (SCREEN SHAKE RESTORE)
+    ctx.restore();
+
+    // CHỚP SÁNG MÀN HÌNH (SCREEN FLASH OVERLAY CHO SKILL LỚN)
+    if (STATE.screenFlash) {
+        ctx.save();
+        ctx.fillStyle = STATE.screenFlash.color;
+        ctx.globalAlpha = Math.max(0, Math.min(1.0, STATE.screenFlash.alpha));
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+        STATE.screenFlash.alpha -= (STATE.screenFlash.decay || 0.05);
+        if (STATE.screenFlash.alpha <= 0) STATE.screenFlash = null;
+    }
 }

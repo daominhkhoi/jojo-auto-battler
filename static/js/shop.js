@@ -77,6 +77,14 @@ function checkAndMerge(champName, starLevel) {
     const copies = STATE.champions.filter(c => c.name === champName && c.star === starLevel);
     if (copies.length >= 3) {
         const targets = copies.slice(0, 3);
+
+        // Prioritize the copy currently deployed on the board (y < 6)
+        targets.sort((a, b) => {
+            const aOnBoard = (a.targetY !== undefined && a.targetY < 6) ? 1 : 0;
+            const bOnBoard = (b.targetY !== undefined && b.targetY < 6) ? 1 : 0;
+            return bOnBoard - aOnBoard;
+        });
+
         STATE.champions = STATE.champions.filter(c => !targets.includes(c));
 
         // Return 2 consumed copies to pool (1 stays as the upgraded unit)
@@ -89,13 +97,13 @@ function checkAndMerge(champName, starLevel) {
         upgraded.hp = upgraded.max_hp;
         upgraded.attack = Math.round(upgraded.attack * 1.8);
         upgraded.mana = 0;
-        upgraded.max_mana = Math.round(upgraded.max_mana * 0.7);
+        // max_mana stays constant across star tiers to prevent infinite CC/perma-stun loops
 
         if (upgraded.skill) {
             if (upgraded.skill.power) upgraded.skill.power = Math.round(upgraded.skill.power * 1.6);
             if (upgraded.skill.duration) upgraded.skill.duration = parseFloat((upgraded.skill.duration * 1.2).toFixed(1));
             if (upgraded.skill.radius) upgraded.skill.radius = parseFloat((upgraded.skill.radius * 1.2).toFixed(1));
-            if (upgraded.skill.percent) upgraded.skill.percent = parseFloat((upgraded.skill.percent * 1.3).toFixed(2));
+            if (upgraded.skill.percent) upgraded.skill.percent = Math.min(0.85, parseFloat((upgraded.skill.percent * 1.3).toFixed(2)));
         }
 
         STATE.champions.push(upgraded);

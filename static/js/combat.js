@@ -4,6 +4,83 @@ import { updateGold, refreshShop } from './shop.js';
 import { startPrepTimer, stopPrepTimer } from './network.js';
 import { showNotification } from './notifications.js';
 
+export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
+    if (!STATE.floatingTexts) STATE.floatingTexts = [];
+
+    // Jitter X slightly so multiple simultaneous hits do not overlap illegibly
+    const jitterX = (Math.random() - 0.5) * 22;
+    const startX = x + jitterX;
+    const startY = y - 10;
+
+    let color = '#ffffff';
+    let baseScale = 1.0;
+    let glow = false;
+    let glowColor = '';
+    let font = 'bold 20px "Segoe UI", Arial, sans-serif';
+
+    switch (type) {
+        case 'crit':
+            color = '#ff3838';
+            baseScale = 1.45;
+            glow = true;
+            glowColor = '#ff3838';
+            font = '900 24px "Segoe UI", Arial, sans-serif';
+            break;
+        case 'skill':
+            color = '#ffa502';
+            baseScale = 1.35;
+            glow = true;
+            glowColor = '#ffa502';
+            font = 'bold 22px "Segoe UI", Arial, sans-serif';
+            break;
+        case 'heal':
+            color = '#2ecc71';
+            baseScale = 1.2;
+            glow = true;
+            glowColor = '#2ecc71';
+            font = 'bold 20px "Segoe UI", Arial, sans-serif';
+            break;
+        case 'shield':
+            color = '#ecf0f1';
+            baseScale = 1.1;
+            font = 'bold 18px "Segoe UI", Arial, sans-serif';
+            break;
+        case 'status':
+            color = options.color || '#f1c40f';
+            baseScale = options.scale || 1.3;
+            glow = true;
+            glowColor = options.glowColor || color;
+            font = '900 21px "Segoe UI", Arial, sans-serif';
+            break;
+        case 'normal':
+        default:
+            color = options.color || '#ffffff';
+            baseScale = 1.0;
+            font = 'bold 19px "Segoe UI", Arial, sans-serif';
+            break;
+    }
+
+    if (options.color) color = options.color;
+    if (options.scale) baseScale = options.scale;
+
+    STATE.floatingTexts.push({
+        x: startX,
+        y: startY,
+        vx: (Math.random() - 0.5) * 0.7,
+        vy: 2.2,
+        text: text,
+        color: color,
+        life: 48,
+        maxLife: 48,
+        baseScale: baseScale,
+        scale: baseScale * 1.35,
+        scaleProgress: 0,
+        glow: glow,
+        glowColor: glowColor,
+        font: font
+    });
+}
+
 export function updatePhysics() {
     if (!STATE.hitEffects) STATE.hitEffects = [];
 
@@ -17,6 +94,13 @@ export function updatePhysics() {
         champ.pixelY += (targetCoords.y - champ.pixelY) * 0.12;
 
         if (champ.shakeTimer > 0) champ.shakeTimer--;
+
+        // Ghost HP bar smoothly drains towards current HP
+        if (champ.ghostHp === undefined || champ.ghostHp < champ.hp) {
+            champ.ghostHp = champ.hp;
+        } else if (champ.ghostHp > champ.hp) {
+            champ.ghostHp -= (champ.ghostHp - champ.hp) * 0.08;
+        }
     });
 
     for (let i = STATE.activeProjectiles.length - 1; i >= 0; i--) {
@@ -26,16 +110,27 @@ export function updatePhysics() {
             proj.lifeTime--;
             if (proj.lifeTime === 8) {
                 const target = STATE.champions.find(c => c.id === proj.targetId);
-                if (target) target.shakeTimer = 12;
+                if (target) {
+                    target.shakeTimer = 12;
+                    const dmg = proj.damage || 0;
+                    if (dmg > 0) {
+                        const isCrit = dmg >= 10000;
+                        spawnFloatingText(proj.targetX, proj.targetY, (isCrit ? `CRIT! -${dmg.toLocaleString()}` : `-${dmg.toLocaleString()}`), isCrit ? 'crit' : 'normal');
+                        if (isCrit) {
+                            STATE.screenShake = Math.max(STATE.screenShake || 0, 5);
+                        }
+                    }
+                }
                 STATE.hitEffects.push({ x: proj.targetX, y: proj.targetY, lifeTime: 8, maxLife: 8 });
 
-                // Spawn sparks
+                // Spawn blood & impact sparks
                 if (!STATE.particles) STATE.particles = [];
-                for (let p = 0; p < 5; p++) {
+                for (let p = 0; p < 8; p++) {
                     STATE.particles.push({
                         x: proj.targetX, y: proj.targetY,
-                        vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10,
-                        color: '#e74c3c', size: Math.random() * 3 + 1, life: 15 + Math.random() * 10
+                        vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12,
+                        color: Math.random() < 0.6 ? '#e74c3c' : '#f39c12',
+                        size: Math.random() * 3 + 1, life: 15 + Math.random() * 10
                     });
                 }
             }
@@ -45,29 +140,40 @@ export function updatePhysics() {
             const dy = proj.targetY - proj.y;
             const dist = Math.hypot(dx, dy);
 
-            // Spawn trail particles for ranged
-            if (Math.random() < 0.5) {
+            // Spawn luminous energy trail particles for ranged
+            if (Math.random() < 0.6) {
                 if (!STATE.particles) STATE.particles = [];
                 STATE.particles.push({
                     x: proj.x, y: proj.y,
                     vx: -dx / dist * 2 + (Math.random() - 0.5), vy: -dy / dist * 2 + (Math.random() - 0.5),
-                    color: '#00ffff', size: 2, life: 10
+                    color: Math.random() < 0.5 ? '#00ffff' : '#ffffff',
+                    size: Math.random() * 2.5 + 1, life: 12
                 });
             }
 
             if (dist < proj.speed) {
                 const target = STATE.champions.find(c => c.id === proj.targetId);
-                if (target) target.shakeTimer = 12;
+                if (target) {
+                    target.shakeTimer = 12;
+                    const dmg = proj.damage || 0;
+                    if (dmg > 0) {
+                        const isCrit = dmg >= 10000;
+                        spawnFloatingText(proj.targetX, proj.targetY, (isCrit ? `CRIT! -${dmg.toLocaleString()}` : `-${dmg.toLocaleString()}`), isCrit ? 'crit' : 'normal');
+                        if (isCrit) {
+                            STATE.screenShake = Math.max(STATE.screenShake || 0, 5);
+                        }
+                    }
+                }
 
                 STATE.hitEffects.push({ x: proj.targetX, y: proj.targetY, lifeTime: 12, maxLife: 12 });
                 STATE.activeProjectiles.splice(i, 1);
 
-                // Spawn impact spark
+                // Spawn impact spark explosion
                 if (!STATE.particles) STATE.particles = [];
-                for (let p = 0; p < 8; p++) {
+                for (let p = 0; p < 10; p++) {
                     STATE.particles.push({
                         x: proj.targetX, y: proj.targetY,
-                        vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12,
+                        vx: (Math.random() - 0.5) * 14, vy: (Math.random() - 0.5) * 14,
                         color: '#00ffff', size: Math.random() * 4 + 1, life: 20 + Math.random() * 10
                     });
                 }
@@ -94,7 +200,13 @@ export function updatePhysics() {
     if (!STATE.floatingTexts) STATE.floatingTexts = [];
     for (let i = STATE.floatingTexts.length - 1; i >= 0; i--) {
         const t = STATE.floatingTexts[i];
-        t.y -= t.speed;
+        t.x += (t.vx || 0);
+        t.y -= (t.vy || 1.4);
+        if (t.vy > 0.4) t.vy *= 0.95; // Gentle upward deceleration
+        if (t.scaleProgress !== undefined && t.scaleProgress < 1.0) {
+            t.scaleProgress += 0.12;
+            t.scale = (t.baseScale || 1.0) * (1.35 - 0.35 * Math.sin(t.scaleProgress * Math.PI));
+        }
         t.life--;
         if (t.life <= 0) STATE.floatingTexts.splice(i, 1);
     }
@@ -113,23 +225,40 @@ export function syncTickData(data) {
             localChamp.targetX = serverChamp.x;
             localChamp.targetY = serverChamp.y;
 
-            localChamp.hp = serverChamp.hp;  // single assignment (FIX: removed duplicate)
+            localChamp.hp = serverChamp.hp;
 
-            // Death particle burst (restored)
+            // Death particle burst & soul wisp
             if (localChamp.is_alive && !serverChamp.is_alive) {
+                STATE.screenShake = Math.max(STATE.screenShake || 0, 6);
                 if (!STATE.particles) STATE.particles = [];
                 const tarSize = getCanvasCoords(localChamp.targetX, localChamp.targetY);
-                for (let p = 0; p < 20; p++) {
+                const deathCenterX = (localChamp.pixelX || tarSize.x) + tarSize.w / 2;
+                const deathCenterY = (localChamp.pixelY || tarSize.y) + tarSize.h / 2;
+
+                // 25 Shatter spark particles
+                for (let p = 0; p < 25; p++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const spd = Math.random() * 8 + 2;
                     STATE.particles.push({
-                        x: (localChamp.pixelX || tarSize.x) + tarSize.w / 2,
-                        y: (localChamp.pixelY || tarSize.y) + tarSize.h / 2,
-                        vx: (Math.random() - 0.5) * 8,
-                        vy: (Math.random() - 0.5) * 8,
-                        color: '#f1c40f',
+                        x: deathCenterX,
+                        y: deathCenterY,
+                        vx: Math.cos(angle) * spd,
+                        vy: Math.sin(angle) * spd,
+                        color: Math.random() < 0.5 ? '#f39c12' : '#e74c3c',
                         size: Math.random() * 5 + 2,
                         life: 30 + Math.random() * 20
                     });
                 }
+                // Soul wisp ascending to sky
+                STATE.particles.push({
+                    x: deathCenterX,
+                    y: deathCenterY,
+                    vx: 0,
+                    vy: -2.8,
+                    color: '#ffffff',
+                    size: 6,
+                    life: 45
+                });
             }
             localChamp.mana = serverChamp.mana;
             localChamp.shield = serverChamp.shield || 0;
@@ -149,6 +278,7 @@ export function syncTickData(data) {
                 targetY: serverChamp.y,
                 hp: serverChamp.hp,
                 max_hp: serverChamp.max_hp,
+                ghostHp: serverChamp.hp,
                 mana: serverChamp.mana,
                 max_mana: serverChamp.max_mana,
                 shield: serverChamp.shield || 0,
@@ -172,6 +302,8 @@ export function syncTickData(data) {
 
             const targetChamp = target || caster;
             const tarSize = getCanvasCoords(targetChamp.targetX, targetChamp.targetY);
+            const tarCenterX = targetChamp.pixelX + tarSize.w / 2;
+            const tarCenterY = targetChamp.pixelY + tarSize.h / 2;
 
             // Automatically convert duration into animation frames (60 FPS)
             let fxLife = 30; // Default 0.5s for burst skill
@@ -181,7 +313,7 @@ export function syncTickData(data) {
 
             if (event.skill_type === 'ricochet') {
                 STATE.hitEffects.push({
-                    x: 0, y: 0, // Use real canvas coordinates when rendering
+                    x: 0, y: 0,
                     effectType: 'ricochet_chain',
                     path: event.bounce_path || [targetChamp.id],
                     casterId: caster.id,
@@ -189,16 +321,53 @@ export function syncTickData(data) {
                 });
             } else {
                 STATE.hitEffects.push({
-                    x: targetChamp.pixelX + tarSize.w / 2,
-                    y: targetChamp.pixelY + tarSize.h / 2,
+                    x: tarCenterX,
+                    y: tarCenterY,
                     lifeTime: fxLife,
                     maxLife: fxLife,
                     effectType: event.skill_type,
-                    radius: event.radius || 1.5 // Receive cell radius from server
+                    radius: event.radius || 1.5
                 });
             }
 
-            if (event.skill_type === 'damage' && target) target.shakeTimer = 30;
+            // Cinematic visual triggers & floating text for skills
+            if (event.skill_type === 'damage') {
+                if (target) target.shakeTimer = 30;
+                STATE.screenShake = Math.max(STATE.screenShake || 0, 7);
+                if (event.power) {
+                    spawnFloatingText(tarCenterX, tarCenterY - 20, `💥 -${event.power.toLocaleString()}`, 'skill', { color: '#ffa502', scale: 1.4 });
+                }
+            } else if (event.skill_type === 'execute') {
+                if (target) target.shakeTimer = 40;
+                STATE.screenShake = Math.max(STATE.screenShake || 0, 12);
+                STATE.screenFlash = { color: 'rgba(231, 76, 60, 0.45)', alpha: 1.0, decay: 0.04 };
+                spawnFloatingText(tarCenterX, tarCenterY - 25, '☠️ EXECUTED!', 'status', { color: '#ff4757', scale: 1.5 });
+            } else if (event.skill_type === 'time_stop') {
+                STATE.screenShake = Math.max(STATE.screenShake || 0, 14);
+                STATE.screenFlash = { color: 'rgba(255, 255, 255, 0.5)', alpha: 1.0, decay: 0.035 };
+                spawnFloatingText(tarCenterX, tarCenterY - 30, '⏳ TIME STOP!', 'status', { color: '#ffffff', glowColor: '#00ffff', scale: 1.5 });
+            } else if (event.skill_type === 'return_to_zero') {
+                STATE.screenShake = Math.max(STATE.screenShake || 0, 16);
+                STATE.screenFlash = { color: 'rgba(255, 215, 0, 0.5)', alpha: 1.0, decay: 0.03 };
+                spawnFloatingText(tarCenterX, tarCenterY - 30, '✨ RETURN TO ZERO!', 'status', { color: '#ffd700', glowColor: '#f39c12', scale: 1.6 });
+            } else if (['heal', 'aoe_heal', 'regen'].includes(event.skill_type)) {
+                const healVal = event.power ? `+${event.power.toLocaleString()}` : '+HP';
+                spawnFloatingText(tarCenterX, tarCenterY - 20, `💚 ${healVal}`, 'heal');
+            } else if (event.skill_type === 'stun') {
+                spawnFloatingText(tarCenterX, tarCenterY - 25, '⚡ STUNNED!', 'status', { color: '#ffd32a' });
+            } else if (event.skill_type === 'hp_shield') {
+                spawnFloatingText(tarCenterX, tarCenterY - 25, '🛡️ SHIELD!', 'shield');
+            } else if (event.skill_type === 'polymorph') {
+                spawnFloatingText(tarCenterX, tarCenterY - 25, '🐌 POLYMORPH!', 'status', { color: '#a29bfe' });
+            } else if (event.skill_type === 'mind_control') {
+                spawnFloatingText(tarCenterX, tarCenterY - 25, '💔 CHARMED!', 'status', { color: '#ff6b81' });
+            } else if (event.skill_type === 'banish') {
+                spawnFloatingText(tarCenterX, tarCenterY - 25, '🌀 BANISHED!', 'status', { color: '#70a1ff' });
+            } else if (event.skill_type === 'blink_strike') {
+                STATE.screenShake = Math.max(STATE.screenShake || 0, 6);
+                const dmgStr = event.power ? `⚡ -${event.power.toLocaleString()}` : '⚡ BLINK STRIKE';
+                spawnFloatingText(tarCenterX, tarCenterY - 20, dmgStr, 'crit');
+            }
         }
         else if (event.type === 'attack') {
             const attacker = STATE.champions.find(c => c.id === event.attackerId);
@@ -213,6 +382,7 @@ export function syncTickData(data) {
                 x: attacker.pixelX + attSize.w / 2, y: attacker.pixelY + attSize.h / 2,
                 targetX: target.pixelX + tarSize.w / 2, targetY: target.pixelY + tarSize.h / 2,
                 targetId: event.targetId,
+                damage: event.damage || 0,
                 type: isRanged ? 'projectile' : 'melee',
                 speed: isRanged ? 16 : 0,
                 lifeTime: isRanged ? 0 : 15
@@ -222,15 +392,26 @@ export function syncTickData(data) {
             const target = STATE.champions.find(c => c.id === event.targetId || c.id === event.target_id);
             if (!target) return;
             const tarSize = getCanvasCoords(target.targetX, target.targetY);
+            const tarCenterX = target.pixelX + tarSize.w / 2;
+            const tarCenterY = target.pixelY + tarSize.h / 2;
 
             STATE.hitEffects.push({
-                x: target.pixelX + tarSize.w / 2,
-                y: target.pixelY + tarSize.h / 2,
+                x: tarCenterX,
+                y: tarCenterY,
                 lifeTime: 30,
                 maxLife: 30,
                 effectType: event.type,
                 damage: event.damage
             });
+
+            if (event.type === 'evasion') {
+                spawnFloatingText(tarCenterX, tarCenterY - 20, 'MISS!', 'status', { color: '#ced6e0', scale: 1.1 });
+            } else if (event.type === 'reflect') {
+                spawnFloatingText(tarCenterX, tarCenterY - 20, `💥 REFLECT -${Math.round(event.damage || 0).toLocaleString()}`, 'skill', { color: '#9b59b6' });
+            } else if (event.type === 'revive') {
+                STATE.screenFlash = { color: 'rgba(241, 196, 15, 0.45)', alpha: 1.0, decay: 0.035 };
+                spawnFloatingText(tarCenterX, tarCenterY - 30, '🌟 REVIVED!', 'status', { color: '#ffd700', scale: 1.4 });
+            }
         }
     });
 }
