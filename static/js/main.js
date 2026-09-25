@@ -332,4 +332,11 @@ if (sessionStorage.getItem('autoFindMatch') === 'true') {
 // Khởi chạy game
 refreshShop();
 updateUnitCount();
+
+// On mobile: always show the shop bar so players can buy champs from the start
+if (window.matchMedia('(max-width: 768px)').matches) {
+    const bb = document.getElementById('bottomBar');
+    if (bb) bb.style.display = 'flex';
+}
+
 animationLoop();

@@ -41,7 +41,8 @@ socket.on('opponent_disconnected', () => {
     STATE.champions = [];
 
     const bottomBar = document.getElementById('bottomBar');
-    if (bottomBar) bottomBar.style.display = 'none';
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    if (bottomBar && !isMobile) bottomBar.style.display = 'none';
 
     const readyBtn = document.getElementById('readyBtn');
     if (readyBtn) readyBtn.style.display = 'none';

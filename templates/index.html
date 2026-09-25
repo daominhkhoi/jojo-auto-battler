@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Minh Khoi - Auto Battler</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=1.1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2.0">
 </head>
 <body>
     <div class="fullscreen-wrapper">
@@ -38,6 +38,7 @@
         </div>
 
         <div class="game-layout">
+            <!-- Desktop: side panels shown inline. Mobile: hidden, toggled as bottom drawers -->
             <div id="infoPanel" class="side-panel">
                 <div class="info-placeholder">Hover over a card or synergy to view details</div>
             </div>
@@ -50,11 +51,12 @@
                     <div class="info-placeholder">Deploy units to activate synergies</div>
                 </div>
             </div>
-            
+
             <div id="sellZone" class="sell-zone">SELL</div>
         </div>
 
-        <div class="bottom-bar" id="bottomBar" style="display: none;">
+        <!-- Shop bar: JS controls display on desktop; CSS forces display on mobile -->
+        <div class="bottom-bar" id="bottomBar">
             <div class="shop-container" id="shopContainer"></div>
         </div>
     </div>

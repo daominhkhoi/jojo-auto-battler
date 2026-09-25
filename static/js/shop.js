@@ -363,11 +363,29 @@ function renderSynergyPanel(traitCounts) {
     list.innerHTML = html;
 
     document.querySelectorAll('.synergy-item').forEach(item => {
+        // Desktop: hover to preview
         item.addEventListener('mouseenter', (e) => {
             const traitName = e.currentTarget.getAttribute('data-trait');
             showDisplayInfo('trait', { name: traitName, count: traitCounts[traitName] });
         });
         item.addEventListener('mouseleave', () => showDisplayInfo(null));
+
+        // Mobile: tap to open info panel with trait details
+        item.addEventListener('click', (e) => {
+            const isMobile = window.matchMedia('(max-width: 768px)').matches;
+            if (!isMobile) return; // desktop handles this via hover
+
+            const traitName = e.currentTarget.getAttribute('data-trait');
+            showDisplayInfo('trait', { name: traitName, count: traitCounts[traitName] });
+
+            // Close synergy panel, open info panel
+            const synergyPanel = document.getElementById('synergyPanel');
+            const infoPanel    = document.getElementById('infoPanel');
+            if (synergyPanel) synergyPanel.classList.remove('show');
+            if (infoPanel)    infoPanel.classList.add('show');
+
+            e.stopPropagation(); // prevent outside-click handler from closing immediately
+        });
     });
 }
 
@@ -480,7 +498,21 @@ export function showDisplayInfo(type, data) {
             thresholdsHTML += `<p style="color: ${color}; font-size: 17px; margin: 10px 0;"><b>[${t.req}]</b> ${t.effect}</p>`;
         });
 
+        // On mobile: inject a back button so users can return to the synergy list
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        const backBtn  = isMobile
+            ? `<button onclick="
+                    document.getElementById('infoPanel').classList.remove('show');
+                    document.getElementById('synergyPanel').classList.add('show');
+               " style="
+                    margin-bottom:10px; padding:6px 14px; font-size:12px;
+                    background:#34495e; border:none; border-radius:6px;
+                    color:#ecf0f1; cursor:pointer; display:flex; align-items:center; gap:6px;
+               ">← Back to Synergies</button>`
+            : '';
+
         panel.innerHTML = `
+            ${backBtn}
             <h3 class="panel-title">${data.name}</h3>
             <div class="card-stats">
                 <p style="margin-bottom: 25px; font-size: 17px; line-height: 1.6; color: #bdc3c7;"><i>${info.desc}</i></p>

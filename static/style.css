@@ -1,5 +1,5 @@
-/* =========================================
-   CSS TỔNG THỂ & FULLSCREEN
+﻿/* =========================================
+   CSS Tá»”NG THá»‚ & FULLSCREEN
    ========================================= */
 body,
 html {
@@ -8,9 +8,9 @@ html {
     width: 100vw;
     height: 100vh;
     background-color: #0b101a;
-    /* Màu nền tối siêu ngầu */
+    /* MÃ u ná»n tá»‘i siÃªu ngáº§u */
     overflow: hidden;
-    /* Cắt bỏ thanh cuộn thừa */
+    /* Cáº¯t bá» thanh cuá»™n thá»«a */
     font-family: 'Segoe UI', Tahoma, sans-serif;
     color: white;
 }
@@ -24,7 +24,7 @@ html {
 }
 
 /* =========================================
-   TOP BAR (Thông tin người chơi & Nút bấm)
+   TOP BAR (ThÃ´ng tin ngÆ°á»i chÆ¡i & NÃºt báº¥m)
    ========================================= */
 .top-bar {
     text-align: center;
@@ -122,7 +122,7 @@ button:hover {
 }
 
 /* =========================================
-   BỐ CỤC 3 CỘT (MÀN HÌNH 1320x919)
+   Bá» Cá»¤C 3 Cá»˜T (MÃ€N HÃŒNH 1320x919)
    ========================================= */
 .game-layout {
     flex: 1;
@@ -130,16 +130,16 @@ button:hover {
     justify-content: center;
     align-items: top;
     gap: 50px;
-    /* Khoảng cách giữa 3 cột */
+    /* Khoáº£ng cÃ¡ch giá»¯a 3 cá»™t */
     width: 100vw;
     padding: 0 1px;
     box-sizing: border-box;
 }
 
-/* Bàn cờ khổng lồ giữa màn hình */
+/* BÃ n cá» khá»•ng lá»“ giá»¯a mÃ n hÃ¬nh */
 #gameBoard {
     height: 70vh;
-    /* Tự động scale vừa màn hình */
+    /* Tá»± Ä‘á»™ng scale vá»«a mÃ n hÃ¬nh */
     width: auto;
     background-color: #1a2230;
     border: 3px solid #0f3460;
@@ -147,7 +147,7 @@ button:hover {
     box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
 }
 
-/* Panel 2 bên: Chứa Info và Tộc Hệ */
+/* Panel 2 bÃªn: Chá»©a Info vÃ  Tá»™c Há»‡ */
 .side-panel {
     width: 270px;
     height: 70vh;
@@ -174,7 +174,7 @@ button:hover {
 }
 
 /* =========================================
-   THÔNG TIN THẺ BÀI (Bảng Trái)
+   THÃ”NG TIN THáºº BÃ€I (Báº£ng TrÃ¡i)
    ========================================= */
 .side-panel img {
     width: 100%;
@@ -201,13 +201,13 @@ button:hover {
 .info-placeholder {
     text-align: center;
     color: #7f8c8d;
-    margin-top: 50%;
+    margin-top: 250px;
     font-style: italic;
     line-height: 1.5;
 }
 
 /* =========================================
-   TỘC / HỆ (Bảng Phải)
+   Tá»˜C / Há»† (Báº£ng Pháº£i)
    ========================================= */
 .synergy-item {
     background: #2c3e50;
@@ -236,7 +236,7 @@ button:hover {
 }
 
 /* =========================================
-   SHOP MUA TƯỚNG (Bottom Bar)
+   SHOP MUA TÆ¯á»šNG (Bottom Bar)
    ========================================= */
 .bottom-bar {
     padding-bottom: 2vh;
@@ -283,7 +283,7 @@ button:hover {
 }
 
 /* =========================================
-   HỆ THỐNG THÔNG BÁO (Notifications)
+   Há»† THá»NG THÃ”NG BÃO (Notifications)
    ========================================= */
 #notification-container {
     position: fixed;
@@ -359,15 +359,15 @@ button:hover {
 }
 
 #gameCanvas {
-    /* Mặc định chiều rộng phủ đầy màn hình, nhưng không vượt quá 1320px của bạn */
+    /* Máº·c Ä‘á»‹nh chiá»u rá»™ng phá»§ Ä‘áº§y mÃ n hÃ¬nh, nhÆ°ng khÃ´ng vÆ°á»£t quÃ¡ 1320px cá»§a báº¡n */
     width: 100%;
     max-width: 1320px;
-    /* Dùng vh (Viewport Height) để đảm bảo bàn cờ không bị lố chiều dọc, chừa chỗ cho Shop */
+    /* DÃ¹ng vh (Viewport Height) Ä‘á»ƒ Ä‘áº£m báº£o bÃ n cá» khÃ´ng bá»‹ lá»‘ chiá»u dá»c, chá»«a chá»— cho Shop */
     height: auto;
     max-height: 75vh;
-    /* Lệnh thần thánh: Tự động co giãn giữ nguyên tỷ lệ gốc, KHÔNG BAO GIỜ BỊ MÉO ẢNH */
+    /* Lá»‡nh tháº§n thÃ¡nh: Tá»± Ä‘á»™ng co giÃ£n giá»¯ nguyÃªn tá»· lá»‡ gá»‘c, KHÃ”NG BAO GIá»œ Bá»Š MÃ‰O áº¢NH */
     object-fit: contain;
-    /* Canh giữa bàn cờ nếu màn hình quá to */
+    /* Canh giá»¯a bÃ n cá» náº¿u mÃ n hÃ¬nh quÃ¡ to */
     display: block;
     margin: 0 auto;
     background-color: #1a1a2e;
@@ -404,19 +404,7 @@ button:hover {
 }
 
 /* =========================================
-   MOBILE TOGGLE BUTTONS
-   ========================================= */
-.mobile-toggle {
-    display: none;
-    background-color: #8e44ad;
-}
-
-.mobile-toggle:hover {
-    background-color: #9b59b6;
-}
-
-/* =========================================
-   RESPONSIVE DESIGN (MOBILE & TABLET)
+   RESPONSIVE DESIGN (TABLET â‰¤ 1024px)
    ========================================= */
 @media (max-width: 1024px) {
     .game-layout {
@@ -428,149 +416,227 @@ button:hover {
     }
 }
 
+/* =========================================
+   MOBILE (â‰¤ 768px) â€” Android Portrait
+   ========================================= */
 @media (max-width: 768px) {
-    body {
-        overflow-y: auto;
-        /* Allow scrolling on mobile if things overflow slightly */
+
+    /* ---- Root ---- */
+    html, body {
+        overflow: hidden;
+        height: 100%;
+        width: 100%;
+        touch-action: pan-y;
     }
 
     .fullscreen-wrapper {
-        height: auto;
-        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        height: 100dvh; /* dvh = dynamic viewport height, accounts for browser chrome */
+        width: 100vw;
+        overflow: hidden;
     }
 
+    /* ---- TOP BAR ---- */
     .top-bar {
-        padding: 2px;
-        position: sticky;
-        top: 0;
-        z-index: 99999;
-        background-color: #1a2230;
-    }
-
-    .top-bar h2 {
-        font-size: 13px;
-        margin: 0 0 1px 0;
+        flex-shrink: 0;
+        padding: 4px 6px;
+        background-color: #0f1923;
+        border-bottom: 1px solid #2c3e50;
+        z-index: 100;
     }
 
     .player-info {
+        display: flex;
         flex-wrap: wrap;
-        font-size: 10px;
-        gap: 5px;
-        padding: 1px 1px;
+        justify-content: center;
+        align-items: center;
+        gap: 6px 12px;
+        font-size: 11px;
+        padding: 4px 8px;
+        margin-bottom: 4px;
+        width: 100%;
+        box-sizing: border-box;
+        border-radius: 6px;
     }
 
-    .gold-display {
-        font-size: 13px;
+    .gold-display  { font-size: 12px; }
+    .level-display { font-size: 11px; }
+    .unit-display  { font-size: 11px; }
+    .round-display { font-size: 11px; }
+    .lp-display    { font-size: 11px; margin-left: 0; }
+
+    .name-input {
+        width: 100px;
+        font-size: 12px;
+        padding: 4px 8px;
     }
 
     .controls {
+        display: flex;
         flex-wrap: wrap;
-        gap: 6px;
-        margin-bottom: 5px;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        margin-bottom: 0;
     }
 
     .controls button {
-        padding: 5px 10px;
-        font-size: 13px;
+        padding: 6px 10px;
+        font-size: 11px;
+        border-radius: 5px;
     }
 
     .mobile-toggle {
         display: inline-block;
+        background-color: #8e44ad;
+        padding: 6px 10px;
+        font-size: 11px;
     }
 
+    /* ---- GAME LAYOUT ---- */
     .game-layout {
-        position: relative;
+        flex: 1;
+        display: flex;
         flex-direction: column;
-        padding: 10px;
-        gap: 20px;
+        align-items: center;
+        justify-content: flex-start;
+        position: relative;
+        padding: 0;
+        gap: 0;
+        width: 100vw;
+        overflow: hidden;
     }
 
+    /* ---- CANVAS ---- */
     #gameBoard {
-        height: auto;
-        width: 100%;
-        max-width: 540px;
-        /* Bỏ max-height để canvas tự scale đúng tỷ lệ, không bị méo */
+        /* Scale canvas to full screen width while preserving 540:870 aspect ratio */
+        width: 100vw !important;
+        height: auto !important;
+        max-width: 100vw;
+        max-height: none;
+        display: block;
+        flex-shrink: 0;
     }
 
-    /* Hide panels by default on mobile, display them as absolute overlays when active */
+    /* ---- SIDE PANELS â€” full-width slide-up drawers ---- */
     .side-panel {
         display: none;
-        position: absolute;
-        top: 15%;
-        z-index: 500;
-        height: auto;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100vw;
         max-height: 55vh;
-        background-color: rgba(26, 34, 48, 0.95);
-        border: 2px solid #3498db;
-        padding: 8px;
-        font-size: 12px;
+        z-index: 600;
+        background-color: rgba(15, 25, 35, 0.97);
+        border-top: 2px solid #3498db;
+        border-radius: 14px 14px 0 0;
+        padding: 12px;
+        font-size: 13px;
         overflow-y: auto;
+        box-sizing: border-box;
+        animation: slideUp 0.25s ease-out;
     }
 
-    #infoPanel {
-        left: 2%;
-        width: 45%;
-        max-width: 180px;
+    @keyframes slideUp {
+        from { transform: translateY(100%); }
+        to   { transform: translateY(0);    }
     }
 
-    #synergyPanel {
-        right: 2%;
-        left: auto;
-        width: 45%;
-        max-width: 180px;
-    }
+    #infoPanel    { border-top-color: #3498db; }
+    #synergyPanel { border-top-color: #f1c40f; }
 
     .side-panel.show {
         display: block;
     }
 
+    /* Info panel image */
+    .side-panel img {
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+        float: left;
+        margin-right: 10px;
+        margin-bottom: 4px;
+    }
+
+    .info-placeholder {
+        margin-top: 30px;
+    }
+
+    /* ---- BOTTOM BAR / SHOP ---- */
     .bottom-bar {
-        display: block;
-        padding-bottom: 20px;
-        width: 100%;
+        flex-shrink: 0;
+        display: flex !important;  /* always visible on mobile */
+        padding: 4px 0 env(safe-area-inset-bottom, 4px);
+        background-color: #0f1923;
+        border-top: 1px solid #2c3e50;
+        width: 100vw;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        box-sizing: border-box;
     }
 
     .shop-container {
         display: flex;
-        justify-content: flex-start; /* Cho phép scroll ngang */
-        width: 100%;
-        margin: 0;
-        padding: 0 10px;
-        gap: 10px;
-        box-sizing: border-box;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        align-items: stretch;
+        gap: 4px;
+        padding: 2px 6px;
+        min-width: max-content; /* allow horizontal scroll */
     }
 
     .shop-card {
-        flex: 0 0 90px; /* Cố định width để cuộn ngang, không bị bóp nhỏ xíu */
-        width: 90px;
-        padding: 5px;
-        overflow: hidden;
+        flex: 0 0 auto;
+        width: 70px;
+        padding: 5px 4px;
+        border-radius: 8px;
+        text-align: center;
+        cursor: pointer;
+        box-sizing: border-box;
     }
 
     .shop-card img {
-        width: 100%;
-        max-width: 35px;
-        height: auto;
-        margin: 0 auto;
+        width: 44px;
+        height: 44px;
+        object-fit: cover;
+        border-radius: 4px;
         display: block;
+        margin: 0 auto 2px;
     }
 
     .shop-card h3 {
-        font-size: 11px;
-        margin: 4px 0;
+        font-size: 8px;
+        margin: 0 0 2px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        line-height: 1.1;
     }
 
     .shop-card p {
         display: none;
-        /* Hide description on mobile to save horizontal space */
     }
 
     .cost {
         font-size: 10px;
+        display: block;
+    }
+
+    /* ---- SELL ZONE ---- */
+    .sell-zone {
+        top: 100px;
+        width: 120px;
+        height: 50px;
+        font-size: 18px;
+        line-height: 50px;
+    }
+
+    /* ---- NOTIFICATION ---- */
+    .game-notification {
+        font-size: 16px;
+        padding: 12px 24px;
     }
 }
