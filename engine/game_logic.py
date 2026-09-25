@@ -241,11 +241,15 @@ class Champion:
 
         # 3. PULL
         elif s_type == 'pull':
-            for c in board_state:
-                if c.team != self.team and c.is_alive and not getattr(c, 'is_submerged', False):
-                    c.x, c.y = self.x, self.y
-                    dmg, evs = c.take_damage(s_power, self, board_state)
-                    event.setdefault('extra_events', []).extend(evs)
+            if target and target.is_alive and not getattr(target, 'is_submerged', False):
+                targets = [target]
+            else:
+                targets = [c for c in board_state if c.team != self.team and c.is_alive and not getattr(c, 'is_submerged', False)]
+
+            for c in targets:
+                c.x, c.y = self.x, self.y
+                dmg, evs = c.take_damage(s_power, self, board_state)
+                event.setdefault('extra_events', []).extend(evs)
 
         # 4. EXECUTE
         elif s_type == 'execute' and target:

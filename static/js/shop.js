@@ -556,7 +556,13 @@ export function showDisplayInfo(type, data, shopContext = null) {
                 case 'banish': skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'submerge': skillDesc = `Submerges into shadows, becoming untargetable for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'mana_battery': skillDesc = `Channels <b>${powerDisplay}</b> Mana/s to the lowest-Mana ally for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'pull': skillDesc = `Erases space, pulling all enemies to self and dealing <b>${powerDisplay}</b> damage.`; break;
+                case 'pull':
+                    skillDesc = (s.target === 'enemy_furthest')
+                        ? `Erases space, pulling the furthest enemy to self and dealing <b>${powerDisplay}</b> damage.`
+                        : (s.target === 'all_enemies'
+                            ? `Erases space, pulling all enemies to self and dealing <b>${powerDisplay}</b> damage.`
+                            : `Erases space, pulling target to self and dealing <b>${powerDisplay}</b> damage.`);
+                    break;
                 case 'mind_control': skillDesc = `Brainwashes the target to fight for your team for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'polymorph': skillDesc = `Transforms the target into a harmless creature for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'stat_steal': skillDesc = `Steals <b>${powerDisplay}</b> Attack from the target for <b>${scaledDuration.toFixed(1)}s</b>.`; break;

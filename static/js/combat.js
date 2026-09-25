@@ -436,6 +436,16 @@ export function syncTickData(data) {
                 spawnFloatingText(tarCenterX, tarCenterY - 25, '💔 CHARMED!', 'status', { color: '#ff6b81' });
             } else if (event.skill_type === 'banish') {
                 spawnFloatingText(tarCenterX, tarCenterY - 25, '🌀 BANISHED!', 'status', { color: '#70a1ff' });
+            } else if (event.skill_type === 'pull') {
+                if (target) {
+                    target.shakeTimer = 35;
+                    target.hitFlashTimer = 3;
+                }
+                STATE.screenShake = Math.max(STATE.screenShake || 0, 8);
+                spawnFloatingText(tarCenterX, tarCenterY - 25, '🌀 PULLED!', 'status', { color: '#00d2d3', scale: 1.4 });
+                if (event.power) {
+                    spawnFloatingText(tarCenterX, tarCenterY - 50, `💥 -${event.power.toLocaleString()}`, 'skill', { color: '#ff4757', scale: 1.3 });
+                }
             } else if (event.skill_type === 'stat_steal') {
                 if (target) target.shakeTimer = 25;
                 STATE.screenShake = Math.max(STATE.screenShake || 0, 7);
