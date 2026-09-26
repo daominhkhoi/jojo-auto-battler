@@ -290,13 +290,45 @@ export function renderBoard(ctx, canvas) {
         }
 
         if (activeBuffs.includes('dot')) {
-            ctx.fillStyle = `rgba(142, 68, 173, ${0.4 + Math.sin(timeNow*8)*0.2})`;
-            ctx.beginPath(); ctx.arc(centerX, pY + currentSize.h - 10, 15, 0, Math.PI*2); ctx.fill();
+            const pulse = 0.55 + Math.sin(timeNow * 8) * 0.35;
+            ctx.save();
+            ctx.strokeStyle = `rgba(165, 94, 234, ${pulse * 0.85})`;
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(pX - 1, pY - 1, currentSize.w + 2, currentSize.h + 2);
+
+            // 3 small rising toxic corrosive embers
+            for (let e = 0; e < 3; e++) {
+                const emX = pX + ((e + 0.5) / 3) * currentSize.w + Math.sin(timeNow * 6 + e) * 4;
+                const emY = pY + currentSize.h - ((timeNow * 35 + e * 20) % (currentSize.h * 0.85));
+                ctx.beginPath();
+                ctx.arc(emX, emY, 1.8, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(46, 213, 115, ${pulse * 0.9})`;
+                ctx.fill();
+            }
+            ctx.font = '13px Arial';
+            ctx.fillText('☣️', pX + currentSize.w - 10, pY + 12);
+            ctx.restore();
         }
 
         if (activeBuffs.includes('regen') || activeBuffs.includes('aoe_heal')) {
-            ctx.fillStyle = `rgba(46, 204, 113, ${0.4 + Math.sin(timeNow*5)*0.2})`;
-            ctx.beginPath(); ctx.arc(centerX, pY + currentSize.h - 10, 15, 0, Math.PI*2); ctx.fill();
+            const pulse = 0.55 + Math.sin(timeNow * 5) * 0.3;
+            ctx.save();
+            ctx.strokeStyle = `rgba(46, 204, 113, ${pulse * 0.85})`;
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(pX - 1, pY - 1, currentSize.w + 2, currentSize.h + 2);
+
+            // Floating green life sparkles
+            for (let s = 0; s < 2; s++) {
+                const spX = pX + ((s + 1) / 3) * currentSize.w;
+                const spY = pY + currentSize.h - ((timeNow * 30 + s * 25) % (currentSize.h * 0.75));
+                ctx.beginPath();
+                ctx.arc(spX, spY, 1.6, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${pulse * 0.95})`;
+                ctx.fill();
+            }
+            ctx.font = '12px Arial';
+            ctx.fillText('💚', pX + 10, pY + 12);
+            ctx.restore();
         }
 
         if (activeBuffs.includes('damage_link') || activeBuffs.includes('life_tether')) {
@@ -359,6 +391,52 @@ export function renderBoard(ctx, canvas) {
             ctx.fillStyle = '#ff4757';
             ctx.font = 'bold 12px "Segoe UI", Arial, sans-serif';
             ctx.fillText('🔻-ATK', centerX, pY - 8);
+            ctx.restore();
+        }
+
+        if (activeBuffs.includes('buff_atk')) {
+            const pulse = 0.6 + Math.sin(timeNow * 10) * 0.35;
+            ctx.save();
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#f39c12';
+            ctx.strokeStyle = `rgba(241, 196, 15, ${pulse})`;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(pX - 2, pY - 2, currentSize.w + 4, currentSize.h + 4);
+
+            ctx.font = 'bold 12px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#f1c40f';
+            ctx.fillText('⚔️+ATK', centerX, pY - 8);
+            ctx.restore();
+        }
+
+        if (activeBuffs.includes('speed_buff')) {
+            const pulse = 0.6 + Math.sin(timeNow * 12) * 0.35;
+            ctx.save();
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#00d2d3';
+            ctx.strokeStyle = `rgba(0, 210, 211, ${pulse})`;
+            ctx.lineWidth = 3;
+            ctx.setLineDash([8, 6]);
+            ctx.strokeRect(pX - 2, pY - 2, currentSize.w + 4, currentSize.h + 4);
+            ctx.setLineDash([]);
+
+            ctx.font = 'bold 12px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#00ffff';
+            ctx.fillText('⚡+SPD', centerX, pY - 8);
+            ctx.restore();
+        }
+
+        if (activeBuffs.includes('mana_lock')) {
+            const lockPulse = 0.7 + Math.sin(timeNow * 6) * 0.25;
+            ctx.save();
+            ctx.strokeStyle = `rgba(231, 76, 60, ${lockPulse * 0.85})`;
+            ctx.lineWidth = 2.0;
+            ctx.setLineDash([5, 4]);
+            ctx.strokeRect(pX - 1, pY - 1, currentSize.w + 2, currentSize.h + 2);
+            ctx.setLineDash([]);
+
+            ctx.font = '13px Arial';
+            ctx.fillText('🔒', centerX, pY - 8);
             ctx.restore();
         }
         
@@ -489,13 +567,23 @@ export function renderBoard(ctx, canvas) {
     // 4. VỤ NỔ IMPACT KHI TRÚNG ĐÍCH HOẶC TUNG SKILL VÀ VÙNG CỐ ĐỊNH TRÊN SÂN
     if (STATE.hitEffects) {
         STATE.hitEffects.forEach(hit => {
+            let hx = hit.x;
+            let hy = hit.y;
+            if (hit.targetId) {
+                const liveTarget = STATE.champions.find(c => c.id === hit.targetId);
+                if (liveTarget) {
+                    const tSize = getCanvasCoords(liveTarget.targetX, liveTarget.targetY);
+                    hx = liveTarget.pixelX + tSize.w / 2;
+                    hy = liveTarget.pixelY + tSize.h / 2;
+                }
+            }
             ctx.save();
-            ctx.translate(hit.x, hit.y);
+            ctx.translate(hx, hy);
             const progress = 1 - (hit.lifeTime / hit.maxLife);
             const currentAlpha = hit.lifeTime < 30 ? (hit.lifeTime / 30) : 1.0;
             const pixelRadius = (hit.radius || 1.5) * CONFIG.BOARD_CELL_WIDTH;
 
-            if (!hit.effectType || hit.effectType === 'damage' || hit.effectType === 'attack_hit') {
+            if (!hit.effectType || hit.effectType === 'attack_hit') {
                 const isCrit = hit.isCrit;
                 const isRanged = hit.hitType === 'ranged';
                 const alpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.2);
@@ -575,6 +663,84 @@ export function renderBoard(ctx, canvas) {
                     ctx.lineWidth = Math.max(1, 2.8 * (1 - progress));
                     ctx.stroke();
                 }
+            }
+            else if (hit.effectType === 'damage') {
+                const alpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.5);
+                ctx.globalAlpha = alpha;
+
+                // 1. Dual Heavy Impact Shockwave Rings (Vòng xung kích kép bùng nổ cực mạnh)
+                const ringR = progress * 68 + 12;
+                // Dark outer backing ring
+                ctx.beginPath();
+                ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(20, 10, 5, ${alpha * 0.9})`;
+                ctx.lineWidth = Math.max(1, 12 * (1 - progress));
+                ctx.stroke();
+
+                // Vibrant Fire-Orange Shockwave
+                ctx.beginPath();
+                ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 121, 63, ${alpha})`;
+                ctx.lineWidth = Math.max(1, 7 * (1 - progress));
+                ctx.stroke();
+
+                // Inner Golden Shockwave
+                ctx.beginPath();
+                ctx.arc(0, 0, ringR * 0.72, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 215, 0, ${alpha * 0.9})`;
+                ctx.lineWidth = Math.max(1, 3.5 * (1 - progress));
+                ctx.stroke();
+
+                // 2. High-Energy Kinetic Slash (Vết chém xé rách không gian góc 45 độ)
+                const slashLen = progress * 80 + 20;
+                ctx.save();
+                ctx.rotate(-Math.PI / 4);
+
+                // Dark under-stroke
+                ctx.beginPath();
+                ctx.moveTo(-slashLen, 0); ctx.lineTo(slashLen, 0);
+                ctx.strokeStyle = `rgba(25, 5, 0, ${alpha * 0.95})`;
+                ctx.lineWidth = Math.max(1, 16 * (1 - progress));
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                // Neon Crimson-Orange Body
+                ctx.beginPath();
+                ctx.moveTo(-slashLen, 0); ctx.lineTo(slashLen, 0);
+                ctx.strokeStyle = `rgba(255, 71, 87, ${alpha})`;
+                ctx.lineWidth = Math.max(1, 10 * (1 - progress));
+                ctx.stroke();
+
+                // Razor Pure White Core
+                ctx.beginPath();
+                ctx.moveTo(-slashLen * 0.85, 0); ctx.lineTo(slashLen * 0.85, 0);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.lineWidth = Math.max(1, 4 * (1 - progress));
+                ctx.stroke();
+                ctx.restore();
+
+                // 3. 8-Point Radial Impact Spikes (8 tia năng lượng bùng nổ xuyên tâm)
+                const spikeLen = (1 - progress) * 35;
+                for (let sp = 0; sp < 8; sp++) {
+                    const ang = (sp * Math.PI) / 4 + progress * 0.5;
+                    const sx = Math.cos(ang) * (ringR * 0.5);
+                    const sy = Math.sin(ang) * (ringR * 0.5);
+                    const ex = Math.cos(ang) * (ringR * 0.5 + spikeLen);
+                    const ey = Math.sin(ang) * (ringR * 0.5 + spikeLen);
+
+                    ctx.beginPath();
+                    ctx.moveTo(sx, sy); ctx.lineTo(ex, ey);
+                    ctx.strokeStyle = `rgba(255, 211, 42, ${alpha * 0.9})`;
+                    ctx.lineWidth = Math.max(1, 3 * (1 - progress));
+                    ctx.stroke();
+                }
+
+                // 4. Center Brilliant Flash
+                const cSize = (1 - progress) * 18;
+                ctx.beginPath();
+                ctx.arc(0, 0, cSize, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.fill();
             }
             else if (hit.effectType === 'aoe_dot') {
                 const alpha = Math.min(1.0, currentAlpha);
@@ -717,79 +883,251 @@ export function renderBoard(ctx, canvas) {
                 const alpha = Math.min(1.0, currentAlpha);
                 ctx.globalAlpha = alpha;
 
-                // 1. Translucent Ruby Silence Field (Vùng cấm chú mờ ảo, tuyệt đối không che đen)
-                ctx.beginPath();
-                ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
-                const lockGrad = ctx.createRadialGradient(0, 0, pixelRadius * 0.2, 0, 0, pixelRadius);
-                lockGrad.addColorStop(0, `rgba(192, 57, 43, ${alpha * 0.06})`);
-                lockGrad.addColorStop(0.8, `rgba(231, 76, 60, ${alpha * 0.14})`);
-                lockGrad.addColorStop(1, `rgba(192, 57, 43, ${alpha * 0.02})`);
-                ctx.fillStyle = lockGrad;
-                ctx.fill();
+                // SINGLE-TARGET RUNIC SEAL OF SILENCE (Ấn chú phong ấn đơn mục tiêu ôm sát thân tướng)
+                const targetBoxR = 34; // Gọn gàng quanh thẻ bài mục tiêu (~34px), không tràn ra sàn đất
 
-                // Outer crimson runic ring (Vành đai phong ấn thanh mảnh)
+                // 1. Sleek Crimson Sealing Runic Ring
                 ctx.beginPath();
-                ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
+                ctx.arc(0, 0, targetBoxR, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(231, 76, 60, ${alpha * 0.85})`;
+                ctx.lineWidth = 2.2;
+                ctx.stroke();
+
+                // Inner runic dashed ring
+                ctx.beginPath();
+                ctx.arc(0, 0, targetBoxR - 4, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
+                ctx.lineWidth = 1.0;
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 2. 4 Corner Sealing Chains snapping shut into center
+                ctx.save();
                 ctx.strokeStyle = `rgba(231, 76, 60, ${alpha * 0.75})`;
                 ctx.lineWidth = 2.0;
-                ctx.stroke();
-
-                // Inner dashed warning ring
+                ctx.setLineDash([6, 4]);
                 ctx.beginPath();
-                ctx.arc(0, 0, pixelRadius - 3.5, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(255, 107, 107, ${alpha * 0.45})`;
-                ctx.lineWidth = 1.0;
-                ctx.setLineDash([5, 5]);
+                ctx.moveTo(-targetBoxR, -targetBoxR); ctx.lineTo(targetBoxR, targetBoxR);
+                ctx.moveTo(targetBoxR, -targetBoxR); ctx.lineTo(-targetBoxR, targetBoxR);
                 ctx.stroke();
                 ctx.setLineDash([]);
+                ctx.restore();
 
-                // 2. Ethereal Sealing Chains crossed in 'X' (Xích cấm chú thanh thoát, nét đứt ma thuật)
-                const sz = pixelRadius * 0.72;
+                // 3. Floating Mystical Silence Padlock on Top of Card
+                const lockY = -targetBoxR - 6 + Math.sin(timeNow * 4) * 2;
                 ctx.save();
-                
-                // Red glowing dashed chains
-                ctx.strokeStyle = `rgba(231, 76, 60, ${alpha * 0.65})`;
-                ctx.lineWidth = 2.0;
-                ctx.setLineDash([7, 6]);
-                ctx.beginPath();
-                ctx.moveTo(-sz, -sz); ctx.lineTo(sz, sz);
-                ctx.moveTo(sz, -sz); ctx.lineTo(-sz, sz);
-                ctx.stroke();
+                ctx.translate(0, lockY);
 
-                // Subtle white chain link glints
-                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.55})`;
-                ctx.lineWidth = 1.0;
-                ctx.setLineDash([2, 11]);
-                ctx.beginPath();
-                ctx.moveTo(-sz, -sz); ctx.lineTo(sz, sz);
-                ctx.moveTo(sz, -sz); ctx.lineTo(-sz, sz);
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                // Center Compact Silence Lock Glyph (Biểu tượng ổ khóa cấm chú nhỏ gọn, tinh tế)
                 // Shackle arc
                 ctx.beginPath();
-                ctx.arc(0, -3.5, 4.5, Math.PI, 0, false);
+                ctx.arc(0, -5, 6, Math.PI, 0, false);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
+                ctx.lineWidth = 2.0;
+                ctx.stroke();
+
+                // Lock Body
+                ctx.beginPath();
+                ctx.rect(-7, -3, 14, 11);
+                ctx.fillStyle = `rgba(192, 57, 43, ${alpha * 0.92})`;
+                ctx.fill();
                 ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.85})`;
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
 
-                // Lock body
+                // Keyhole
                 ctx.beginPath();
-                ctx.rect(-5.5, -2, 11, 8.5);
-                ctx.fillStyle = `rgba(192, 57, 43, ${alpha * 0.85})`;
-                ctx.fill();
-                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.75})`;
-                ctx.lineWidth = 1.0;
-                ctx.stroke();
-
-                // Keyhole dot
-                ctx.beginPath();
-                ctx.arc(0, 1.5, 1.3, 0, Math.PI * 2);
+                ctx.arc(0, 1, 1.8, 0, Math.PI * 2);
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(0, 1); ctx.lineTo(0, 5);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.4;
+                ctx.stroke();
 
                 ctx.restore();
+            }
+            else if (hit.effectType === 'dot') {
+                const alpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.2);
+                ctx.globalAlpha = alpha;
+
+                // 1. Swirling Corrosive Acid Vortex (Vòng xoáy độc tố ăn mòn bung tỏa)
+                const swirlR = progress * 52 + 10;
+                ctx.save();
+                ctx.rotate(progress * Math.PI * 2.2);
+
+                // 4 Curved Acid Splash Tentacles
+                for (let b = 0; b < 4; b++) {
+                    ctx.rotate(Math.PI / 2);
+                    ctx.beginPath();
+                    ctx.moveTo(swirlR * 0.25, 0);
+                    ctx.quadraticCurveTo(swirlR * 0.6, swirlR * 0.45, swirlR, 0);
+                    ctx.strokeStyle = `rgba(165, 94, 234, ${alpha})`;
+                    ctx.lineWidth = Math.max(1, 5.5 * (1 - progress));
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+
+                    ctx.strokeStyle = `rgba(46, 213, 115, ${alpha * 0.85})`;
+                    ctx.lineWidth = Math.max(1, 2.2 * (1 - progress));
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                // 2. Toxic Acid Expanding Ring
+                ctx.beginPath();
+                ctx.arc(0, 0, swirlR, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(142, 68, 173, ${alpha * 0.75})`;
+                ctx.lineWidth = Math.max(1, 3.5 * (1 - progress));
+                ctx.stroke();
+
+                // 3. Bubbling Poison Orbs
+                for (let i = 0; i < 5; i++) {
+                    const ang = (i * Math.PI * 2) / 5 + progress * 2.5;
+                    const dist = swirlR * 0.65;
+                    const bx = Math.cos(ang) * dist;
+                    const by = Math.sin(ang) * dist;
+                    ctx.beginPath();
+                    ctx.arc(bx, by, Math.max(1, (1 - progress) * 4), 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(46, 213, 115, ${alpha * 0.9})`;
+                    ctx.fill();
+                }
+            }
+            else if (hit.effectType === 'buff_atk') {
+                const alpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.2);
+                ctx.globalAlpha = alpha;
+
+                // 1. Rising Golden Awakening Aura Pillar (Cột sáng bùng nổ linh hồn)
+                const pWidth = 30 * (1 - progress * 0.3);
+                const pHeight = progress * 85 + 25;
+
+                const grad = ctx.createLinearGradient(0, 15, 0, -pHeight);
+                grad.addColorStop(0, `rgba(243, 156, 18, 0)`);
+                grad.addColorStop(0.3, `rgba(241, 196, 15, ${alpha * 0.65})`);
+                grad.addColorStop(0.8, `rgba(255, 234, 167, ${alpha * 0.85})`);
+                grad.addColorStop(1, `rgba(255, 255, 255, 0)`);
+
+                ctx.beginPath();
+                ctx.ellipse(0, -pHeight * 0.45, pWidth, pHeight * 0.55, 0, 0, Math.PI * 2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                // 2. Expanding Ground Shockwave Discs
+                const gR = progress * 55 + 10;
+                ctx.beginPath();
+                ctx.ellipse(0, 15, gR, gR * 0.45, 0, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(241, 196, 15, ${alpha * 0.9})`;
+                ctx.lineWidth = Math.max(1, 4.5 * (1 - progress));
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.ellipse(0, 15, gR * 0.7, gR * 0.3, 0, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.85})`;
+                ctx.lineWidth = Math.max(1, 2.2 * (1 - progress));
+                ctx.stroke();
+
+                // 3. Upward Golden Spark Flares
+                for (let s = 0; s < 4; s++) {
+                    const offX = (s - 1.5) * 14;
+                    const offY = -progress * 65 - (s * 8);
+                    ctx.beginPath();
+                    ctx.arc(offX, offY, Math.max(1, (1 - progress) * 3), 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 215, 0, ${alpha * 0.95})`;
+                    ctx.fill();
+                }
+            }
+            else if (hit.effectType === 'speed_buff') {
+                const alpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.2);
+                ctx.globalAlpha = alpha;
+
+                // 1. High-Speed Tempest Rings (Vòng phong lôi xanh ngọc lướt nhanh)
+                const spR = progress * 60 + 10;
+                ctx.save();
+                ctx.rotate(timeNow * 10);
+                ctx.beginPath();
+                ctx.arc(0, 0, spR, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(0, 210, 211, ${alpha * 0.85})`;
+                ctx.lineWidth = Math.max(1, 4.5 * (1 - progress));
+                ctx.setLineDash([12, 8]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 2. Electric Lightning Sparks (Tia sét tốc độ)
+                for (let l = 0; l < 4; l++) {
+                    ctx.rotate(Math.PI / 2);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(spR * 0.4, spR * 0.2);
+                    ctx.lineTo(spR * 0.3, spR * 0.5);
+                    ctx.lineTo(spR * 0.85, spR * 0.85);
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
+                    ctx.lineWidth = Math.max(1, 2.2 * (1 - progress));
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                // Inner bright speed flash
+                ctx.beginPath();
+                ctx.arc(0, 0, (1 - progress) * 20, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(72, 219, 251, ${alpha * 0.6})`;
+                ctx.fill();
+            }
+            else if (hit.effectType === 'heal' || hit.effectType === 'regen') {
+                const alpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.2);
+                ctx.globalAlpha = alpha;
+
+                // 1. Luminous Emerald Healing Bloom
+                const bloomR = progress * 55 + 10;
+                ctx.beginPath();
+                ctx.arc(0, 0, bloomR, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(46, 204, 113, ${alpha * 0.9})`;
+                ctx.lineWidth = Math.max(1, 4.5 * (1 - progress));
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(0, 0, bloomR * 0.7, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.85})`;
+                ctx.lineWidth = Math.max(1, 2.2 * (1 - progress));
+                ctx.stroke();
+
+                // 2. Sacred 4-Leaf Healing Cross
+                const armLen = (1 - progress * 0.5) * 22;
+                const armThick = Math.max(1, 4.5 * (1 - progress));
+
+                // Dark backing
+                ctx.beginPath();
+                ctx.moveTo(-armLen, 0); ctx.lineTo(armLen, 0);
+                ctx.moveTo(0, -armLen); ctx.lineTo(0, armLen);
+                ctx.strokeStyle = `rgba(15, 30, 20, ${alpha * 0.8})`;
+                ctx.lineWidth = armThick + 2.5;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                // Vibrant Green Cross
+                ctx.beginPath();
+                ctx.moveTo(-armLen, 0); ctx.lineTo(armLen, 0);
+                ctx.moveTo(0, -armLen); ctx.lineTo(0, armLen);
+                ctx.strokeStyle = `rgba(46, 204, 113, ${alpha})`;
+                ctx.lineWidth = armThick;
+                ctx.stroke();
+
+                // Pure White Core
+                ctx.beginPath();
+                ctx.moveTo(-armLen * 0.7, 0); ctx.lineTo(armLen * 0.7, 0);
+                ctx.moveTo(0, -armLen * 0.7); ctx.lineTo(0, armLen * 0.7);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.lineWidth = Math.max(1, armThick * 0.45);
+                ctx.stroke();
+
+                // 3. Floating Motes of Life
+                for (let m = 0; m < 5; m++) {
+                    const mx = (m - 2) * 11;
+                    const my = -progress * 42 - (m * 4);
+                    ctx.beginPath();
+                    ctx.arc(mx, my, Math.max(1, (1 - progress) * 2.8), 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
+                    ctx.fill();
+                }
             }
             else if (hit.effectType === 'return_to_zero') {
                 ctx.globalAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.0);

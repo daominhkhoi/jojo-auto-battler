@@ -391,13 +391,18 @@ export function syncTickData(data) {
                     maxLife: Math.min(fxLife, 50)
                 });
             } else {
+                const isShortFx = ['buff_atk', 'speed_buff', 'heal', 'damage'].includes(event.skill_type);
+                const lifeSpan = isShortFx ? 36 : (event.skill_type === 'dot' ? 45 : fxLife);
                 STATE.hitEffects.push({
                     x: tarCenterX,
                     y: tarCenterY,
-                    lifeTime: fxLife,
-                    maxLife: fxLife,
+                    targetId: targetChamp ? targetChamp.id : null,
+                    casterId: caster.id,
+                    lifeTime: lifeSpan,
+                    maxLife: lifeSpan,
                     effectType: event.skill_type,
-                    radius: event.radius || 1.5
+                    radius: event.radius || 1.5,
+                    power: event.power || 0
                 });
             }
 
@@ -424,6 +429,12 @@ export function syncTickData(data) {
             } else if (['heal', 'aoe_heal', 'regen'].includes(event.skill_type)) {
                 const healVal = event.power ? `+${event.power.toLocaleString()}` : '+HP';
                 spawnFloatingText(tarCenterX, tarCenterY - 20, `💚 ${healVal}`, 'heal');
+            } else if (event.skill_type === 'buff_atk') {
+                spawnFloatingText(tarCenterX, tarCenterY - 25, `⚔️ +${event.power ? event.power.toLocaleString() : 'ATK'}!`, 'status', { color: '#f39c12', scale: 1.4 });
+            } else if (event.skill_type === 'speed_buff') {
+                spawnFloatingText(tarCenterX, tarCenterY - 25, `⚡ +${event.power || 'SPD'}%!`, 'status', { color: '#00d2d3', scale: 1.4 });
+            } else if (event.skill_type === 'dot') {
+                spawnFloatingText(tarCenterX, tarCenterY - 25, `☣️ POISONED!`, 'status', { color: '#a55eea', scale: 1.3 });
             } else if (event.skill_type === 'stun') {
                 spawnFloatingText(tarCenterX, tarCenterY - 25, '⚡ STUNNED!', 'status', { color: '#ffd32a' });
             } else if (event.skill_type === 'mana_lock') {
