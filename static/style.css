@@ -99,6 +99,138 @@ html {
     color: #e74c3c;
 }
 
+/* =========================================
+   VOICE CHAT WIDGET & REAL-TIME VU METER
+   ========================================= */
+.voice-widget {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    padding: 4px 10px;
+    margin-left: 10px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    vertical-align: middle;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.voice-btn {
+    width: 30px;
+    height: 30px;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1.5px solid rgba(0, 255, 136, 0.45) !important;
+    color: #00ff88 !important;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    outline: none;
+}
+
+.voice-btn:hover {
+    background: rgba(0, 255, 136, 0.2) !important;
+    border-color: #00ff88 !important;
+    box-shadow: 0 0 12px rgba(0, 255, 136, 0.5);
+    transform: scale(1.08);
+}
+
+#voiceAudioBtn {
+    border-color: rgba(0, 220, 255, 0.45) !important;
+    color: #00e5ff !important;
+}
+
+#voiceAudioBtn:hover {
+    background: rgba(0, 220, 255, 0.2) !important;
+    border-color: #00e5ff !important;
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.5);
+}
+
+.voice-btn.muted {
+    background: rgba(231, 76, 60, 0.15) !important;
+    border-color: rgba(231, 76, 60, 0.5) !important;
+    color: #ff4757 !important;
+    box-shadow: none !important;
+}
+
+.voice-btn.muted:hover {
+    background: rgba(231, 76, 60, 0.28) !important;
+    border-color: #ff4757 !important;
+    box-shadow: 0 0 10px rgba(255, 71, 87, 0.4) !important;
+}
+
+.voice-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+}
+
+.voice-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+    pointer-events: none;
+}
+
+/* Vertical VU Meter Track & Bar */
+.voice-meter-track {
+    width: 9px;
+    height: 32px;
+    background: rgba(10, 14, 22, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end; /* Fills from bottom to top */
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.85);
+    padding: 1px;
+    box-sizing: border-box;
+}
+
+.voice-meter-bar {
+    width: 100%;
+    height: 0%;
+    border-radius: 999px;
+    /* Red at bottom (small volume), smoothly transitioning into Amber/Yellow, and Green at top (loud volume) */
+    background: linear-gradient(
+        to top,
+        #ff3838 0%,    /* Đỏ tươi: Nhỏ */
+        #ff5252 20%,   /* Đỏ hồng */
+        #ffa502 50%,   /* Cam vàng hổ phách: Vừa */
+        #2ed573 80%,   /* Xanh lá tươi */
+        #00ff88 100%   /* Xanh ngọc neon: Lớn */
+    );
+    background-size: 100% 30px;
+    background-position: bottom;
+    transition: height 0.05s ease-out;
+    position: relative;
+}
+
+.voice-meter-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2.5px;
+    border-radius: 999px;
+    background: #ffffff;
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.95);
+    opacity: 0.85;
+}
+
 .controls {
     display: flex;
     justify-content: center;
@@ -506,6 +638,31 @@ button:hover {
         width: 100px;
         font-size: 12px;
         padding: 4px 8px;
+    }
+
+    .voice-widget {
+        padding: 2px 7px;
+        gap: 6px;
+        margin-left: 0;
+    }
+
+    .voice-btn {
+        width: 25px;
+        height: 25px;
+    }
+
+    .voice-btn svg {
+        width: 13px;
+        height: 13px;
+    }
+
+    .voice-meter-track {
+        width: 7px;
+        height: 25px;
+    }
+
+    .voice-meter-bar {
+        background-size: 100% 23px;
     }
 
     .controls {

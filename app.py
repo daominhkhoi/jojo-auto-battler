@@ -410,8 +410,8 @@ def handle_find_match(data=None):
                 'aborted': False,
             }
 
-            socketio.emit('match_found', {'room': room_name, 'opponentName': p2['name']}, to=p1['sid'])
-            socketio.emit('match_found', {'room': room_name, 'opponentName': p1['name']}, to=p2['sid'])
+            socketio.emit('match_found', {'room': room_name, 'opponentName': p2['name'], 'isInitiator': True, 'isBot': False}, to=p1['sid'])
+            socketio.emit('match_found', {'room': room_name, 'opponentName': p1['name'], 'isInitiator': False, 'isBot': False}, to=p2['sid'])
         else:
             # Auto-fallback to smart bot after 3.5s so players never wait forever alone
             def bot_fallback_timer(pid, pname):
@@ -424,6 +424,29 @@ def handle_find_match(data=None):
                         _create_bot_game(pid, pname)
 
             socketio.start_background_task(bot_fallback_timer, player_id, player_name)
+
+
+@socketio.on('voice_signal')
+def handle_voice_signal(data):
+    """
+    Relay WebRTC signaling messages (offer, answer, candidate) between peers in a 1v1 match.
+    """
+    room_name = data.get('room')
+    signal_data = data.get('signal')
+    if not room_name or not signal_data:
+        return
+
+    game = games.get(room_name)
+    if not game:
+        return
+
+    sender_id = request.sid
+    recipient_id = game['player2'] if game['player1'] == sender_id else game['player1']
+    if recipient_id and not str(recipient_id).startswith('bot_'):
+        socketio.emit('voice_signal', {
+            'sender': sender_id,
+            'signal': signal_data
+        }, to=recipient_id)
 
 
 @socketio.on('disconnect')

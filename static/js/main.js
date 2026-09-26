@@ -5,6 +5,7 @@ import { renderBoard } from './renderer.js';
 import { updatePhysics } from './combat.js';
 import { showNotification } from './notifications.js';
 import { findMatch, playVsBot, declareReady } from './network.js';
+import { initVoiceChat } from './voice.js';
 
 const canvas = document.getElementById('gameBoard');
 const ctx = canvas.getContext('2d');
@@ -336,6 +337,9 @@ if (sessionStorage.getItem('autoPlayBot') === 'true') {
         }, 500);
     }
 }
+
+// Initialize Voice Chat Controls & VU Meter
+initVoiceChat();
 
 // Launch game
 refreshShop();

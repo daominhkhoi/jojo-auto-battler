@@ -1,6 +1,7 @@
 // static/js/network.js
 import { STATE, CONFIG, CHAMPION_POOL, TRAITS_INFO } from './globals.js';
 import { showNotification } from './notifications.js';
+import { onMatchFoundVoice, closePeerConnection } from './voice.js';
 
 export const socket = io();
 
@@ -23,6 +24,9 @@ socket.on('match_found', (data) => {
 
     showNotification(`Match found with ${data.opponentName}!`);
 
+    // Initialize WebRTC voice chat connection for this match
+    onMatchFoundVoice(data);
+
     const readyBtn = document.getElementById('readyBtn');
     if (readyBtn) readyBtn.style.display = 'inline-block';
 
@@ -40,6 +44,7 @@ socket.on('match_found', (data) => {
 
 socket.on('opponent_disconnected', () => {
     showNotification("Opponent disconnected! Match cancelled.");
+    closePeerConnection();
     STATE.isCombatPhase = false;
     STATE.champions = [];
 
