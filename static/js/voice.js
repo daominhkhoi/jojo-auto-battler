@@ -14,6 +14,12 @@ let analyserNode = null;
 let sourceNode = null;
 let peerConnection = null;
 
+// Remote audio playback state (Web Audio API forces mobile loudspeaker output)
+let remoteAudioContext = null;
+let remoteAudioSource = null;
+let remoteGainNode = null;
+let silentAudioStream = null;
+
 let isMicMuted = true; // Mặc định tắt micro để tôn trọng quyền riêng tư
 let isAudioDeafened = false;
 let isVoiceInitialized = false;
@@ -45,6 +51,9 @@ export function initVoiceChat() {
         audioBtn.addEventListener('click', handleAudioButtonClick);
     }
 
+    // Setup global touch/pointer unlocker for mobile browsers
+    setupMobileAudioUnlock();
+
     // Set initial UI state (Muted by default)
     updateMicUi(isMicMuted);
 
@@ -55,6 +64,62 @@ export function initVoiceChat() {
     startMeterLoop();
 }
 
+function setupMobileAudioUnlock() {
+    const unlock = () => {
+        if (remoteAudioContext && remoteAudioContext.state === 'suspended') {
+            remoteAudioContext.resume().catch(() => {});
+        }
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().catch(() => {});
+        }
+        const remoteAudio = document.getElementById('remoteVoiceAudio');
+        if (remoteAudio && remoteAudio.paused) {
+            remoteAudio.play().catch(() => {});
+        }
+    };
+
+    window.addEventListener('touchstart', unlock, { passive: true });
+    window.addEventListener('touchend', unlock, { passive: true });
+    window.addEventListener('pointerdown', unlock, { passive: true });
+    window.addEventListener('click', unlock, { passive: true });
+}
+
+// ==========================================
+// SILENT TRACK GENERATOR (GUARANTEES SENDRECV SDP)
+// ==========================================
+function getOrCreateAudioTrackToAttach() {
+    if (localStream) {
+        const t = localStream.getAudioTracks()[0];
+        if (t) {
+            t.enabled = !isMicMuted;
+            return { track: t, stream: localStream };
+        }
+    }
+
+    // Create a silent dummy audio track so SDP offer/answer ALWAYS negotiates a=sendrecv
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+            if (!silentAudioStream) {
+                const ctx = new AudioCtx();
+                const osc = ctx.createOscillator();
+                const dst = ctx.createMediaStreamDestination();
+                osc.connect(dst);
+                osc.start();
+                silentAudioStream = dst.stream;
+            }
+            const track = silentAudioStream.getAudioTracks()[0];
+            if (track) {
+                track.enabled = false; // Completely muted silence
+                return { track, stream: silentAudioStream };
+            }
+        }
+    } catch (e) {
+        console.warn("[Voice] Silent audio track creation failed:", e);
+    }
+    return null;
+}
+
 // ==========================================
 // MICROPHONE ACCESS & AUDIO ANALYZER
 // ==========================================
@@ -63,17 +128,35 @@ function attachLocalTracksToPeer() {
     const audioTrack = localStream.getAudioTracks()[0];
     if (!audioTrack) return;
 
-    const senders = peerConnection.getSenders();
-    const audioSender = senders.find(s => (s.track && s.track.kind === 'audio') || (!s.track && s.kind === 'audio')) || senders[0];
+    audioTrack.enabled = !isMicMuted;
+
+    // Find the audio sender to replace the track
+    const transceivers = peerConnection.getTransceivers ? peerConnection.getTransceivers() : [];
+    let audioSender = null;
+    for (const t of transceivers) {
+        if (t.sender && (t.sender.track?.kind === 'audio' || t.receiver?.track?.kind === 'audio' || !t.sender.track)) {
+            audioSender = t.sender;
+            t.direction = 'sendrecv';
+            break;
+        }
+    }
+    if (!audioSender) {
+        const senders = peerConnection.getSenders();
+        audioSender = senders.find(s => (s.track && s.track.kind === 'audio') || !s.track) || senders[0];
+    }
+
     if (audioSender && typeof audioSender.replaceTrack === 'function') {
         audioSender.replaceTrack(audioTrack).then(() => {
-            console.log("[Voice] Attached audio track via replaceTrack.");
+            console.log("[Voice] Attached active mic track via replaceTrack successfully.");
         }).catch(err => {
-            console.warn("[Voice] replaceTrack error:", err);
+            console.warn("[Voice] replaceTrack error, falling back to addTrack:", err);
+            try {
+                peerConnection.addTrack(audioTrack, localStream);
+            } catch (e) {}
         });
     } else {
         try {
-            if (!senders.some(s => s.track === audioTrack)) {
+            if (!peerConnection.getSenders().some(s => s.track === audioTrack)) {
                 peerConnection.addTrack(audioTrack, localStream);
                 console.log("[Voice] Attached audio track via addTrack.");
             }
@@ -275,6 +358,10 @@ function handleAudioButtonClick() {
         remoteAudio.muted = isAudioDeafened;
     }
 
+    if (remoteGainNode) {
+        remoteGainNode.gain.value = isAudioDeafened ? 0 : 1.0;
+    }
+
     const audioBtn = document.getElementById('voiceAudioBtn');
     const svgOn = document.getElementById('svgSpeakerOn');
     const svgOff = document.getElementById('svgSpeakerOff');
@@ -346,6 +433,63 @@ async function drainPendingIceCandidates() {
     }
 }
 
+// Routes incoming remote audio stream to BOTH HTMLMediaElement AND Web Audio API
+// This guarantees audio plays through the Phone's Loudspeaker (loa ngoài) rather than the quiet earpiece!
+function playIncomingStream(stream, track) {
+    const remoteAudio = document.getElementById('remoteVoiceAudio');
+    if (remoteAudio) {
+        remoteAudio.srcObject = stream;
+        remoteAudio.muted = isAudioDeafened;
+        remoteAudio.volume = 1.0;
+        remoteAudio.playsInline = true;
+
+        const playPromise = remoteAudio.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(error => {
+                console.warn("[Voice] remoteAudio.play() rejected (will unlock on touch):", error);
+            });
+        }
+    }
+
+    // Force Loudspeaker playback on mobile devices using Web Audio API
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+            if (!remoteAudioContext) {
+                remoteAudioContext = new AudioCtx();
+            }
+            if (remoteAudioContext.state === 'suspended') {
+                remoteAudioContext.resume().catch(() => {});
+            }
+            if (remoteAudioSource) {
+                try { remoteAudioSource.disconnect(); } catch (e) {}
+            }
+            remoteAudioSource = remoteAudioContext.createMediaStreamSource(stream);
+            if (!remoteGainNode) {
+                remoteGainNode = remoteAudioContext.createGain();
+            }
+            remoteGainNode.gain.value = isAudioDeafened ? 0 : 1.0;
+            remoteAudioSource.connect(remoteGainNode);
+            remoteGainNode.connect(remoteAudioContext.destination);
+            console.log("[Voice] Remote stream successfully connected to Web Audio destination (Loudspeaker).");
+        }
+    } catch (e) {
+        console.warn("[Voice] Web Audio API playback routing error:", e);
+    }
+
+    if (track) {
+        track.onunmute = () => {
+            console.log("[Voice] Remote track unmuted, RTP voice packets arriving!");
+            if (remoteAudioContext && remoteAudioContext.state === 'suspended') {
+                remoteAudioContext.resume().catch(() => {});
+            }
+            if (remoteAudio && remoteAudio.paused) {
+                remoteAudio.play().catch(() => {});
+            }
+        };
+    }
+}
+
 export async function onMatchFoundVoice(matchData) {
     isBotMatch = !!matchData.isBot;
 
@@ -372,41 +516,24 @@ function setupPeerConnection(isInitiator) {
     try {
         peerConnection = new RTCPeerConnection(RTC_CONFIG);
 
-        // Pre-add transceiver for audio to ensure immediate bidirectional media readiness
-        try {
-            peerConnection.addTransceiver('audio', { direction: 'sendrecv' });
-        } catch (e) {
-            console.warn("[Voice] addTransceiver fallback:", e);
-        }
-
-        // Add local mic tracks to peer connection if already available
-        if (localStream) {
-            attachLocalTracksToPeer();
+        // Pre-attach track (real mic if active, or silent track) so WebRTC ALWAYS negotiates bidirectional sendrecv SDP
+        const audioInfo = getOrCreateAudioTrackToAttach();
+        if (audioInfo) {
+            peerConnection.addTrack(audioInfo.track, audioInfo.stream);
+            console.log("[Voice] Pre-attached audio track to RTCPeerConnection to guarantee bidirectional sendrecv SDP.");
+        } else {
+            try {
+                peerConnection.addTransceiver('audio', { direction: 'sendrecv' });
+            } catch (e) {
+                console.warn("[Voice] addTransceiver fallback:", e);
+            }
         }
 
         // Receive remote opponent's audio track
         peerConnection.ontrack = (event) => {
             console.log("[Voice] Received remote audio track from opponent:", event.track);
-            const remoteAudio = document.getElementById('remoteVoiceAudio');
-            if (remoteAudio) {
-                const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
-                remoteAudio.srcObject = stream;
-                remoteAudio.muted = isAudioDeafened;
-
-                const playPromise = remoteAudio.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(error => {
-                        console.warn("[Voice] Remote audio autoplay blocked by browser policy:", error);
-                        const unlockAudio = () => {
-                            remoteAudio.play().catch(e => console.warn("[Voice] Playback retry error:", e));
-                            document.removeEventListener('click', unlockAudio);
-                            document.removeEventListener('touchstart', unlockAudio);
-                        };
-                        document.addEventListener('click', unlockAudio, { once: true });
-                        document.addEventListener('touchstart', unlockAudio, { once: true });
-                    });
-                }
-            }
+            const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+            playIncomingStream(stream, event.track);
         };
 
         // Send ICE candidate to opponent via socket signaling
@@ -479,7 +606,14 @@ async function handleIncomingVoiceSignal(data) {
                 attachLocalTracksToPeer();
             }
 
-            const answer = await peerConnection.createAnswer();
+            // Ensure all audio transceivers are set to sendrecv before creating answer
+            if (peerConnection.getTransceivers) {
+                peerConnection.getTransceivers().forEach(t => {
+                    t.direction = 'sendrecv';
+                });
+            }
+
+            const answer = await peerConnection.createAnswer({ offerToReceiveAudio: true });
             await peerConnection.setLocalDescription(answer);
 
             socket.emit('voice_signal', {
@@ -534,6 +668,11 @@ export function closePeerConnection() {
             console.warn("[Voice] Error closing peerConnection:", e);
         }
         peerConnection = null;
+    }
+
+    if (remoteAudioSource) {
+        try { remoteAudioSource.disconnect(); } catch (e) {}
+        remoteAudioSource = null;
     }
 
     const remoteAudio = document.getElementById('remoteVoiceAudio');

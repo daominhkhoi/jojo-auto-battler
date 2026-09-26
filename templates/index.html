@@ -107,7 +107,7 @@
     </div>
 
     <!-- Hidden audio element for receiving remote peer audio stream -->
-    <audio id="remoteVoiceAudio" autoplay playsinline></audio>
+    <audio id="remoteVoiceAudio" autoplay playsinline webkit-playsinline preload="auto"></audio>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
