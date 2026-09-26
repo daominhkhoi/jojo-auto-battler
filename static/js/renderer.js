@@ -1535,18 +1535,23 @@ export function renderBoard(ctx, canvas) {
                 if (caster && target) {
                     const cSize = getCanvasCoords(caster.targetX, caster.targetY);
                     const tSize = getCanvasCoords(target.targetX, target.targetY);
-                    const cX = caster.pixelX + cSize.w / 2;
-                    const cY = caster.pixelY + cSize.h / 2;
-                    const tX = target.pixelX + tSize.w / 2;
-                    const tY = target.pixelY + tSize.h / 2;
+                    const cX = (caster.pixelX !== undefined ? caster.pixelX : cSize.x) + cSize.w / 2;
+                    const cY = (caster.pixelY !== undefined ? caster.pixelY : cSize.y) + cSize.h / 2;
+                    const tX = (target.pixelX !== undefined ? target.pixelX : tSize.x) + tSize.w / 2;
+                    const tY = (target.pixelY !== undefined ? target.pixelY : tSize.y) + tSize.h / 2;
+
+                    // hitEffects loop has ALREADY translated context to Target center (hx=tX, hy=tY).
+                    // Therefore in local coordinate space: Target = (0, 0), Caster = (toCasterX, toCasterY).
+                    const toCasterX = cX - tX;
+                    const toCasterY = cY - tY;
 
                     const beamAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.5);
 
                     ctx.save();
-                    // 1. Siphon Energy Laser Beam (Tia laze rút năng lượng siêu đậm & sắc)
+                    // 1. Siphon Energy Laser Beam (Tia laze rút năng lượng siêu đậm & sắc từ Target -> Caster)
                     // Layer 1: Dark cosmic shadow backing beam
                     ctx.beginPath();
-                    ctx.moveTo(tX, tY); ctx.lineTo(cX, cY);
+                    ctx.moveTo(0, 0); ctx.lineTo(toCasterX, toCasterY);
                     ctx.strokeStyle = `rgba(25, 5, 40, ${beamAlpha * 0.95})`;
                     ctx.lineWidth = 16;
                     ctx.lineCap = 'round';
@@ -1554,14 +1559,14 @@ export function renderBoard(ctx, canvas) {
 
                     // Layer 2: Vivid violet plasma
                     ctx.beginPath();
-                    ctx.moveTo(tX, tY); ctx.lineTo(cX, cY);
+                    ctx.moveTo(0, 0); ctx.lineTo(toCasterX, toCasterY);
                     ctx.strokeStyle = `rgba(155, 89, 182, ${beamAlpha})`;
                     ctx.lineWidth = 10;
                     ctx.stroke();
 
                     // Layer 3: Pure white laser core
                     ctx.beginPath();
-                    ctx.moveTo(tX, tY); ctx.lineTo(cX, cY);
+                    ctx.moveTo(0, 0); ctx.lineTo(toCasterX, toCasterY);
                     ctx.strokeStyle = `rgba(255, 255, 255, ${beamAlpha})`;
                     ctx.lineWidth = 4;
                     ctx.stroke();
@@ -1570,8 +1575,8 @@ export function renderBoard(ctx, canvas) {
                     const orbCount = 5;
                     for (let i = 0; i < orbCount; i++) {
                         const orbT = ((progress * 3.5) + (i / orbCount)) % 1.0;
-                        const orbX = tX + (cX - tX) * orbT;
-                        const orbY = tY + (cY - tY) * orbT;
+                        const orbX = toCasterX * orbT;
+                        const orbY = toCasterY * orbT;
 
                         // Dark outline
                         ctx.beginPath();
@@ -1592,17 +1597,17 @@ export function renderBoard(ctx, canvas) {
                         ctx.fill();
                     }
 
-                    // 3. Target collapsing drain spiral (Vòng xoáy rút cạn năng lượng)
+                    // 3. Target collapsing drain spiral (Vòng xoáy rút cạn năng lượng ngay trên Target)
                     ctx.beginPath();
-                    ctx.arc(tX, tY, (1 - progress) * 48 + 15, 0, Math.PI * 2);
+                    ctx.arc(0, 0, (1 - progress) * 48 + 15, 0, Math.PI * 2);
                     ctx.strokeStyle = `rgba(231, 76, 60, ${beamAlpha})`;
                     ctx.lineWidth = 4.5;
                     ctx.setLineDash([8, 8]);
                     ctx.stroke();
 
-                    // 4. Caster aura burst (Vòng nạp năng lượng bùng nổ)
+                    // 4. Caster aura burst (Vòng nạp năng lượng bùng nổ ngay trên Caster)
                     ctx.beginPath();
-                    ctx.arc(cX, cY, progress * 52 + 10, 0, Math.PI * 2);
+                    ctx.arc(toCasterX, toCasterY, progress * 52 + 10, 0, Math.PI * 2);
                     ctx.strokeStyle = `rgba(241, 196, 15, ${(1 - progress) * 0.95})`;
                     ctx.lineWidth = 5.5;
                     ctx.setLineDash([]);

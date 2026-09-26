@@ -363,8 +363,8 @@ export function syncTickData(data) {
 
             const targetChamp = target || caster;
             const tarSize = getCanvasCoords(targetChamp.targetX, targetChamp.targetY);
-            const tarCenterX = targetChamp.pixelX + tarSize.w / 2;
-            const tarCenterY = targetChamp.pixelY + tarSize.h / 2;
+            const tarCenterX = (targetChamp.pixelX !== undefined ? targetChamp.pixelX : tarSize.x) + tarSize.w / 2;
+            const tarCenterY = (targetChamp.pixelY !== undefined ? targetChamp.pixelY : tarSize.y) + tarSize.h / 2;
 
             // Automatically convert duration into animation frames (60 FPS)
             let fxLife = 30; // Default 0.5s for burst skill
@@ -461,8 +461,8 @@ export function syncTickData(data) {
                 if (target) target.shakeTimer = 25;
                 STATE.screenShake = Math.max(STATE.screenShake || 0, 7);
                 const casSize = getCanvasCoords(caster.targetX, caster.targetY);
-                const casCenterX = caster.pixelX + casSize.w / 2;
-                const casCenterY = caster.pixelY + casSize.h / 2;
+                const casCenterX = (caster.pixelX !== undefined ? caster.pixelX : casSize.x) + casSize.w / 2;
+                const casCenterY = (caster.pixelY !== undefined ? caster.pixelY : casSize.y) + casSize.h / 2;
                 const stealPwr = event.power ? event.power.toLocaleString() : 'ATK';
 
                 // Floating text on Target (drained)
@@ -853,7 +853,7 @@ function finishRoundReview(serverResult) {
         const saveCurrentName = () => {
             const nameInput = document.getElementById('playerNameInput');
             const currentName = nameInput && nameInput.value.trim() !== "" ? nameInput.value.trim() : "Player";
-            try { localStorage.setItem('savedPlayerName', currentName); } catch (e) {}
+            try { localStorage.setItem('savedPlayerName', currentName); } catch (e) { }
         };
 
         // 1. Về sảnh chính (giữ nguyên tên, dừng lại ở sảnh chờ để người chơi tự chọn)
@@ -879,7 +879,7 @@ function finishRoundReview(serverResult) {
 
         // FIX: Capped income formula — base increases per round but caps at 35 gold.
         // Old formula (round * 5 + 5) caused runaway snowballing late game.
-        const rawIncome  = STATE.currentRound * 3 + 5;
+        const rawIncome = STATE.currentRound * 3 + 5;
         const baseIncome = Math.min(rawIncome, 35);
         updateGold(baseIncome);
         showNotification(`Round ${STATE.currentRound} Start: +${baseIncome} Gold`);
@@ -895,7 +895,6 @@ function finishRoundReview(serverResult) {
         startPrepTimer();
     }
 }
-}
 
 function resetBoardForNextRound() {
     if (STATE.isBotVsBot) {
@@ -910,14 +909,14 @@ function resetBoardForNextRound() {
     STATE.champions.forEach(champ => {
         if (champ.raw_hp !== undefined) {
             champ.max_hp = champ.raw_hp;
-            champ.hp     = champ.raw_hp;
+            champ.hp = champ.raw_hp;
         } else {
-            champ.hp     = champ.max_hp;
+            champ.hp = champ.max_hp;
         }
-        champ.mana     = 0;
-        champ.shield   = 0;
+        champ.mana = 0;
+        champ.shield = 0;
         champ.is_alive = true;
-        champ.team     = STATE.myTeam || 'Team1'; // Restore from mind_control / soul_swap
+        champ.team = STATE.myTeam || 'Team1'; // Restore from mind_control / soul_swap
 
         // FIX: Reset attack, speed, range, skill to raw baseline so buffs do not leak
         if (champ.raw_attack !== undefined) champ.attack = champ.raw_attack;
@@ -930,7 +929,7 @@ function resetBoardForNextRound() {
         if (champ.raw_skill !== undefined) champ.skill = champ.raw_skill;
         champ.applied_traits = [];
 
-        champ.buffs        = [];
+        champ.buffs = [];
         champ.buff_details = [];
 
         if (champ.originalX !== undefined && champ.originalY !== undefined) {
@@ -941,7 +940,7 @@ function resetBoardForNextRound() {
     });
 
     STATE.activeProjectiles = [];
-    STATE.hitEffects        = [];
+    STATE.hitEffects = [];
 }
 export function updateRoundUI() {
     const roundText = document.getElementById('roundText');
