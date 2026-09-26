@@ -364,13 +364,34 @@ button:hover {
 /* =========================================
    CHAMPION INFO PANEL (Left)
    ========================================= */
+.champ-info-img,
 .side-panel img {
     width: 100%;
-    height: fit-content;
-    object-fit: cover;
-    border-radius: 1px;
-    border: 1px solid #f39c12;
-    margin-bottom: 1px;
+    height: 110px;
+    max-height: 110px;
+    object-fit: contain;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.5) 100%);
+    border-radius: 8px;
+    border: 1.5px solid #f39c12;
+    margin-bottom: 6px;
+    box-sizing: border-box;
+    display: block;
+}
+
+/* Custom sleek scrollbar for side panels */
+.side-panel::-webkit-scrollbar {
+    width: 5px;
+}
+.side-panel::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+.side-panel::-webkit-scrollbar-thumb {
+    background: rgba(243, 156, 18, 0.4);
+    border-radius: 4px;
+}
+.side-panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(243, 156, 18, 0.8);
 }
 
 .card-stats {
@@ -793,13 +814,19 @@ button:hover {
     }
 
     /* Info panel image */
+    .champ-info-img,
     .side-panel img {
-        width: 80px;
-        height: 80px;
-        object-fit: cover;
+        width: 75px;
+        height: 75px;
+        max-height: 75px;
+        object-fit: contain;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.5) 100%);
         float: left;
         margin-right: 10px;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
+        border-radius: 6px;
+        border: 1.5px solid #f39c12;
+        box-sizing: border-box;
     }
 
     .info-placeholder {

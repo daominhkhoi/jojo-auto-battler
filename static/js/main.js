@@ -4,7 +4,7 @@ import { buyXp, refreshShop, updateGold, updateUnitCount, sellChampion, showDisp
 import { renderBoard } from './renderer.js';
 import { updatePhysics } from './combat.js';
 import { showNotification } from './notifications.js';
-import { findMatch, playVsBot, declareReady } from './network.js';
+import { findMatch, playVsBot, playBotVsBot, leaveMatch, declareReady } from './network.js';
 import { initVoiceChat } from './voice.js';
 
 const canvas = document.getElementById('gameBoard');
@@ -16,6 +16,8 @@ const ctx = canvas.getContext('2d');
 document.getElementById('buyXpBtn').addEventListener('click', buyXp);
 document.getElementById('findMatchBtn').addEventListener('click', findMatch);
 document.getElementById('vsBotBtn')?.addEventListener('click', playVsBot);
+document.getElementById('botVsBotBtn')?.addEventListener('click', playBotVsBot);
+document.getElementById('exitMatchBtn')?.addEventListener('click', leaveMatch);
 document.getElementById('readyBtn').addEventListener('click', declareReady);
 
 document.getElementById('rollBtn').addEventListener('click', () => {
@@ -88,7 +90,7 @@ function handlePointerDown(e) {
     const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
 
     if (touchedChamp) {
-        if (!STATE.isCombatPhase) {
+        if (!STATE.isCombatPhase && !STATE.isBotVsBot) {
             isDragging = true;
             draggedChamp = touchedChamp;
             originalX = touchedChamp.targetX;

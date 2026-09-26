@@ -16,8 +16,9 @@ from engine.game_logic import (
     Champion, find_closest_target, calculate_distance, move_towards,
     register_champion_costs
 )
-from engine.bot_ai import SmartBot
+from engine.bot_ai import SmartBot, BOT_ARCHETYPES
 import os
+import random
 import time
 import pandas as pd
 import gevent.lock
@@ -106,6 +107,9 @@ _SKILL_BALANCE_OVERRIDES = {
     'Justice': {'duration': 2.8},
     'Aqua Necklace': {'duration': 2.2},
     'Heaven\'s Door': {'duration': 2.2},
+
+    # 10. Return to Zero: Gây sát thương = 20% Max HP bản thân cho toàn địch
+    'Gold Experience Requiem': {'percent': 0.20},
 }
 
 def _load_champion_data():
@@ -227,10 +231,6 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
     elif trait_counts.get("Team Bucciarati", 0) >= 4: global_hp_buff += 35000
     elif trait_counts.get("Team Bucciarati", 0) >= 2: global_hp_buff += 15000
 
-    if trait_counts.get("Utility", 0) >= 6: global_hp_buff += 50000
-    elif trait_counts.get("Utility", 0) >= 4: global_hp_buff += 25000
-    elif trait_counts.get("Utility", 0) >= 2: global_hp_buff += 10000
-
     result = []
     for c in board_champs_raw:
         name     = c['name']
@@ -252,6 +252,8 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
         final_range  = template.get('attack_range', 1.0)
         final_speed  = template.get('speed', 1.0)
         final_mana   = 0
+        mana_refund_ratio = 0.0
+        double_cast_chance = 0.0
 
         # Star scaling for skill attributes (power, duration, radius, percent)
         skill_power_mult = 1.6 ** (star - 1)
@@ -299,10 +301,18 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
 
         if "Bucciarati" in traits:
             tc = trait_counts.get("Bucciarati", 0)
-            if final_skill.get('power'):
-                if tc >= 6:   final_skill['power'] = round(final_skill['power'] * 2.3)
-                elif tc >= 4: final_skill['power'] = round(final_skill['power'] * 1.7)
-                elif tc >= 2: final_skill['power'] = round(final_skill['power'] * 1.3)
+            if tc >= 6:
+                double_cast_chance = 1.00
+                if final_skill.get('power'):
+                    final_skill['power'] = round(final_skill['power'] * 1.60)
+            elif tc >= 4:
+                double_cast_chance = 0.66
+                if final_skill.get('power'):
+                    final_skill['power'] = round(final_skill['power'] * 1.40)
+            elif tc >= 2:
+                double_cast_chance = 0.33
+                if final_skill.get('power'):
+                    final_skill['power'] = round(final_skill['power'] * 1.20)
 
         if "La Squadra" in traits:
             tc = trait_counts.get("La Squadra", 0)
@@ -342,9 +352,15 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
 
         if "Long-Distance" in traits:
             tc = trait_counts.get("Long-Distance", 0)
-            if tc >= 6:   final_range += 1; final_attack *= 2.0
-            elif tc >= 4: final_range += 1; final_attack *= 1.5
-            elif tc >= 2: final_range += 1; final_attack *= 1.2
+            if tc >= 6:
+                final_attack *= 1.30
+                final_speed *= 1.75
+            elif tc >= 4:
+                final_attack *= 1.20
+                final_speed *= 1.50
+            elif tc >= 2:
+                final_attack *= 1.10
+                final_speed *= 1.25
 
         if "Automatic" in traits:
             tc = trait_counts.get("Automatic", 0)
@@ -370,10 +386,14 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
             elif tc >= 4: final_hp *= 1.7
             elif tc >= 2: final_hp *= 1.3
 
+        if "Utility" in traits:
+            tc = trait_counts.get("Utility", 0)
+            if tc >= 6:   mana_refund_ratio = 0.60
+            elif tc >= 4: mana_refund_ratio = 0.40
+            elif tc >= 2: mana_refund_ratio = 0.20
+
         applied_traits = []
         if global_hp_buff > 0:
-            if trait_counts.get("Utility", 0) >= 2:
-                applied_traits.append(f"Utility ({trait_counts['Utility']})")
             if trait_counts.get("Team Bucciarati", 0) >= 2:
                 applied_traits.append(f"Team Bucciarati ({trait_counts['Team Bucciarati']})")
 
@@ -403,6 +423,8 @@ def _compute_trait_buffs(board_champs_raw, trait_counts):
             'raw_range':    raw_range,
             'raw_speed':    raw_speed,
             'applied_traits': list(dict.fromkeys(applied_traits)),
+            'mana_refund_ratio': mana_refund_ratio,
+            'double_cast_chance': double_cast_chance,
         })
 
     return result
@@ -463,6 +485,161 @@ def _create_bot_game(player_id, player_name):
         print(f"[BOT MATCH] {player_name} matched in {room_name}")
 
 
+def _create_bot_vs_bot_game(player_id, player_name):
+    """Instantiate a Bot vs Bot spectator match where 2 smart bots battle autonomously."""
+    keys = list(BOT_ARCHETYPES.keys())
+    random.shuffle(keys)
+    bot1 = SmartBot(keys[0])
+    bot2 = SmartBot(keys[1])
+    room_name = f"room_{player_id[:5]}_bvb"
+
+    try:
+        join_room(room_name, sid=player_id)
+    except KeyError:
+        return
+
+    game = {
+        'player1': player_id, 'p1_name': bot1.name,
+        'player2': f"bot2_{player_id[:5]}", 'p2_name': bot2.name,
+        'board_state': [], 'ready_count': 0,
+        'p1_lp': 0, 'p2_lp': 0,
+        'aborted': False,
+        'bot1': bot1,
+        'bot2': bot2,
+        'is_bot_vs_bot': True,
+        'round_number': 1
+    }
+    games[room_name] = game
+
+    socketio.emit('match_found', {
+        'room': room_name,
+        'opponentName': bot2.name,
+        'playerName': bot1.name,
+        'isBot': True,
+        'isBotVsBot': True,
+        'your_team': 'Team1'
+    }, to=player_id)
+
+    print(f"[BOT VS BOT] {player_name} watching {bot1.name} VS {bot2.name} in {room_name}")
+
+    def bot_vs_bot_match_flow():
+        socketio.sleep(0.5)
+
+        while not game.get('aborted'):
+            if game.get('p1_lp', 0) >= 10 or game.get('p2_lp', 0) >= 10:
+                winner_name = bot1.name if game['p1_lp'] >= 10 else bot2.name
+                socketio.emit('bvb_game_over', {
+                    'winner': winner_name,
+                    'p1_lp': game['p1_lp'],
+                    'p2_lp': game['p2_lp']
+                }, to=player_id)
+                break
+
+            round_num = game.get('round_number', 1)
+            print(f"[BvB] Round {round_num} preparation starting (10s timer) in {room_name}")
+
+            # Both bots independently purchase champions, level up, and position units
+            bot1_team_raw = bot1.build_team(_CHAMPION_DATA, _CHAMPION_TRAITS)
+            bot2_team_raw = bot2.build_team(_CHAMPION_DATA, _CHAMPION_TRAITS)
+
+            # Count traits Bot 1
+            bot1_counted = set()
+            bot1_traits = {}
+            for c in bot1_team_raw:
+                if c['name'] not in bot1_counted:
+                    bot1_counted.add(c['name'])
+                    for t in _CHAMPION_TRAITS.get(c['name'], []):
+                        bot1_traits[t] = bot1_traits.get(t, 0) + 1
+            buffed_bot1 = _compute_trait_buffs(bot1_team_raw, bot1_traits)
+
+            # Count traits Bot 2
+            bot2_counted = set()
+            bot2_traits = {}
+            for c in bot2_team_raw:
+                if c['name'] not in bot2_counted:
+                    bot2_counted.add(c['name'])
+                    for t in _CHAMPION_TRAITS.get(c['name'], []):
+                        bot2_traits[t] = bot2_traits.get(t, 0) + 1
+            buffed_bot2 = _compute_trait_buffs(bot2_team_raw, bot2_traits)
+
+            # Deploy both teams onto the board
+            game['board_state'] = []
+            for champ in buffed_bot1:
+                game['board_state'].append(Champion(
+                    id=champ['id'], name=champ['name'], team="Team1",
+                    x=float(champ['x']), y=float(champ['y']),
+                    hp=champ['max_hp'], attack=champ['attack'],
+                    attack_range=champ['attack_range'], speed=champ['speed'],
+                    max_mana=champ['max_mana'], star=champ.get('star', 1),
+                    skill=champ.get('skill'), raw_skill=champ.get('raw_skill'),
+                    start_mana=champ.get('start_mana', 0),
+                    active_buffs=champ.get('active_buffs', []),
+                    raw_hp=champ.get('raw_hp'), raw_attack=champ.get('raw_attack'),
+                    raw_range=champ.get('raw_range'), raw_speed=champ.get('raw_speed'),
+                    applied_traits=champ.get('applied_traits', []),
+                    mana_refund_ratio=champ.get('mana_refund_ratio', 0.0),
+                    double_cast_chance=champ.get('double_cast_chance', 0.0)
+                ))
+
+            for champ in buffed_bot2:
+                game['board_state'].append(Champion(
+                    id=champ['id'], name=champ['name'], team="Team2",
+                    x=4 - float(champ['x']), y=5 - float(champ['y']),
+                    hp=champ['max_hp'], attack=champ['attack'],
+                    attack_range=champ['attack_range'], speed=champ['speed'],
+                    max_mana=champ['max_mana'], star=champ.get('star', 1),
+                    skill=champ.get('skill'), raw_skill=champ.get('raw_skill'),
+                    start_mana=champ.get('start_mana', 0),
+                    active_buffs=champ.get('active_buffs', []),
+                    raw_hp=champ.get('raw_hp'), raw_attack=champ.get('raw_attack'),
+                    raw_range=champ.get('raw_range'), raw_speed=champ.get('raw_speed'),
+                    applied_traits=champ.get('applied_traits', []),
+                    mana_refund_ratio=champ.get('mana_refund_ratio', 0.0),
+                    double_cast_chance=champ.get('double_cast_chance', 0.0)
+                ))
+
+            base_champions = [c.to_dict() for c in game['board_state']]
+
+            # Sync prep board state to spectator immediately
+            socketio.emit('bvb_round_prep', {
+                'round': round_num,
+                'champions': base_champions,
+                'bot1_name': bot1.name,
+                'bot2_name': bot2.name,
+                'p1_lp': game.get('p1_lp', 0),
+                'p2_lp': game.get('p2_lp', 0),
+                'seconds': 10
+            }, to=player_id)
+
+            # 10s countdown between rounds as requested by user
+            for sec_left in range(10, 0, -1):
+                if game.get('aborted'):
+                    return
+                socketio.emit('bvb_countdown_tick', {'seconds': sec_left}, to=player_id)
+                socketio.sleep(1.0)
+
+            if game.get('aborted'):
+                return
+
+            # Lock inspection for 2s
+            socketio.emit('match_locked', to=room_name)
+            socketio.sleep(2.0)
+            if game.get('aborted'):
+                return
+
+            # Start combat
+            socketio.emit('combat_start', to=room_name)
+            run_game_loop(room_name)
+
+            if game.get('aborted'):
+                return
+
+            game['round_number'] = round_num + 1
+            socketio.sleep(2.0)
+
+    socketio.start_background_task(bot_vs_bot_match_flow)
+
+
 @socketio.on('find_match')
 def handle_find_match(data=None):
     data        = data or {}
@@ -488,7 +665,12 @@ def handle_find_match(data=None):
         for r in rooms_to_delete:
             del games[r]
 
-        # 1. Direct VS BOT request
+        # 1. Direct BOT VS BOT spectator request
+        if data.get('bot_vs_bot'):
+            _create_bot_vs_bot_game(player_id, player_name)
+            return
+
+        # 2. Direct VS BOT request
         if vs_bot:
             _create_bot_game(player_id, player_name)
             return
@@ -561,6 +743,21 @@ def handle_voice_signal(data):
             'sender': sender_id,
             'signal': signal_data
         }, to=recipient_id)
+
+
+@socketio.on('leave_match')
+def handle_leave_match(data=None):
+    player_id = request.sid
+    with _matchmaking_lock:
+        rooms_to_delete = []
+        for room_name, game in games.items():
+            if game['player1'] == player_id or game['player2'] == player_id:
+                game['aborted'] = True
+                leave_room(room_name, sid=player_id)
+                rooms_to_delete.append(room_name)
+        for r in rooms_to_delete:
+            del games[r]
+    socketio.emit('match_left', to=player_id)
 
 
 @socketio.on('disconnect')
@@ -657,7 +854,9 @@ def handle_submit_board(data):
             raw_attack=champ.get('raw_attack'),
             raw_range=champ.get('raw_range'),
             raw_speed=champ.get('raw_speed'),
-            applied_traits=champ.get('applied_traits', [])
+            applied_traits=champ.get('applied_traits', []),
+            mana_refund_ratio=champ.get('mana_refund_ratio', 0.0),
+            double_cast_chance=champ.get('double_cast_chance', 0.0)
         )
         game['board_state'].append(new_champ)
 
@@ -702,7 +901,9 @@ def handle_submit_board(data):
                 raw_attack=champ.get('raw_attack'),
                 raw_range=champ.get('raw_range'),
                 raw_speed=champ.get('raw_speed'),
-                applied_traits=champ.get('applied_traits', [])
+                applied_traits=champ.get('applied_traits', []),
+                mana_refund_ratio=champ.get('mana_refund_ratio', 0.0),
+                double_cast_chance=champ.get('double_cast_chance', 0.0)
             )
             game['board_state'].append(new_champ)
 
@@ -779,6 +980,28 @@ def run_game_loop(room_name):
             if buff_events:
                 all_tick_events.extend(buff_events)
 
+            # Check pending Bucciarati Double Cast (1.0s delay = 10 ticks)
+            if getattr(champ, 'pending_double_cast_ticks', 0) > 0:
+                champ.pending_double_cast_ticks -= 1
+                if champ.pending_double_cast_ticks == 0:
+                    if champ.is_alive and not getattr(champ, 'is_stunned', False) and not getattr(champ, 'is_banished', False):
+                        second_target = find_closest_target(champ, game['board_state'])
+                        if second_target:
+                            second_event = champ.cast_skill(second_target, game['board_state'], is_bonus_cast=True)
+                            if second_event:
+                                if 'spawned_clones' in second_event:
+                                    new_clones.extend(second_event.pop('spawned_clones'))
+                                if 'extra_events' in second_event:
+                                    all_tick_events.extend(second_event.pop('extra_events'))
+                                second_event['is_double_cast'] = True
+                                all_tick_events.append(second_event)
+                                all_tick_events.append({
+                                    'type': 'double_cast',
+                                    'casterId': champ.id
+                                })
+                            champ.reset_attack_cooldown()
+                continue
+
             target = find_closest_target(champ, game['board_state'])
             if target:
                 dist = calculate_distance(champ.x, champ.y, target.x, target.y)
@@ -794,6 +1017,16 @@ def run_game_loop(room_name):
                                 if 'extra_events' in skill_event:
                                     all_tick_events.extend(skill_event.pop('extra_events'))
                                 all_tick_events.append(skill_event)
+
+                            # Bucciarati Trait: Schedule Double Cast after 1.0s (10 ticks)
+                            dc_chance = getattr(champ, 'double_cast_chance', 0.0)
+                            if dc_chance > 0 and random.random() < dc_chance and champ.is_alive and not getattr(champ, 'is_stunned', False) and not getattr(champ, 'is_banished', False):
+                                champ.pending_double_cast_ticks = 10
+                                all_tick_events.append({
+                                    'type': 'double_cast_charge',
+                                    'casterId': champ.id
+                                })
+
                             champ.reset_attack_cooldown()
                         else:
                             # 3. Normal attack — only gain mana if not mana-locked
@@ -872,15 +1105,28 @@ def run_game_loop(room_name):
 
             if game.get('bot'):
                 game['bot'].on_round_end(winner=winner, player_board=base_champions)
+            elif game.get('is_bot_vs_bot'):
+                b1_won = (winner == 'Team1')
+                b2_won = (winner == 'Team2')
+                game['bot1'].on_round_end(winner=('Team1' if b1_won else ('Team2' if b2_won else 'Draw')), player_board=base_champions)
+                game['bot2'].on_round_end(winner=('Team2' if b1_won else ('Team1' if b2_won else 'Draw')), player_board=base_champions)
 
             # Reset for next round
             game['ready_count'] = 0
             game['board_state'] = []
 
             p1_result = 'win' if winner == 'Team1' else ('loss' if winner == 'Team2' else 'draw')
-            socketio.emit('combat_end', {'result': p1_result}, to=game['player1'])
+            socketio.emit('combat_end', {
+                'result': p1_result,
+                'winner': winner,
+                'isBotVsBot': game.get('is_bot_vs_bot', False),
+                'p1_lp': game.get('p1_lp', 0),
+                'p2_lp': game.get('p2_lp', 0),
+                'bot1_name': game.get('p1_name', 'Bot 1'),
+                'bot2_name': game.get('p2_name', 'Bot 2')
+            }, to=game['player1'])
 
-            if not game.get('bot'):
+            if not game.get('bot') and not game.get('is_bot_vs_bot'):
                 p2_result = 'win' if winner == 'Team2' else ('loss' if winner == 'Team1' else 'draw')
                 socketio.emit('combat_end', {'result': p2_result}, to=game['player2'])
 

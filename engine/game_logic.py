@@ -23,7 +23,8 @@ class Champion:
     def __init__(self, id, name, team, x, y, hp, attack, attack_range, speed, max_mana,
                  star=1, skill=None, start_mana=0, active_buffs=None,
                  raw_hp=None, raw_attack=None, raw_range=None, raw_speed=None,
-                 raw_skill=None, applied_traits=None):
+                 raw_skill=None, applied_traits=None, mana_refund_ratio=0.0,
+                 double_cast_chance=0.0):
         self.id = id
         self.name = name
         self.team = team
@@ -42,6 +43,9 @@ class Champion:
         self.raw_speed = raw_speed if raw_speed is not None else speed
         self.mana = start_mana
         self.max_mana = max_mana if max_mana > 0 else 100
+        self.mana_refund_ratio = mana_refund_ratio
+        self.double_cast_chance = double_cast_chance
+        self.pending_double_cast_ticks = 0
         self.is_alive = True
         self.star = star
         self.attack_cooldown = 0
@@ -179,8 +183,14 @@ class Champion:
         return None
 
     # ------------------------------------------------------------------
-    def cast_skill(self, base_target, board_state):
-        self.mana = 0
+    def cast_skill(self, base_target, board_state, is_bonus_cast=False):
+        if not is_bonus_cast:
+            refund_ratio = getattr(self, 'mana_refund_ratio', 0.0)
+            refund = round(self.max_mana * refund_ratio) if refund_ratio > 0 else 0
+            self.mana = min(self.max_mana - 1, refund) if refund > 0 else 0
+        else:
+            refund = 0
+            refund_ratio = 0.0
         if not self.is_alive or self.is_stunned or self.is_banished:
             return None
 
@@ -211,6 +221,15 @@ class Champion:
             'radius': s_radius, 'duration': s_duration, 'power': s_power
         }
 
+        # Utility Trait: sự kiện hoàn trả mana sau khi tung chiêu
+        if refund > 0:
+            event.setdefault('extra_events', []).append({
+                'type': 'mana_refund',
+                'target_id': self.id,
+                'amount': refund,
+                'percent': int(round(refund_ratio * 100))
+            })
+
         # 1. TIME STOP
         if s_type == 'time_stop':
             for c in board_state:
@@ -223,20 +242,33 @@ class Champion:
 
         # 1.5. RETURN TO ZERO
         elif s_type == 'return_to_zero':
+            pct = float(self.skill.get('percent', 0.20))
+            if pct <= 0:
+                pct = 0.20
+            dmg = int(round(self.max_hp * pct))
             for c in board_state:
                 if c.team != self.team and c.is_alive:
                     c.mana = 0
                     for buff in c.active_buffs[:]:
                         bt = buff['type']
-                        if bt == 'buff_atk':               c.attack -= buff['power']
-                        elif bt == 'speed_buff':           c.speed  -= buff['power']
-                        elif bt == 'speed_debuff':         c.speed  += buff['power']
-                        elif bt == 'mind_control':         c.team    = buff.get('original_team', c.team)
-                        elif bt == 'banish':               c.is_banished   = False
-                        elif bt == 'submerge':             c.is_submerged  = False
-                        elif bt == 'stat_steal_victim':    c.attack += buff['power']
+                        if bt == 'buff_atk':                 c.attack -= buff['power']
+                        elif bt == 'speed_buff':             c.speed  -= buff['power']
+                        elif bt == 'speed_debuff':           c.speed  += buff['power']
+                        elif bt == 'mind_control':           c.team    = buff.get('original_team', c.team)
+                        elif bt == 'banish':                 c.is_banished   = False
+                        elif bt == 'submerge':               c.is_submerged  = False
+                        elif bt == 'stat_steal_victim':      c.attack += buff['power']
                         elif bt == 'stat_steal_beneficiary': c.attack = max(0, c.attack - buff['power'])
                         c.active_buffs.remove(buff)
+
+                    # Gây sát thương = 20% máu bản thân cho toàn địch
+                    actual_dmg, evs = c.take_damage(dmg, self, board_state)
+                    event.setdefault('extra_events', []).extend(evs)
+                    event.setdefault('extra_events', []).append({
+                        'type': 'aoe_damage_hit',
+                        'target_id': c.id,
+                        'damage': actual_dmg
+                    })
 
         # 2. BLINK STRIKE
         elif s_type == 'blink_strike' and target:
@@ -552,6 +584,8 @@ class Champion:
             'skill': getattr(self, 'skill', None),
             'raw_skill': getattr(self, 'raw_skill', None),
             'applied_traits': getattr(self, 'applied_traits', []),
+            'mana_refund_ratio': getattr(self, 'mana_refund_ratio', 0.0),
+            'double_cast_chance': getattr(self, 'double_cast_chance', 0.0),
             'buffs': [b['type'] for b in self.active_buffs],
             'buff_details': safe_buffs
         }

@@ -515,10 +515,10 @@ export function showDisplayInfo(type, data, shopContext = null) {
         let activeSynergiesHTML = '';
         if (data.applied_traits && data.applied_traits.length > 0) {
             activeSynergiesHTML = `
-                <div style="background: rgba(46, 204, 113, 0.15); border: 1px solid rgba(46, 204, 113, 0.4); border-left: 4px solid #2ecc71; padding: 7px 10px; margin: 8px 0; border-radius: 6px;">
-                    <p style="margin: 0 0 5px 0; color: #2ecc71; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">⚡ Active Synergies (In Combat):</p>
-                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                        ${data.applied_traits.map(t => `<span style="background: linear-gradient(135deg, #27ae60, #2ecc71); color: #ffffff; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">✓ ${t}</span>`).join('')}
+                <div style="background: rgba(46, 204, 113, 0.15); border: 1px solid rgba(46, 204, 113, 0.4); border-left: 4px solid #2ecc71; padding: 5px 8px; margin: 6px 0; border-radius: 6px;">
+                    <p style="margin: 0 0 4px 0; color: #2ecc71; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">⚡ Active Synergies (In Combat):</p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                        ${data.applied_traits.map(t => `<span style="background: linear-gradient(135deg, #27ae60, #2ecc71); color: #ffffff; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">✓ ${t}</span>`).join('')}
                     </div>
                 </div>
             `;
@@ -551,7 +551,12 @@ export function showDisplayInfo(type, data, shopContext = null) {
             switch (s.type) {
                 case 'damage': skillDesc = `Deals <b>${powerDisplay}</b> burst damage to the nearest enemy.`; break;
                 case 'time_stop': skillDesc = `Freezes time for all enemies for <b>${scaledDuration.toFixed(1)}s</b>. Self gains massive Attack Speed.`; break;
-                case 'return_to_zero': skillDesc = `Reverts all enemies' actions to zero, wiping their Mana and purging all active buffs instantly.`; break;
+                case 'return_to_zero': {
+                    const pct = s.percent ? s.percent : 0.20;
+                    const rtzDmg = Math.round(maxHp * pct);
+                    skillDesc = `Deals <b>${rtzDmg.toLocaleString()}</b> damage (<b>${Math.round(pct * 100)}% Max HP</b>) to ALL enemies, wiping their Mana to 0 and purging all active buffs instantly.`;
+                    break;
+                }
                 case 'blink_strike': skillDesc = `Teleports behind the furthest enemy and deals <b>${powerDisplay}</b> damage.`; break;
                 case 'execute': {
                     const execThreshold = (s.percent && s.percent > 0)
@@ -606,13 +611,13 @@ export function showDisplayInfo(type, data, shopContext = null) {
             const targetStr = targetMap[s.target] || 'The Target';
 
             skillHTML = `
-                <div style="background: rgba(142, 68, 173, 0.2); border-left: 4px solid #9b59b6; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                <div style="background: rgba(142, 68, 173, 0.2); border-left: 4px solid #9b59b6; padding: 7px 9px; margin: 6px 0; border-radius: 4px;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <p style="margin: 0; color: #e8daef; font-size: 15px; text-shadow: 1px 1px 2px black;">✨ <b>SKILL: ${skillName}</b></p>
-                        ${isSkillAmped ? `<span style="background:linear-gradient(135deg,#27ae60,#2ecc71); color:#fff; font-size:11px; font-weight:800; padding:2px 7px; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.4);">⚡ AMPED</span>` : ''}
+                        <p style="margin: 0; color: #e8daef; font-size: 14px; text-shadow: 1px 1px 2px black;">✨ <b>SKILL: ${skillName}</b></p>
+                        ${isSkillAmped ? `<span style="background:linear-gradient(135deg,#27ae60,#2ecc71); color:#fff; font-size:10px; font-weight:800; padding:1px 6px; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.4);">⚡ AMPED</span>` : ''}
                     </div>
-                    <p style="margin: 2px 0 5px 0; color: #e74c3c; font-size: 13px;">🎯 <b>Target:</b> ${targetStr}</p>
-                    <p style="margin: 5px 0 0 0; color: #d2b4de; font-size: 14px; font-style: italic;">${skillDesc}</p>
+                    <p style="margin: 2px 0 4px 0; color: #e74c3c; font-size: 12px;">🎯 <b>Target:</b> ${targetStr}</p>
+                    <p style="margin: 3px 0 0 0; color: #d2b4de; font-size: 13px; line-height: 1.3; font-style: italic;">${skillDesc}</p>
                 </div>
             `;
         }
@@ -620,7 +625,7 @@ export function showDisplayInfo(type, data, shopContext = null) {
         panel.innerHTML = `
             ${actionHeaderHTML}
             <h3 class="panel-title">${data.name} ${'⭐'.repeat(currentStar)}</h3>
-            ${imgSrc ? `<img src="${imgSrc}" style="width:100%; height:300px; object-fit:cover; border-radius:8px; border:2px solid #f39c12; margin-bottom:10px;">` : ''}
+            ${imgSrc ? `<img src="${imgSrc}" class="champ-info-img" alt="${data.name}">` : ''}
             <div class="card-stats">
                 ${activeSynergiesHTML}
                 ${traitsHTML}
@@ -631,7 +636,7 @@ export function showDisplayInfo(type, data, shopContext = null) {
                 <p>🎯 Range: ${rngDisplay}</p>
                 <p>⚡ Speed: ${spdDisplay}</p>
                 <p>💧 Mana: <b>${data.mana || 0} / ${maxMana}</b>${manaExtra}</p>
-                <p style="margin-top: 10px; border-top: 1px dashed #7f8c8d; padding-top: 10px;">🪙 Cost: <b>${champCost} Gold</b></p>
+                <p style="margin-top: 8px; border-top: 1px dashed #7f8c8d; padding-top: 8px;">🪙 Cost: <b>${champCost} Gold</b></p>
             </div>
         `;
 

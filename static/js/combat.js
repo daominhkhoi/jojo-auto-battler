@@ -571,20 +571,98 @@ export function syncTickData(data) {
                     spawnFloatingText(tarCenterX, tarCenterY - 30, '🌟 REVIVED!', 'status', { color: '#ffd700', scale: 1.4 });
                 }
             }
+        } else if (event.type === 'mana_refund') {
+            const target = STATE.champions.find(c => c.id === event.target_id || c.id === event.targetId);
+            if (target) {
+                const tarSize = getCanvasCoords(target.targetX, target.targetY);
+                const tarCenterX = (target.pixelX !== undefined ? target.pixelX : tarSize.x) + tarSize.w / 2;
+                const tarCenterY = (target.pixelY !== undefined ? target.pixelY : tarSize.y) + tarSize.h / 2;
+                spawnFloatingText(tarCenterX, tarCenterY - 35, `💧 +${event.percent}% MANA!`, 'status', { color: '#00d2d3', scale: 1.3 });
+            }
+        } else if (event.type === 'aoe_damage_hit') {
+            const target = STATE.champions.find(c => c.id === event.target_id || c.id === event.targetId);
+            if (target) {
+                target.shakeTimer = 25;
+                const tarSize = getCanvasCoords(target.targetX, target.targetY);
+                const tarCenterX = (target.pixelX !== undefined ? target.pixelX : tarSize.x) + tarSize.w / 2;
+                const tarCenterY = (target.pixelY !== undefined ? target.pixelY : tarSize.y) + tarSize.h / 2;
+                if (event.damage && event.damage > 0) {
+                    spawnFloatingText(tarCenterX, tarCenterY - 20, `💥 -${Math.round(event.damage).toLocaleString()}`, 'skill', { color: '#ffd700', scale: 1.35 });
+                }
+            }
+        } else if (event.type === 'double_cast_charge') {
+            const caster = STATE.champions.find(c => c.id === event.casterId || c.id === event.caster_id);
+            if (caster) {
+                const casSize = getCanvasCoords(caster.targetX, caster.targetY);
+                const casCenterX = (caster.pixelX !== undefined ? caster.pixelX : casSize.x) + casSize.w / 2;
+                const casCenterY = (caster.pixelY !== undefined ? caster.pixelY : casSize.y) + casSize.h / 2;
+                spawnFloatingText(casCenterX, casCenterY - 45, '⚡ DOUBLE CAST READY!', 'status', { color: '#f1c40f', scale: 1.25 });
+                if (!STATE.particles) STATE.particles = [];
+                for (let p = 0; p < 14; p++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const spd = Math.random() * 4 + 1.5;
+                    STATE.particles.push({
+                        x: casCenterX,
+                        y: casCenterY,
+                        vx: Math.cos(angle) * spd,
+                        vy: Math.sin(angle) * spd,
+                        color: '#f39c12',
+                        size: Math.random() * 3 + 2,
+                        life: 25
+                    });
+                }
+            }
+        } else if (event.type === 'double_cast') {
+            const caster = STATE.champions.find(c => c.id === event.casterId || c.id === event.caster_id);
+            if (caster) {
+                const casSize = getCanvasCoords(caster.targetX, caster.targetY);
+                const casCenterX = (caster.pixelX !== undefined ? caster.pixelX : casSize.x) + casSize.w / 2;
+                const casCenterY = (caster.pixelY !== undefined ? caster.pixelY : casSize.y) + casSize.h / 2;
+                spawnFloatingText(casCenterX, casCenterY - 50, '✨ DOUBLE CAST!', 'status', { color: '#ffd700', glowColor: '#e67e22', scale: 1.6 });
+            }
         }
     });
 }
 
 export function handleCombatEnd(serverResult) {
-    if (!STATE.isCombatPhase) return;
+    const res = typeof serverResult === 'object' ? serverResult.result : serverResult;
+    const winner = typeof serverResult === 'object' ? serverResult.winner : (res === 'win' ? 'Team1' : (res === 'loss' ? 'Team2' : 'draw'));
+
+    if (STATE.isBotVsBot) {
+        if (typeof serverResult === 'object' && serverResult.p1_lp !== undefined) {
+            STATE.playerLP = serverResult.p1_lp;
+            STATE.botLP = serverResult.p2_lp;
+        } else {
+            if (winner === 'Team1') STATE.playerLP += 1;
+            else if (winner === 'Team2') STATE.botLP += 1;
+        }
+
+        if (winner === 'Team1') {
+            showNotification(`🏆 ${STATE.bot1Name || 'Bot 1'} thắng round này!`);
+        } else if (winner === 'Team2') {
+            showNotification(`🏆 ${STATE.bot2Name || 'Bot 2'} thắng round này!`);
+        } else {
+            showNotification("TIME UP! Hai bot hòa nhau hiệp này!");
+        }
+
+        updateLpUI();
+        resetBoardForNextRound();
+        STATE.isCombatPhase = false;
+
+        const bvbTimer = document.getElementById('bvbTimerText');
+        if (bvbTimer) {
+            bvbTimer.innerText = "⏳ NGHỈ GIỮA HIỆP...";
+        }
+        return;
+    }
 
     // --- 1. USE SERVER REFEREE RESULT ---
-    if (serverResult === 'draw') {
+    if (res === 'draw') {
         showNotification("TIME UP! IT'S A DRAW! No points awarded.");
-    } else if (serverResult === 'win') {
+    } else if (res === 'win') {
         STATE.playerLP += 1;
         showNotification("Victory! You won this round!");
-    } else if (serverResult === 'loss') {
+    } else if (res === 'loss') {
         STATE.botLP += 1;
         showNotification("Defeat! Opponent won this round!");
     }
@@ -682,6 +760,13 @@ export function handleCombatEnd(serverResult) {
 }
 
 function resetBoardForNextRound() {
+    if (STATE.isBotVsBot) {
+        STATE.champions = [];
+        STATE.activeProjectiles = [];
+        STATE.hitEffects = [];
+        return;
+    }
+
     // Keep only the player's own units (have originalX set)
     STATE.champions = STATE.champions.filter(c => c.originalX !== undefined);
     STATE.champions.forEach(champ => {

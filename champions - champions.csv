@@ -33,7 +33,7 @@ Empress,1,78085,2462,1.0,0.83,120,"Tarot, Bound",dot,4500.0,,4.4,enemy_highest_a
 Enigma,1,61188,1530,3.0,0.96,100,"Morioh, Utility",banish,,,3.9,enemy_closest
 Foo Fighters,3,82500,3984,5.0,1.43,90,"Green Dolphin, Long-Distance",regen,4600.0,,10.0,self
 Geb,3,133089,4981,1.0,0.94,120,"Tarot, Bound",blink_strike,38000.0,,,enemy_furthest
-Gold Experience Requiem,5,170475,5990,4.0,1.2,100,"Requiem, Long-Distance",return_to_zero,,,,all_enemies
+Gold Experience Requiem,5,170475,5990,4.0,1.2,100,"Requiem, Long-Distance",return_to_zero,0.2,,,all_enemies
 Gold Experience,2,106559,3543,4.0,0.9,120,"Bucciarati, Power Type",aoe_heal,6800.0,2.1,5.6,ally_lowest_hp
 Goo Goo Dolls,1,52550,1819,3.0,0.93,80,"Green Dolphin, Phenomenon",polymorph,,,4.8,enemy_highest_atk
 Green Day,4,118711,5100,4.0,1.03,80,"Unita Speciale, Phenomenon",aoe_dot,6800.0,2.0,12.0,area_closest

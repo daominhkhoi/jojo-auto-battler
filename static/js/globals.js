@@ -100,11 +100,11 @@ export const TRAITS_INFO = {
         ]
     },
     "Bucciarati": {
-        desc: "The golden wind (Part 5).",
+        desc: "The golden wind (Part 5). Chance to cast skill twice and increased Skill Power.",
         thresholds: [
-            { req: 2, effect: "+30% Skill Power" },
-            { req: 4, effect: "+70% Skill Power" },
-            { req: 6, effect: "+130% Skill Power" }
+            { req: 2, effect: "+20% Skill Power & 33% Double Cast" },
+            { req: 4, effect: "+40% Skill Power & 66% Double Cast" },
+            { req: 6, effect: "+60% Skill Power & 100% Double Cast" }
         ]
     },
     "La Squadra": {
@@ -150,9 +150,9 @@ export const TRAITS_INFO = {
     "Long-Distance": {
         desc: "Ranged operation (Sniper).",
         thresholds: [
-            { req: 2, effect: "+1 Range, +20% Attack" },
-            { req: 4, effect: "+1 Range, +50% Attack" },
-            { req: 6, effect: "+1 Range, +100% Attack" }
+            { req: 2, effect: "+10% Attack & +25% Attack Speed" },
+            { req: 4, effect: "+20% Attack & +50% Attack Speed" },
+            { req: 6, effect: "+30% Attack & +75% Attack Speed" }
         ]
     },
     "Automatic": {
@@ -172,11 +172,11 @@ export const TRAITS_INFO = {
         ]
     },
     "Utility": {
-        desc: "Special abilities (Support).",
+        desc: "Support stands. (Only applies to Utility champions).",
         thresholds: [
-            { req: 2, effect: "+10.000 HP for ALL ALLIES" },
-            { req: 4, effect: "+25.000 HP for ALL ALLIES" },
-            { req: 6, effect: "+50.000 HP for ALL ALLIES" }
+            { req: 2, effect: "Recover 20% Max Mana after casting skill" },
+            { req: 4, effect: "Recover 40% Max Mana after casting skill" },
+            { req: 6, effect: "Recover 60% Max Mana after casting skill" }
         ]
     },
     "Bound": {
