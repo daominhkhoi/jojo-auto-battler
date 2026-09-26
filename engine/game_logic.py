@@ -242,9 +242,9 @@ class Champion:
 
         # 1.5. RETURN TO ZERO
         elif s_type == 'return_to_zero':
-            pct = float(self.skill.get('percent', 0.20))
+            pct = float(self.skill.get('percent', 0.10))
             if pct <= 0:
-                pct = 0.20
+                pct = 0.10
             dmg = int(round(self.max_hp * pct))
             for c in board_state:
                 if c.team != self.team and c.is_alive:

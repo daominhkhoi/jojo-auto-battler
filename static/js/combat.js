@@ -624,9 +624,74 @@ export function syncTickData(data) {
     });
 }
 
+let roundReviewInterval = null;
+
+export function cancelRoundReview() {
+    if (roundReviewInterval) {
+        clearInterval(roundReviewInterval);
+        roundReviewInterval = null;
+    }
+    hideRoundReviewBanner();
+    STATE.isRoundReview = false;
+    STATE.roundWinner = null;
+}
+
+function showRoundReviewBanner(title, subtitle, color, secondsLeft) {
+    let banner = document.getElementById('roundReviewBanner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'roundReviewBanner';
+        banner.style.position = 'fixed';
+        banner.style.top = '10%';
+        banner.style.left = '50%';
+        banner.style.transform = 'translateX(-50%)';
+        banner.style.zIndex = '9999';
+        banner.style.pointerEvents = 'none';
+        banner.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        document.body.appendChild(banner);
+    }
+
+    banner.innerHTML = `
+        <div style="background: rgba(13, 17, 23, 0.94); border: 2px solid ${color}; border-radius: 14px; padding: 16px 36px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.85), 0 0 25px ${color}55; backdrop-filter: blur(10px); min-width: 280px; max-width: 90vw;">
+            <div style="font-size: 28px; font-weight: 900; color: ${color}; text-shadow: 0 0 16px ${color}; letter-spacing: 1px; margin-bottom: 4px;">${title}</div>
+            <div style="font-size: 15px; color: #ecf0f1; font-weight: 500; margin-bottom: 10px; opacity: 0.9;">${subtitle}</div>
+            <div id="roundReviewTimerBadge" style="display: inline-block; background: rgba(255,255,255,0.12); color: #fff; font-size: 13px; font-weight: bold; padding: 4px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.25);">
+                ⏳ Reviewing battlefield... Next in <span id="roundReviewCountdownNum" style="color: ${color}; font-size: 16px; font-weight: 900;">${secondsLeft}s</span>
+            </div>
+        </div>
+    `;
+    banner.style.display = 'block';
+    banner.style.opacity = '1';
+    banner.style.transform = 'translateX(-50%) scale(1)';
+}
+
+function updateRoundReviewCountdown(secondsLeft) {
+    const numEl = document.getElementById('roundReviewCountdownNum');
+    if (numEl) {
+        numEl.innerText = `${secondsLeft}s`;
+    }
+}
+
+function hideRoundReviewBanner() {
+    const banner = document.getElementById('roundReviewBanner');
+    if (banner) {
+        banner.style.opacity = '0';
+        banner.style.transform = 'translateX(-50%) scale(0.95)';
+        setTimeout(() => {
+            if (banner) banner.style.display = 'none';
+        }, 300);
+    }
+}
+
 export function handleCombatEnd(serverResult) {
+    cancelRoundReview();
+
     const res = typeof serverResult === 'object' ? serverResult.result : serverResult;
     const winner = typeof serverResult === 'object' ? serverResult.winner : (res === 'win' ? 'Team1' : (res === 'loss' ? 'Team2' : 'draw'));
+
+    STATE.isCombatPhase = false;
+    STATE.isRoundReview = true;
+    STATE.roundWinner = winner;
 
     if (STATE.isBotVsBot) {
         if (typeof serverResult === 'object' && serverResult.p1_lp !== undefined) {
@@ -637,38 +702,109 @@ export function handleCombatEnd(serverResult) {
             else if (winner === 'Team2') STATE.botLP += 1;
         }
 
+        const bot1 = STATE.bot1Name || 'Bot 1';
+        const bot2 = STATE.bot2Name || 'Bot 2';
+        let title = "⚔️ ROUND DRAW!";
+        let subtitle = `Both bots fought to a draw (${STATE.playerLP} - ${STATE.botLP})`;
+        let color = "#f39c12";
+
         if (winner === 'Team1') {
-            showNotification(`🏆 ${STATE.bot1Name || 'Bot 1'} thắng round này!`);
+            title = `🏆 ${bot1.toUpperCase()} WINS ROUND!`;
+            subtitle = `${bot1} won this round (${STATE.playerLP} - ${STATE.botLP})`;
+            color = "#2ecc71";
+            showNotification(`🏆 ${bot1} wins this round!`, "success");
         } else if (winner === 'Team2') {
-            showNotification(`🏆 ${STATE.bot2Name || 'Bot 2'} thắng round này!`);
+            title = `🏆 ${bot2.toUpperCase()} WINS ROUND!`;
+            subtitle = `${bot2} won this round (${STATE.playerLP} - ${STATE.botLP})`;
+            color = "#e74c3c";
+            showNotification(`🏆 ${bot2} wins this round!`, "success");
         } else {
-            showNotification("TIME UP! Hai bot hòa nhau hiệp này!");
+            showNotification("TIME UP! Round Draw between both bots!", "info");
         }
 
         updateLpUI();
-        resetBoardForNextRound();
-        STATE.isCombatPhase = false;
 
         const bvbTimer = document.getElementById('bvbTimerText');
         if (bvbTimer) {
-            bvbTimer.innerText = "⏳ NGHỈ GIỮA HIỆP...";
+            bvbTimer.style.display = 'inline-block';
+            bvbTimer.innerText = "⏳ ROUND OVER (Review: 5s)...";
+        }
+
+        showRoundReviewBanner(title, subtitle, color, 5);
+
+        let secondsLeft = 5;
+        roundReviewInterval = setInterval(() => {
+            secondsLeft--;
+            if (secondsLeft > 0) {
+                updateRoundReviewCountdown(secondsLeft);
+                if (bvbTimer) {
+                    bvbTimer.innerText = `⏳ ROUND OVER (Review: ${secondsLeft}s)...`;
+                }
+            } else {
+                clearInterval(roundReviewInterval);
+                roundReviewInterval = null;
+                finishRoundReview(serverResult);
+            }
+        }, 1000);
+        return;
+    }
+
+    // --- NORMAL GAME (PvP / PvE with Bot) ---
+    if (res === 'draw') {
+        showNotification("TIME UP! IT'S A DRAW! No points awarded.", "info");
+    } else if (res === 'win') {
+        STATE.playerLP += 1;
+        showNotification("Victory! You won this round!", "success");
+    } else if (res === 'loss') {
+        STATE.botLP += 1;
+        showNotification("Defeat! Opponent won this round!", "error");
+    }
+    updateLpUI();
+
+    let title = "⚔️ ROUND DRAW!";
+    let subtitle = "Time up! No points awarded.";
+    let color = "#f39c12";
+
+    if (res === 'win') {
+        title = "🏆 ROUND VICTORY!";
+        subtitle = `You won this round (${STATE.playerLP} - ${STATE.botLP})`;
+        color = "#2ecc71";
+    } else if (res === 'loss') {
+        title = "💀 ROUND DEFEAT!";
+        subtitle = `Opponent won this round (${STATE.playerLP} - ${STATE.botLP})`;
+        color = "#e74c3c";
+    }
+
+    showRoundReviewBanner(title, subtitle, color, 5);
+
+    let secondsLeft = 5;
+    roundReviewInterval = setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft > 0) {
+            updateRoundReviewCountdown(secondsLeft);
+        } else {
+            clearInterval(roundReviewInterval);
+            roundReviewInterval = null;
+            finishRoundReview(serverResult);
+        }
+    }, 1000);
+}
+
+function finishRoundReview(serverResult) {
+    STATE.isRoundReview = false;
+    STATE.roundWinner = null;
+    hideRoundReviewBanner();
+
+    resetBoardForNextRound();
+
+    if (STATE.isBotVsBot) {
+        const bvbTimer = document.getElementById('bvbTimerText');
+        if (bvbTimer) {
+            bvbTimer.innerText = "⏳ PREPARING NEXT ROUND...";
         }
         return;
     }
 
-    // --- 1. USE SERVER REFEREE RESULT ---
-    if (res === 'draw') {
-        showNotification("TIME UP! IT'S A DRAW! No points awarded.");
-    } else if (res === 'win') {
-        STATE.playerLP += 1;
-        showNotification("Victory! You won this round!");
-    } else if (res === 'loss') {
-        STATE.botLP += 1;
-        showNotification("Defeat! Opponent won this round!");
-    }
-
-    updateLpUI();
-    resetBoardForNextRound();
     refreshShop();
     STATE.isCombatPhase = false;
 
@@ -689,13 +825,13 @@ export function handleCombatEnd(serverResult) {
         overlay.style.position = 'fixed';
         overlay.style.top = '0'; overlay.style.left = '0';
         overlay.style.width = '100vw'; overlay.style.height = '100vh';
-        overlay.style.backgroundColor = 'rgba(0,0,0,0.85)'; // 85% opacity dark backdrop
+        overlay.style.backgroundColor = 'rgba(0,0,0,0.85)';
         overlay.style.color = isWinner ? '#f1c40f' : '#e74c3c';
         overlay.style.display = 'flex';
         overlay.style.flexDirection = 'column';
         overlay.style.justifyContent = 'center';
         overlay.style.alignItems = 'center';
-        overlay.style.zIndex = '9999'; // High z-index overlay
+        overlay.style.zIndex = '9999';
 
         overlay.innerHTML = `
             <div style="background: rgba(20, 24, 33, 0.95); border: 2px solid ${isWinner ? '#f1c40f' : '#e74c3c'}; border-radius: 16px; padding: 40px 50px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.8); max-width: 90%;">
@@ -754,9 +890,11 @@ export function handleCombatEnd(serverResult) {
             readyBtn.innerText = "READY";
             readyBtn.style.backgroundColor = "#2ecc71";
             readyBtn.disabled = false;
+            readyBtn.classList.remove('active');
         }
         startPrepTimer();
     }
+}
 }
 
 function resetBoardForNextRound() {

@@ -43,9 +43,8 @@ export function renderBoard(ctx, canvas) {
 
     // 2. VẼ LỚP THẺ BÀI (DƯỚI CÙNG)
     STATE.champions.forEach(champ => {
-        if (!champ.is_alive && champ.hp <= 0) return;
-
         const currentSize = getCanvasCoords(champ.targetX, champ.targetY);
+        if (!currentSize) return;
 
         let shakeX = 0; let shakeY = 0;
         if (champ.shakeTimer > 0) {
@@ -54,10 +53,31 @@ export function renderBoard(ctx, canvas) {
             shakeY = (Math.random() - 0.5) * 2 * intensity;
         }
 
-        const pX = champ.pixelX + shakeX;
-        const pY = champ.pixelY + shakeY;
+        const pX = (champ.pixelX !== undefined ? champ.pixelX : currentSize.x) + shakeX;
+        const pY = (champ.pixelY !== undefined ? champ.pixelY : currentSize.y) + shakeY;
         const centerX = pX + currentSize.w / 2;
         const centerY = pY + currentSize.h / 2;
+
+        if (!champ.is_alive && champ.hp <= 0) {
+            // Draw fallen unit ghosted with skull so players can see who fell
+            ctx.save();
+            ctx.globalAlpha = 0.28;
+            ctx.filter = 'grayscale(100%)';
+            const img = IMAGE_CACHE[champ.name];
+            if (img) {
+                ctx.drawImage(img, pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
+            } else {
+                ctx.fillStyle = '#2c3e50';
+                ctx.fillRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
+            }
+            ctx.filter = 'none';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('💀', centerX, centerY);
+            ctx.restore();
+            return;
+        }
 
         ctx.globalAlpha = (champ.buffs && champ.buffs.includes('submerge')) ? 0.3 : 1.0;
 
@@ -103,10 +123,23 @@ export function renderBoard(ctx, canvas) {
         // Xác định team của người chơi hiện tại một cách cố định và chuẩn xác tuyệt đối từ STATE.myTeam
         const myTeam = STATE.myTeam || 'Team1';
         // - Khi chuẩn bị (chưa vào combat): Mọi tướng trên sân và hàng chờ của mình đều là đồng minh (Xanh).
-        // - Khi đang combat: Tướng nào cùng phe myTeam là đồng minh (Xanh), ngược lại là đối thủ (Đỏ).
-        const isAlly = (!STATE.isCombatPhase && (champ.originalX !== undefined || champ.targetY >= 6))
+        // - Khi đang combat / review: Tướng nào cùng phe myTeam là đồng minh (Xanh), ngược lại là đối thủ (Đỏ).
+        const isAlly = (!STATE.isCombatPhase && !STATE.isRoundReview && (champ.originalX !== undefined || champ.targetY >= 6))
             ? true
             : (champ.team === myTeam);
+
+        // VICTORY CROWN FOR SURVIVING WINNERS DURING ROUND REVIEW
+        if (STATE.isRoundReview && STATE.roundWinner && champ.is_alive && champ.hp > 0) {
+            const isWinnerUnit = champ.team === STATE.roundWinner;
+            if (isWinnerUnit) {
+                ctx.save();
+                ctx.font = '22px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText('👑', centerX, pY - 4);
+                ctx.restore();
+            }
+        }
 
         // VẼ HÀO QUANG CHO TƯỚNG 2⭐ VÀ 3⭐ (GODLY STAR AURA)
         const starCount = champ.star || 1;

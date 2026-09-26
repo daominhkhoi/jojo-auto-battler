@@ -90,7 +90,7 @@ function handlePointerDown(e) {
     const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
 
     if (touchedChamp) {
-        if (!STATE.isCombatPhase && !STATE.isBotVsBot) {
+        if (!STATE.isCombatPhase && !STATE.isRoundReview && !STATE.isBotVsBot) {
             isDragging = true;
             draggedChamp = touchedChamp;
             originalX = touchedChamp.targetX;

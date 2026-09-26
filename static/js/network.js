@@ -54,7 +54,7 @@ socket.on('match_found', (data) => {
         const bvbTimer = document.getElementById('bvbTimerText');
         if (bvbTimer) {
             bvbTimer.style.display = 'inline-block';
-            bvbTimer.innerText = "⏳ CHUẨN BỊ HIỆP 1: 10s";
+            bvbTimer.innerText = "⏳ ROUND 1 IN: 10s";
         }
 
         const buyXpBtn = document.getElementById('buyXpBtn');
@@ -62,7 +62,7 @@ socket.on('match_found', (data) => {
         const rollBtn = document.getElementById('rollBtn');
         if (rollBtn) rollBtn.style.display = 'none';
 
-        showNotification(`🤖 ĐANG XEM: ${STATE.bot1Name} ⚔️ ${STATE.bot2Name}!`, "info");
+        showNotification(`🤖 SPECTATING: ${STATE.bot1Name} ⚔️ ${STATE.bot2Name}!`, "info");
         return;
     }
 
@@ -133,7 +133,15 @@ socket.on('opponent_disconnected', () => {
 });
 
 socket.on('match_locked', () => {
-    showNotification("Both ready! 5s to inspect opponent!");
+    if (STATE.isBotVsBot) {
+        showNotification("🔒 Battlefield locked! Starting combat...", "info");
+        const bvbTimer = document.getElementById('bvbTimerText');
+        if (bvbTimer) {
+            bvbTimer.innerText = "🔒 LOCKED - FIGHT!";
+        }
+    } else {
+        showNotification("Both ready! 5s to inspect opponent!");
+    }
 });
 
 let prepTimerInterval;
@@ -180,6 +188,13 @@ let combatTimerInterval;
 socket.on('combat_start', () => {
     showNotification("FIGHT!");
 
+    if (STATE.isBotVsBot) {
+        const bvbTimer = document.getElementById('bvbTimerText');
+        if (bvbTimer) {
+            bvbTimer.innerText = "⚔️ BATTLE IN PROGRESS";
+        }
+    }
+
     let timeElapsed = 0;
     const timerText = document.getElementById('timerText');
     if (timerText) {
@@ -212,6 +227,11 @@ socket.on('combat_end', (data) => {
 
 socket.on('bvb_round_prep', (data) => {
     STATE.isCombatPhase = false;
+    STATE.isRoundReview = false;
+    import('./combat.js').then(module => {
+        if (module.cancelRoundReview) module.cancelRoundReview();
+    });
+
     STATE.playerLP = data.p1_lp || 0;
     STATE.botLP = data.p2_lp || 0;
     STATE.currentRound = data.round || 1;
@@ -270,19 +290,26 @@ socket.on('bvb_round_prep', (data) => {
         bvbTimer.style.display = 'inline-block';
         bvbTimer.innerText = `⏳ ROUND ${data.round} IN: 10s`;
     }
-    showNotification(`🤖 Hiệp ${data.round}: ${STATE.bot1Name} ⚔️ ${STATE.bot2Name} (Chuẩn bị 10s)`, "info");
+    showNotification(`🤖 Round ${data.round}: ${STATE.bot1Name} ⚔️ ${STATE.bot2Name} (10s Prep)`, "info");
 });
 
 socket.on('bvb_countdown_tick', (data) => {
     const bvbTimer = document.getElementById('bvbTimerText');
     if (bvbTimer) {
         bvbTimer.style.display = 'inline-block';
-        bvbTimer.innerText = `⏳ BẮT ĐẦU SAU: ${data.seconds}s`;
+        if (data.seconds === 0) {
+            bvbTimer.innerText = "⚔️ STARTING IN: 0s";
+        } else {
+            bvbTimer.innerText = `⏳ STARTING IN: ${data.seconds}s`;
+        }
     }
 });
 
 socket.on('bvb_game_over', (data) => {
-    showNotification(`🏆 TRẬN ĐẤU KẾT THÚC! ${data.winner} ĐÃ CHIẾN THẮNG CHUNG CUỘC!`, "success");
+    import('./combat.js').then(module => {
+        if (module.cancelRoundReview) module.cancelRoundReview();
+    });
+    showNotification(`🏆 MATCH OVER! ${data.winner} WON THE MATCH!`, "success");
     const bvbTimer = document.getElementById('bvbTimerText');
     if (bvbTimer) {
         bvbTimer.innerText = `🏆 WINNER: ${data.winner}`;

@@ -552,7 +552,7 @@ export function showDisplayInfo(type, data, shopContext = null) {
                 case 'damage': skillDesc = `Deals <b>${powerDisplay}</b> burst damage to the nearest enemy.`; break;
                 case 'time_stop': skillDesc = `Freezes time for all enemies for <b>${scaledDuration.toFixed(1)}s</b>. Self gains massive Attack Speed.`; break;
                 case 'return_to_zero': {
-                    const pct = s.percent ? s.percent : 0.20;
+                    const pct = s.percent ? s.percent : 0.10;
                     const rtzDmg = Math.round(maxHp * pct);
                     skillDesc = `Deals <b>${rtzDmg.toLocaleString()}</b> damage (<b>${Math.round(pct * 100)}% Max HP</b>) to ALL enemies, wiping their Mana to 0 and purging all active buffs instantly.`;
                     break;

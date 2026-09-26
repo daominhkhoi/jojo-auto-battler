@@ -611,8 +611,8 @@ def _create_bot_vs_bot_game(player_id, player_name):
                 'seconds': 10
             }, to=player_id)
 
-            # 10s countdown between rounds as requested by user
-            for sec_left in range(10, 0, -1):
+            # 10s countdown between rounds as requested by user (10 down to 0)
+            for sec_left in range(10, -1, -1):
                 if game.get('aborted'):
                     return
                 socketio.emit('bvb_countdown_tick', {'seconds': sec_left}, to=player_id)
@@ -623,9 +623,10 @@ def _create_bot_vs_bot_game(player_id, player_name):
 
             # Lock inspection for 2s
             socketio.emit('match_locked', to=room_name)
-            socketio.sleep(2.0)
-            if game.get('aborted'):
-                return
+            for _ in range(20):
+                if game.get('aborted'):
+                    return
+                socketio.sleep(0.1)
 
             # Start combat
             socketio.emit('combat_start', to=room_name)
@@ -634,8 +635,13 @@ def _create_bot_vs_bot_game(player_id, player_name):
             if game.get('aborted'):
                 return
 
+            # 5s post-round review delay so spectators can visually inspect the battlefield
+            for _ in range(50):
+                if game.get('aborted'):
+                    return
+                socketio.sleep(0.1)
+
             game['round_number'] = round_num + 1
-            socketio.sleep(2.0)
 
     socketio.start_background_task(bot_vs_bot_match_flow)
 
