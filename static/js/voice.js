@@ -14,7 +14,7 @@ let analyserNode = null;
 let sourceNode = null;
 let peerConnection = null;
 
-let isMicMuted = false;
+let isMicMuted = true; // Mặc định tắt micro để tôn trọng quyền riêng tư
 let isAudioDeafened = false;
 let isVoiceInitialized = false;
 let isBotMatch = false;
@@ -45,6 +45,9 @@ export function initVoiceChat() {
         audioBtn.addEventListener('click', handleAudioButtonClick);
     }
 
+    // Set initial UI state (Muted by default)
+    updateMicUi(isMicMuted);
+
     // Listen for WebRTC signals from opponent
     socket.on('voice_signal', handleIncomingVoiceSignal);
 
@@ -55,7 +58,7 @@ export function initVoiceChat() {
 // ==========================================
 // MICROPHONE ACCESS & AUDIO ANALYZER
 // ==========================================
-async function startMicrophone() {
+async function startMicrophone(initialUnmute = false) {
     if (localStream) return true;
 
     try {
@@ -85,9 +88,27 @@ async function startMicrophone() {
             sourceNode.connect(analyserNode);
         }
 
+        if (initialUnmute) {
+            isMicMuted = false;
+        }
+
+        // Apply muted state to stream tracks (muted by default)
+        localStream.getAudioTracks().forEach(track => {
+            track.enabled = !isMicMuted;
+        });
+
+        // If peer connection is already active, attach tracks
+        if (peerConnection) {
+            const senders = peerConnection.getSenders();
+            localStream.getAudioTracks().forEach(track => {
+                if (!senders.some(s => s.track === track)) {
+                    peerConnection.addTrack(track, localStream);
+                }
+            });
+        }
+
         isVoiceInitialized = true;
         updateMicUi(isMicMuted);
-        showNotification("Micro đã sẵn sàng! Bạn có thể nói để test âm lượng.");
         return true;
     } catch (err) {
         console.warn("[Voice] Microphone access failed or denied:", err);
@@ -159,10 +180,12 @@ function startMeterLoop() {
 // CONTROLS: MIC & SPEAKER BUTTONS
 // ==========================================
 async function handleMicButtonClick() {
-    // If mic not yet permitted / started, request it on first click
+    // If mic not yet permitted / started, request it and unmute
     if (!localStream) {
-        const success = await startMicrophone();
+        const success = await startMicrophone(true);
         if (!success) return;
+        showNotification("Micro: ĐÃ BẬT (Unmuted)");
+        return;
     }
 
     isMicMuted = !isMicMuted;
@@ -170,6 +193,15 @@ async function handleMicButtonClick() {
     if (localStream) {
         localStream.getAudioTracks().forEach(track => {
             track.enabled = !isMicMuted;
+        });
+    }
+
+    if (peerConnection && localStream) {
+        const senders = peerConnection.getSenders();
+        localStream.getAudioTracks().forEach(track => {
+            if (!senders.some(s => s.track === track)) {
+                peerConnection.addTrack(track, localStream);
+            }
         });
     }
 
@@ -245,11 +277,7 @@ export async function onMatchFoundVoice(matchData) {
 
     console.log("[Voice] PVP Match found! Initiating WebRTC connection, isInitiator:", matchData.isInitiator);
 
-    // If local stream isn't active yet, try activating it silently
-    if (!localStream) {
-        await startMicrophone();
-    }
-
+    // Setup WebRTC connection (tracks will be sent if mic is enabled)
     setupPeerConnection(matchData.isInitiator);
 }
 
