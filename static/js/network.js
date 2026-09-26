@@ -26,7 +26,11 @@ socket.on('match_found', (data) => {
     if (pText) pText.innerText = "0/10";
     if (bText) bText.innerText = "0/10";
 
-    showNotification(`Match found with ${data.opponentName}!`);
+    if (data.isBot) {
+        showNotification(`🤖 Đang đấu với BOT (${data.opponentName})! (Voice chat 1-1 mở khi ghép với người)`, "info");
+    } else {
+        showNotification(`🎮 ĐÃ GHÉP NỐI 1-1 VỚI ${data.opponentName}! Voice Chat P2P sẵn sàng.`, "success");
+    }
 
     // Initialize WebRTC voice chat connection for this match
     onMatchFoundVoice(data);
@@ -159,6 +163,7 @@ socket.on('combat_end', (data) => {
 // CLIENT EMIT FUNCTIONS
 // ==========================================
 export function findMatch() {
+    closePeerConnection();
     const nameInput = document.getElementById('playerNameInput');
     const pName = nameInput && nameInput.value.trim() !== "" ? nameInput.value.trim() : "Player";
     try { localStorage.setItem('savedPlayerName', pName); } catch (e) {}
@@ -179,6 +184,7 @@ export function findMatch() {
 }
 
 export function playVsBot() {
+    closePeerConnection();
     const nameInput = document.getElementById('playerNameInput');
     const pName = nameInput && nameInput.value.trim() !== "" ? nameInput.value.trim() : "Player";
     try { localStorage.setItem('savedPlayerName', pName); } catch (e) {}

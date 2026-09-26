@@ -116,6 +116,43 @@ html {
     vertical-align: middle;
     user-select: none;
     flex-shrink: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.voice-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.28);
+    transition: all 0.3s ease;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+    flex-shrink: 0;
+}
+
+.voice-widget.connecting {
+    border-color: rgba(255, 165, 2, 0.5) !important;
+}
+
+.voice-widget.connecting .voice-status-dot {
+    background: #ffa502;
+    box-shadow: 0 0 8px #ffa502;
+    animation: voice-pulse 1.2s infinite ease-in-out;
+}
+
+.voice-widget.connected {
+    border-color: rgba(46, 213, 115, 0.7) !important;
+    box-shadow: 0 0 16px rgba(46, 213, 115, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+}
+
+.voice-widget.connected .voice-status-dot {
+    background: #2ed573;
+    box-shadow: 0 0 10px #2ed573;
+    animation: voice-pulse 2s infinite ease-in-out;
+}
+
+@keyframes voice-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.95; }
+    50% { transform: scale(1.35); opacity: 0.4; }
 }
 
 .voice-btn {

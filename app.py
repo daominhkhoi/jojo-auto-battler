@@ -414,14 +414,15 @@ def handle_find_match(data=None):
             socketio.emit('match_found', {'room': room_name, 'opponentName': p2['name'], 'isInitiator': True, 'isBot': False, 'your_team': 'Team1'}, to=p1['sid'])
             socketio.emit('match_found', {'room': room_name, 'opponentName': p1['name'], 'isInitiator': False, 'isBot': False, 'your_team': 'Team2'}, to=p2['sid'])
         else:
-            # Auto-fallback to smart bot after 3.5s so players never wait forever alone
+            # Wait up to 25s for human opponent in PVP queue before falling back to bot
             def bot_fallback_timer(pid, pname):
-                socketio.sleep(3.5)
+                socketio.sleep(25.0)
                 with _matchmaking_lock:
                     global waiting_players
                     match_candidate = next((p for p in waiting_players if p['sid'] == pid), None)
                     if match_candidate:
                         waiting_players = [p for p in waiting_players if p['sid'] != pid]
+                        print(f"[SEARCH] No opponent after 25s for {pname}, falling back to SmartBot.")
                         _create_bot_game(pid, pname)
 
             socketio.start_background_task(bot_fallback_timer, player_id, player_name)
@@ -434,14 +435,20 @@ def handle_voice_signal(data):
     """
     room_name = data.get('room')
     signal_data = data.get('signal')
-    if not room_name or not signal_data:
-        return
-
-    game = games.get(room_name)
-    if not game:
+    if not signal_data:
         return
 
     sender_id = request.sid
+    game = games.get(room_name) if room_name else None
+    if not game:
+        # Fallback: search active games by sender's socket ID
+        for g in games.values():
+            if g.get('player1') == sender_id or g.get('player2') == sender_id:
+                game = g
+                break
+    if not game:
+        return
+
     recipient_id = game['player2'] if game['player1'] == sender_id else game['player1']
     if recipient_id and not str(recipient_id).startswith('bot_'):
         socketio.emit('voice_signal', {

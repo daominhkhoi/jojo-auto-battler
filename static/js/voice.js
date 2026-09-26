@@ -64,15 +64,18 @@ function attachLocalTracksToPeer() {
     if (!audioTrack) return;
 
     const senders = peerConnection.getSenders();
-    const audioSender = senders.find(s => s.track?.kind === 'audio') || senders[0];
+    const audioSender = senders.find(s => (s.track && s.track.kind === 'audio') || (!s.track && s.kind === 'audio')) || senders[0];
     if (audioSender && typeof audioSender.replaceTrack === 'function') {
-        audioSender.replaceTrack(audioTrack).catch(err => {
+        audioSender.replaceTrack(audioTrack).then(() => {
+            console.log("[Voice] Attached audio track via replaceTrack.");
+        }).catch(err => {
             console.warn("[Voice] replaceTrack error:", err);
         });
     } else {
         try {
             if (!senders.some(s => s.track === audioTrack)) {
                 peerConnection.addTrack(audioTrack, localStream);
+                console.log("[Voice] Attached audio track via addTrack.");
             }
         } catch (e) {
             console.warn("[Voice] addTrack error:", e);
@@ -296,12 +299,61 @@ function handleAudioButtonClick() {
 // ==========================================
 // WEBRTC PEER CONNECTION (PvP VOICE STREAM)
 // ==========================================
+let pendingIceCandidates = [];
+let hasNotifiedConnected = false;
+
+function updateVoiceConnectionUi(state) {
+    const widget = document.getElementById('voiceWidget');
+    const dot = document.getElementById('voiceStatusDot');
+    if (!widget || !dot) return;
+
+    if (state === 'connected') {
+        widget.classList.add('connected');
+        widget.classList.remove('connecting');
+        dot.title = "Voice P2P 1-1: ĐÃ KẾT NỐI (Sẵn sàng đàm thoại)";
+        if (!hasNotifiedConnected) {
+            showNotification("🎙️ Voice Chat P2P: ĐÃ KẾT NỐI 1-1 THÀNH CÔNG!", "success");
+            hasNotifiedConnected = true;
+        }
+    } else if (state === 'connecting') {
+        widget.classList.remove('connected');
+        widget.classList.add('connecting');
+        dot.title = "Voice P2P 1-1: Đang thiết lập kết nối...";
+    } else {
+        widget.classList.remove('connected');
+        widget.classList.remove('connecting');
+        if (isBotMatch) {
+            dot.title = "Đấu với Bot (Local Mic Test)";
+        } else {
+            dot.title = "Voice P2P 1-1: Chưa kết nối";
+        }
+    }
+}
+
+async function drainPendingIceCandidates() {
+    if (!peerConnection || !peerConnection.remoteDescription) return;
+    if (pendingIceCandidates.length === 0) return;
+
+    console.log(`[Voice] Draining ${pendingIceCandidates.length} buffered ICE candidate(s)...`);
+    while (pendingIceCandidates.length > 0) {
+        const candidate = pendingIceCandidates.shift();
+        try {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            console.log("[Voice] Added buffered ICE candidate successfully.");
+        } catch (err) {
+            console.warn("[Voice] Failed to add buffered ICE candidate:", err);
+        }
+    }
+}
+
 export async function onMatchFoundVoice(matchData) {
     isBotMatch = !!matchData.isBot;
 
     // In Bot matches, mic is strictly in Local Mic Test mode (VU meter works, no WebRTC overhead)
     if (isBotMatch) {
-        console.log("[Voice] Match is VS BOT. Local Mic Test active.");
+        console.log("[Voice] Match is VS BOT. Local Mic Test active, WebRTC peer connection disabled.");
+        closePeerConnection();
+        updateVoiceConnectionUi('bot');
         return;
     }
 
@@ -313,6 +365,9 @@ export async function onMatchFoundVoice(matchData) {
 
 function setupPeerConnection(isInitiator) {
     closePeerConnection();
+    pendingIceCandidates = [];
+    hasNotifiedConnected = false;
+    updateVoiceConnectionUi('connecting');
 
     try {
         peerConnection = new RTCPeerConnection(RTC_CONFIG);
@@ -331,12 +386,26 @@ function setupPeerConnection(isInitiator) {
 
         // Receive remote opponent's audio track
         peerConnection.ontrack = (event) => {
-            console.log("[Voice] Received remote audio track from opponent.");
+            console.log("[Voice] Received remote audio track from opponent:", event.track);
             const remoteAudio = document.getElementById('remoteVoiceAudio');
-            if (remoteAudio && event.streams && event.streams[0]) {
-                remoteAudio.srcObject = event.streams[0];
+            if (remoteAudio) {
+                const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+                remoteAudio.srcObject = stream;
                 remoteAudio.muted = isAudioDeafened;
-                remoteAudio.play().catch(e => console.warn("[Voice] Remote audio play error:", e));
+
+                const playPromise = remoteAudio.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.warn("[Voice] Remote audio autoplay blocked by browser policy:", error);
+                        const unlockAudio = () => {
+                            remoteAudio.play().catch(e => console.warn("[Voice] Playback retry error:", e));
+                            document.removeEventListener('click', unlockAudio);
+                            document.removeEventListener('touchstart', unlockAudio);
+                        };
+                        document.addEventListener('click', unlockAudio, { once: true });
+                        document.addEventListener('touchstart', unlockAudio, { once: true });
+                    });
+                }
             }
         };
 
@@ -353,8 +422,18 @@ function setupPeerConnection(isInitiator) {
             }
         };
 
+        peerConnection.onconnectionstatechange = () => {
+            const state = peerConnection ? peerConnection.connectionState : 'closed';
+            console.log("[Voice] PeerConnection State changed:", state);
+            updateVoiceConnectionUi(state);
+        };
+
         peerConnection.oniceconnectionstatechange = () => {
-            console.log("[Voice] ICE Connection State:", peerConnection?.iceConnectionState);
+            const iceState = peerConnection ? peerConnection.iceConnectionState : 'closed';
+            console.log("[Voice] ICE Connection State changed:", iceState);
+            if (iceState === 'disconnected' || iceState === 'failed') {
+                updateVoiceConnectionUi(iceState);
+            }
         };
 
         // If this player is the designated initiator (Player 1), create offer
@@ -374,6 +453,7 @@ function setupPeerConnection(isInitiator) {
         }
     } catch (err) {
         console.error("[Voice] Error setting up RTCPeerConnection:", err);
+        updateVoiceConnectionUi('failed');
     }
 }
 
@@ -392,15 +472,11 @@ async function handleIncomingVoiceSignal(data) {
             }
 
             await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+            await drainPendingIceCandidates();
 
-            // Ensure local mic tracks are added
+            // Ensure local mic tracks are attached if active
             if (localStream) {
-                localStream.getAudioTracks().forEach(track => {
-                    const senders = peerConnection.getSenders();
-                    if (!senders.some(s => s.track === track)) {
-                        peerConnection.addTrack(track, localStream);
-                    }
-                });
+                attachLocalTracksToPeer();
             }
 
             const answer = await peerConnection.createAnswer();
@@ -418,11 +494,21 @@ async function handleIncomingVoiceSignal(data) {
             console.log("[Voice] Received WebRTC answer from opponent.");
             if (peerConnection) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                await drainPendingIceCandidates();
             }
         }
         else if (signal.type === 'candidate') {
-            if (peerConnection && signal.candidate) {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            if (signal.candidate) {
+                if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+                    try {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                    } catch (err) {
+                        console.warn("[Voice] Error adding ICE candidate:", err);
+                    }
+                } else {
+                    console.log("[Voice] Buffering incoming ICE candidate (remoteDescription not ready yet)");
+                    pendingIceCandidates.push(signal.candidate);
+                }
             }
         }
     } catch (err) {
@@ -434,10 +520,15 @@ async function handleIncomingVoiceSignal(data) {
 // CLEANUP
 // ==========================================
 export function closePeerConnection() {
+    pendingIceCandidates = [];
+    hasNotifiedConnected = false;
+
     if (peerConnection) {
         try {
             peerConnection.ontrack = null;
             peerConnection.onicecandidate = null;
+            peerConnection.onconnectionstatechange = null;
+            peerConnection.oniceconnectionstatechange = null;
             peerConnection.close();
         } catch (e) {
             console.warn("[Voice] Error closing peerConnection:", e);
@@ -449,4 +540,6 @@ export function closePeerConnection() {
     if (remoteAudio) {
         remoteAudio.srcObject = null;
     }
+
+    updateVoiceConnectionUi('closed');
 }
