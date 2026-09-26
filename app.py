@@ -33,25 +33,109 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 _CHAMPION_DATA = {}   # name → full stat dict
 _CHAMPION_TRAITS = {} # name → list of trait strings
 
+# Balanced skill damage floor (at least 20% - 35% of same-cost average HP)
+_SKILL_BALANCE_OVERRIDES = {
+    # 1. Chiêu gây sát thương tức thì (damage & blink_strike): 26% - 35% HP trung bình cùng cost
+    'Planet Waves': 17500,
+    'Green, Green Grass of Home': 18000,
+    'Stray Cat': 18200,
+    'Lovers': 18800,
+    'High Priestess': 19200,
+    'Marilyn Manson': 19800,
+    'Cheap Trick': 26000,
+    'Dragon\'s Dream': 26500,
+    'Red Hot Chili Pepper': 25800,
+    'Clash': 35000,
+    'Beach Boy': 36500,
+    'Stone Free': 36800,
+    'Hanged Man': 37500,
+    'Geb': 38000,
+    'Aerosmith': 38500,
+
+    # 2. Chiêu Execute: Ngưỡng HP kết liễu tỷ lệ theo Cost (Cost 1: 10%, Cost 2: 20%, Cost 3: 25%, Cost 4: 30%)
+    'Rolling Stones': {'power': 21500, 'percent': 0.20},
+    'Black Sabbath': {'power': 28500, 'percent': 0.25},
+    'Killer Queen': {'power': 37500, 'percent': 0.30},
+
+    # 3. Chiêu Đạn nảy (ricochet): 19% - 21.5% HP mỗi phát nảy (tổng 3 phát = ~60% HP)
+    'Manhattan Transfer': 12800,
+    'Emperor': 13000,
+    'Sex Pistols': 23200,
+    'Hierophant Green': 23800,
+
+    # 4. Chiêu Sát thương đốt đơn mục tiêu (dot): 6.9% - 8.0% HP/giây (tổng đốt qua duration = 30% - 56% HP)
+    'Empress': 4500,
+    'Sky High': 4800,
+    'Ratt': 6400,
+    'Yo-Yo Ma': 6500,
+    'Magician\'s Red': 8800,
+    'Metallica': 11500,
+
+    # 5. Chiêu Sát thương diện rộng (aoe_dot): 6.0% - 7.5% HP/giây (tổng đốt = 27% - 56% HP)
+    'Strength': 4000,
+    'Sun': 4000,
+    'Under World': 4200,
+    'Dark Blue Moon': 6200,
+    'The Grateful Dead': 7600,
+    'Bad Company': 10600,
+    'Purple Haze': 10800,
+    'Green Day': 6800,
+
+    # 6. Chiêu Hồi máu, Hồi phục & Hút máu
+    'Crazy Diamond': {'power': 55000, 'duration': 0},
+    'Gold Experience': 6800,
+    'Mr.President': 7600,
+    'Foo Fighters': 4600,
+    'Highway Star': 3500,
+
+    # 7. Chiêu Lá chắn (hp_shield): Giảm % khiên nhưng kéo dài thời gian tồn tại gấp đôi (6.5s - 7.5s)
+    'Kraft Work': {'percent': 0.25, 'duration': 6.5},
+    'Spice Girl': {'percent': 0.25, 'duration': 6.5},
+    'Yellow Temperance': {'percent': 0.25, 'duration': 6.5},
+    'Diver Down': {'percent': 0.30, 'duration': 7.0},
+    'The Fool': {'percent': 0.30, 'duration': 7.0},
+    'White Album': {'percent': 0.35, 'duration': 7.5},
+
+    # 8. Kéo & Đổi chỗ đơn mục tiêu (pull & swap)
+    'The Hand': 36000,
+    'Sticky Fingers': 32000,
+
+    # 9. Tinh chỉnh thời gian khống chế (CC) & Mana
+    'Death Thirteen': {'duration': 3.8, 'mana': 100},
+    'Weather Report': {'duration': 4.8, 'mana': 100},
+    'Justice': {'duration': 2.8},
+    'Aqua Necklace': {'duration': 2.2},
+    'Heaven\'s Door': {'duration': 2.2},
+}
+
 def _load_champion_data():
     """
-    Load champion data from Google Sheets on startup.
+    Load champion data from local CSV or Google Sheets on startup.
     Falls back to local champions.csv if the network call fails.
     """
     global _CHAMPION_DATA, _CHAMPION_TRAITS
 
-    url = ("https://docs.google.com/spreadsheets/d/e/"
-           "2PACX-1vREGk7FjfrTa0W2mzlWKfzeJX-JOPEu7CsNgt8ksH6RxoRyo9EfS7JSoFxamK8KOdwGYZp8h7oOC9uw"
-           "/pub?gid=1700806245&single=true&output=csv")
-    try:
-        df = pd.read_csv(url, sep=',', encoding='utf-8')
-    except Exception as e:
-        print(f"[WARN]  Google Sheets unavailable, falling back to champions.csv: {e}")
-        csv_path = os.path.join(os.path.dirname(__file__), 'champions.csv')
+    local_csv = os.path.join(os.path.dirname(__file__), 'champions - champions.csv')
+    if not os.path.exists(local_csv):
+        local_csv = os.path.join(os.path.dirname(__file__), 'champions.csv')
+
+    df = None
+    if os.path.exists(local_csv):
         try:
-            df = pd.read_csv(csv_path, sep=';')
-        except Exception as e2:
-            print(f"[ERR] Cannot load champion data at all: {e2}")
+            df = pd.read_csv(local_csv, sep=',')
+            print(f"[OK] Loaded champion data from local '{os.path.basename(local_csv)}'.")
+        except Exception as e:
+            print(f"[WARN] Local CSV load failed: {e}")
+
+    if df is None:
+        url = ("https://docs.google.com/spreadsheets/d/e/"
+               "2PACX-1vREGk7FjfrTa0W2mzlWKfzeJX-JOPEu7CsNgt8ksH6RxoRyo9EfS7JSoFxamK8KOdwGYZp8h7oOC9uw"
+               "/pub?gid=1700806245&single=true&output=csv")
+        try:
+            df = pd.read_csv(url, sep=',', encoding='utf-8')
+            print("[OK] Loaded champion data from Google Sheets.")
+        except Exception as e:
+            print(f"[ERR] Cannot load champion data at all: {e}")
             return
 
     df.columns = df.columns.str.replace('\ufeff', '').str.strip()
@@ -69,14 +153,34 @@ def _load_champion_data():
         skill = {'type': skill_type if skill_type and skill_type != 'nan' else 'damage'}
 
         power_val = row.get('SkillStat', '')
-        if power_val != '' and str(power_val) != 'nan':
+        dur_val = row.get('SkillDuration', '')
+
+        mana_val = None
+        if name in _SKILL_BALANCE_OVERRIDES:
+            ov = _SKILL_BALANCE_OVERRIDES[name]
+            if isinstance(ov, dict):
+                if 'power' in ov: skill['power'] = int(ov['power'])
+                if 'percent' in ov: skill['percent'] = float(ov['percent'])
+                if 'duration' in ov: dur_val = ov['duration']
+                if 'mana' in ov: mana_val = int(ov['mana'])
+            elif isinstance(ov, (int, float)):
+                if ov <= 2: skill['percent'] = float(ov)
+                else:       skill['power']   = int(ov)
+        elif power_val != '' and str(power_val) != 'nan':
             val = float(power_val)
             if val <= 2: skill['percent'] = val
             else:        skill['power']   = int(val)
 
-        dur_val = row.get('SkillDuration', '')
-        if dur_val != '' and str(dur_val) != 'nan':
+        # Default execute percent threshold by cost if not explicitly provided
+        if skill.get('type') == 'execute' and 'percent' not in skill:
+            cost_val = int(row.get('Cost', 1)) if row.get('Cost') != '' else 1
+            cost_thresholds = {1: 0.10, 2: 0.20, 3: 0.25, 4: 0.30, 5: 0.35}
+            skill['percent'] = cost_thresholds.get(cost_val, 0.20)
+
+        if dur_val != '' and str(dur_val) != 'nan' and dur_val is not None:
             skill['duration'] = float(dur_val)
+        else:
+            skill['duration'] = 0.0
 
         rad_val = row.get('Radius', '')
         if rad_val != '' and str(rad_val) != 'nan':
@@ -85,6 +189,8 @@ def _load_champion_data():
         tgt_val = str(row.get('Target', 'enemy_closest')).strip()
         skill['target'] = tgt_val if tgt_val and tgt_val != 'nan' else 'enemy_closest'
 
+        final_mana = mana_val if mana_val is not None else (int(row.get('Mana', 200)) if row.get('Mana') != '' else 200)
+
         _CHAMPION_DATA[name] = {
             'name': name,
             'cost':         int(row.get('Cost', 1))     if row.get('Cost')  != '' else 1,
@@ -92,7 +198,7 @@ def _load_champion_data():
             'attack':       int(row.get('ATK', 100))    if row.get('ATK')   != '' else 100,
             'attack_range': float(row.get('Range', 1))  if row.get('Range') != '' else 1,
             'speed':        float(row.get('Speed', 1))  if row.get('Speed') != '' else 1,
-            'max_mana':     int(row.get('Mana', 200))   if row.get('Mana')  != '' else 200,
+            'max_mana':     final_mana,
             'traits': traits,
             'skill':  skill,
         }

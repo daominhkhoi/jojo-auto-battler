@@ -125,7 +125,14 @@ class Champion:
                     events.append({'type': 'damage_link_proc', 'caster_id': self.id,
                                    'target_id': linked_target.id, 'damage': actual_damage})
                     if linked_target.hp <= 0:
-                        linked_target.is_alive = False
+                        revive_buff = next((b for b in linked_target.active_buffs if b['type'] == 'revive'), None)
+                        if revive_buff:
+                            linked_target.hp = linked_target.max_hp
+                            linked_target.is_alive = True
+                            linked_target.active_buffs.remove(revive_buff)
+                            events.append({'type': 'revive', 'target_id': linked_target.id})
+                        else:
+                            linked_target.is_alive = False
 
         # 4. Revive
         if self.hp <= 0:
@@ -195,7 +202,7 @@ class Champion:
 
         s_power   = int(self.skill.get('power', 0))
         s_duration = float(self.skill.get('duration', 0))
-        s_percent  = float(self.skill.get('percent', 0.5))
+        s_percent  = float(self.skill.get('percent', 0))
         s_radius   = float(self.skill.get('radius', 1.5))
 
         event = {
@@ -253,7 +260,14 @@ class Champion:
 
         # 4. EXECUTE
         elif s_type == 'execute' and target:
-            if target.hp / target.max_hp < 0.2:
+            if 0 < s_percent <= 1.0:
+                threshold = s_percent
+            else:
+                cost = get_champion_cost(self.name)
+                cost_thresholds = {1: 0.10, 2: 0.20, 3: 0.25, 4: 0.30, 5: 0.35}
+                threshold = cost_thresholds.get(cost, 0.20)
+
+            if (target.hp / max(1, target.max_hp)) < threshold:
                 dmg, evs = target.take_damage(999999, self, board_state)
             else:
                 dmg, evs = target.take_damage(s_power, self, board_state)
@@ -340,7 +354,13 @@ class Champion:
             event.setdefault('extra_events', []).extend(evs)
 
         elif s_type == 'heal' and target:
-            target.active_buffs.append({'type': 'heal', 'power': s_power, 'duration': s_duration})
+            if s_duration > 0:
+                target.active_buffs.append({'type': 'heal', 'power': s_power, 'duration': s_duration})
+            else:
+                target.hp = min(target.max_hp, target.hp + s_power)
+                event.setdefault('extra_events', []).append({
+                    'type': 'heal', 'target_id': target.id, 'power': s_power
+                })
 
         elif s_type == 'regen':
             self.active_buffs.append({'type': 'regen', 'power': s_power, 'duration': s_duration})
@@ -400,7 +420,7 @@ class Champion:
             target.active_buffs.append({'type': 'stun', 'duration': s_duration})
 
         elif s_type == 'global_slow':
-            slow_pct = s_percent * 100 if s_percent > 0.5 else 50
+            slow_pct = s_percent * 100 if s_percent > 0 else 50
             for c in board_state:
                 if c.team != self.team and c.is_alive \
                         and not getattr(c, 'is_submerged', False) \

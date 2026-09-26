@@ -553,7 +553,13 @@ export function showDisplayInfo(type, data, shopContext = null) {
                 case 'time_stop': skillDesc = `Freezes time for all enemies for <b>${scaledDuration.toFixed(1)}s</b>. Self gains massive Attack Speed.`; break;
                 case 'return_to_zero': skillDesc = `Reverts all enemies' actions to zero, wiping their Mana and purging all active buffs instantly.`; break;
                 case 'blink_strike': skillDesc = `Teleports behind the furthest enemy and deals <b>${powerDisplay}</b> damage.`; break;
-                case 'execute': skillDesc = `Instantly executes targets below 20% HP. Otherwise, deals <b>${powerDisplay}</b> physical damage.`; break;
+                case 'execute': {
+                    const execThreshold = (s.percent && s.percent > 0)
+                        ? Math.round(s.percent * 100)
+                        : (template.cost === 1 ? 10 : (template.cost === 2 ? 20 : (template.cost === 3 ? 25 : (template.cost >= 4 ? 30 : 20))));
+                    skillDesc = `Instantly executes targets below <b>${execThreshold}%</b> HP. Otherwise, deals <b>${powerDisplay}</b> physical damage.`;
+                    break;
+                }
                 case 'banish': skillDesc = `Removes the target from the battlefield for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'submerge': skillDesc = `Submerges into shadows, becoming untargetable for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'mana_battery': skillDesc = `Channels <b>${powerDisplay}</b> Mana/s to the lowest-Mana ally for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
@@ -579,7 +585,7 @@ export function showDisplayInfo(type, data, shopContext = null) {
                 case 'global_slow': skillDesc = `Slows all enemies' Attack Speed by <b>50%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'mana_lock': skillDesc = `Silences the target, preventing Mana gain for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'stun': skillDesc = `Stuns the target for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'heal': skillDesc = `Heals the most wounded ally for <b>${powerDisplay}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'heal': skillDesc = (scaledDuration > 0) ? `Heals the most wounded ally for <b>${powerDisplay}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.` : `Instantly restores <b>${powerDisplay}</b> HP to the most wounded ally.`; break;
                 case 'aoe_heal': skillDesc = `Heals allies in radius (<b>${scaledRadius}</b>) for <b>${powerDisplay}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'regen': skillDesc = `Regenerates <b>${powerDisplay}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'buff_atk': skillDesc = `Increases Attack by <b>+${powerDisplay}</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
