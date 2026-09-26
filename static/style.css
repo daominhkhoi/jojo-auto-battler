@@ -214,7 +214,7 @@ html {
     );
     background-size: 100% 30px;
     background-position: bottom;
-    transition: height 0.05s ease-out;
+    transition: none;
     position: relative;
 }
 

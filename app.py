@@ -348,7 +348,8 @@ def _create_bot_game(player_id, player_name):
     socketio.emit('match_found', {
         'room': room_name,
         'opponentName': bot.name,
-        'isBot': True
+        'isBot': True,
+        'your_team': 'Team1'
     }, to=player_id)
     try:
         print(f"[BOT MATCH] {player_name} matched with {bot.name} in {room_name}")
@@ -410,8 +411,8 @@ def handle_find_match(data=None):
                 'aborted': False,
             }
 
-            socketio.emit('match_found', {'room': room_name, 'opponentName': p2['name'], 'isInitiator': True, 'isBot': False}, to=p1['sid'])
-            socketio.emit('match_found', {'room': room_name, 'opponentName': p1['name'], 'isInitiator': False, 'isBot': False}, to=p2['sid'])
+            socketio.emit('match_found', {'room': room_name, 'opponentName': p2['name'], 'isInitiator': True, 'isBot': False, 'your_team': 'Team1'}, to=p1['sid'])
+            socketio.emit('match_found', {'room': room_name, 'opponentName': p1['name'], 'isInitiator': False, 'isBot': False, 'your_team': 'Team2'}, to=p2['sid'])
         else:
             # Auto-fallback to smart bot after 3.5s so players never wait forever alone
             def bot_fallback_timer(pid, pname):
@@ -604,7 +605,8 @@ def handle_submit_board(data):
         socketio.emit('sync_tick', {
             "champions": base_champions,
             "events":    [],
-            "opponent_lp": game.get('p2_lp', 0)
+            "opponent_lp": game.get('p2_lp', 0),
+            "your_team":  "Team1"
         }, to=game['player1'])
 
         # Player 2 (if human) gets mirrored coordinates
@@ -619,7 +621,8 @@ def handle_submit_board(data):
             socketio.emit('sync_tick', {
                 "champions": p2_champions,
                 "events":    [],
-                "opponent_lp": game.get('p1_lp', 0)
+                "opponent_lp": game.get('p1_lp', 0),
+                "your_team":  "Team2"
             }, to=game['player2'])
 
         def delay_start():
@@ -705,7 +708,8 @@ def run_game_loop(room_name):
         socketio.emit('sync_tick', {
             "champions": base_champions,
             "events":    all_tick_events,
-            "opponent_lp": game.get('p2_lp', 0)
+            "opponent_lp": game.get('p2_lp', 0),
+            "your_team":  "Team1"
         }, to=game['player1'])
 
         if not game.get('bot'):
@@ -719,7 +723,8 @@ def run_game_loop(room_name):
             socketio.emit('sync_tick', {
                 "champions": p2_champions,
                 "events":    all_tick_events,
-                "opponent_lp": game.get('p1_lp', 0)
+                "opponent_lp": game.get('p1_lp', 0),
+                "your_team":  "Team2"
             }, to=game['player2'])
 
         # Check end conditions

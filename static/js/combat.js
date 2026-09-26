@@ -247,6 +247,9 @@ export function updatePhysics() {
 }
 
 export function syncTickData(data) {
+    if (data.your_team) {
+        STATE.myTeam = data.your_team;
+    }
     if (data.opponent_lp !== undefined) {
         STATE.botLP = data.opponent_lp;
         updateLpUI();
@@ -423,6 +426,8 @@ export function syncTickData(data) {
                 spawnFloatingText(tarCenterX, tarCenterY - 20, `💚 ${healVal}`, 'heal');
             } else if (event.skill_type === 'stun') {
                 spawnFloatingText(tarCenterX, tarCenterY - 25, '⚡ STUNNED!', 'status', { color: '#ffd32a' });
+            } else if (event.skill_type === 'mana_lock') {
+                spawnFloatingText(tarCenterX, tarCenterY - 25, '🔒 SILENCED!', 'status', { color: '#e74c3c' });
             } else if (event.skill_type === 'hp_shield') {
                 spawnFloatingText(tarCenterX, tarCenterY - 25, '🛡️ SHIELD!', 'shield');
             } else if (event.skill_type === 'polymorph') {
@@ -678,7 +683,7 @@ function resetBoardForNextRound() {
         champ.mana     = 0;
         champ.shield   = 0;
         champ.is_alive = true;
-        champ.team     = 'Team1'; // Restore from mind_control / soul_swap
+        champ.team     = STATE.myTeam || 'Team1'; // Restore from mind_control / soul_swap
 
         // FIX: Reset attack, speed, range, skill to raw baseline so buffs do not leak
         if (champ.raw_attack !== undefined) champ.attack = champ.raw_attack;

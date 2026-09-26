@@ -100,9 +100,13 @@ export function renderBoard(ctx, canvas) {
             ctx.fillRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
         }
 
-        // Xác định team của người chơi hiện tại dựa trên các tướng có originalX
-        const localTeam = STATE.champions.find(c => c.originalX !== undefined)?.team || 'Team1';
-        const isAlly = (champ.team === localTeam);
+        // Xác định team của người chơi hiện tại một cách cố định và chuẩn xác tuyệt đối từ STATE.myTeam
+        const myTeam = STATE.myTeam || 'Team1';
+        // - Khi chuẩn bị (chưa vào combat): Mọi tướng trên sân và hàng chờ của mình đều là đồng minh (Xanh).
+        // - Khi đang combat: Tướng nào cùng phe myTeam là đồng minh (Xanh), ngược lại là đối thủ (Đỏ).
+        const isAlly = (!STATE.isCombatPhase && (champ.originalX !== undefined || champ.targetY >= 6))
+            ? true
+            : (champ.team === myTeam);
 
         // VẼ HÀO QUANG CHO TƯỚNG 2⭐ VÀ 3⭐ (GODLY STAR AURA)
         const starCount = champ.star || 1;
@@ -573,110 +577,102 @@ export function renderBoard(ctx, canvas) {
                 }
             }
             else if (hit.effectType === 'aoe_dot') {
-                const alpha = Math.min(1.0, currentAlpha * 1.3);
+                const alpha = Math.min(1.0, currentAlpha);
                 ctx.globalAlpha = alpha;
 
-                // 1. Dark Miasma Pool (Vùng ăn mòn tím độc siêu đậm & sắc nét)
+                // 1. Soft Translucent Miasma Pool (Vùng ăn mòn mờ nhẹ, tuyệt đối không che khuất tướng)
                 ctx.beginPath();
                 ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(38, 8, 68, ${alpha * 0.78})`;
+                const dotGrad = ctx.createRadialGradient(0, 0, pixelRadius * 0.2, 0, 0, pixelRadius);
+                dotGrad.addColorStop(0, `rgba(142, 68, 173, ${alpha * 0.08})`);
+                dotGrad.addColorStop(0.8, `rgba(155, 89, 182, ${alpha * 0.16})`);
+                dotGrad.addColorStop(1, `rgba(186, 85, 211, ${alpha * 0.02})`);
+                ctx.fillStyle = dotGrad;
                 ctx.fill();
 
-                // Dark outer boundary ring
+                // 2. Refined Biohazard Perimeter Ring (Vành đai độc tố thanh mảnh, sắc nét)
                 ctx.beginPath();
                 ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(18, 4, 32, ${alpha * 0.95})`;
-                ctx.lineWidth = 7;
+                ctx.strokeStyle = `rgba(186, 85, 211, ${alpha * 0.7})`;
+                ctx.lineWidth = 2.0;
                 ctx.stroke();
 
-                // 2. Neon Biohazard Perimeter Ring (Vành đai độc tố phát quang rực rỡ)
-                ctx.beginPath();
-                ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(186, 85, 211, ${alpha})`;
-                ctx.lineWidth = 4.5;
-                ctx.stroke();
-
-                // Inner magenta dashed ring
+                // Inner dashed energy accent
                 ctx.beginPath();
                 ctx.arc(0, 0, pixelRadius - 3, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(243, 104, 224, ${alpha * 0.85})`;
-                ctx.lineWidth = 1.8;
+                ctx.strokeStyle = `rgba(243, 104, 224, ${alpha * 0.45})`;
+                ctx.lineWidth = 1.0;
+                ctx.setLineDash([6, 6]);
                 ctx.stroke();
+                ctx.setLineDash([]);
 
-                // 3. Rotating Toxic Sawblade Vortex (Vòng xoáy cưa răng cưa sắc bén)
+                // 3. Rotating Toxic Sawblade Vortex (Vòng xoáy cưa viền mảnh, quay thanh thoát)
                 ctx.save();
                 ctx.rotate(timeNow * 2.2);
                 ctx.beginPath();
                 ctx.arc(0, 0, pixelRadius * 0.72, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(224, 86, 253, ${alpha})`;
-                ctx.lineWidth = 4.5;
-                ctx.setLineDash([18, 12]);
+                ctx.strokeStyle = `rgba(224, 86, 253, ${alpha * 0.5})`;
+                ctx.lineWidth = 1.6;
+                ctx.setLineDash([14, 10]);
                 ctx.stroke();
 
-                // 4 Orbiting toxic acid orbs (Hạt độc ngọc xanh phát quang có viền đậm)
+                // 4 Orbiting toxic acid sparks (Hạt độc nhỏ li ti, không che nhân vật)
                 for (let orb = 0; orb < 4; orb++) {
                     const oAngle = (orb * Math.PI / 2);
                     const ox = Math.cos(oAngle) * pixelRadius * 0.72;
                     const oy = Math.sin(oAngle) * pixelRadius * 0.72;
                     
-                    // Dark contour
+                    // Acid body
                     ctx.beginPath();
-                    ctx.arc(ox, oy, 7, 0, Math.PI * 2);
-                    ctx.fillStyle = '#0f1412';
+                    ctx.arc(ox, oy, 3.2, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(0, 255, 136, ${alpha * 0.85})`;
                     ctx.fill();
 
-                    // Neon acid body
+                    // Core tiny white
                     ctx.beginPath();
-                    ctx.arc(ox, oy, 5.5, 0, Math.PI * 2);
-                    ctx.fillStyle = '#00ff88';
-                    ctx.fill();
-
-                    // Core bright white
-                    ctx.beginPath();
-                    ctx.arc(ox, oy, 2.5, 0, Math.PI * 2);
-                    ctx.fillStyle = '#ffffff';
+                    ctx.arc(ox, oy, 1.4, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
                     ctx.fill();
                 }
                 ctx.restore();
             }
             else if (hit.effectType === 'aoe_heal') {
-                const alpha = Math.min(1.0, currentAlpha * 1.3);
+                const alpha = Math.min(1.0, currentAlpha);
                 ctx.globalAlpha = alpha;
 
-                // 1. Radiant Sanctuary Base (Vùng thánh địa sinh mệnh xanh ngọc lục bảo đậm đà)
+                // 1. Soft Emerald Sanctuary Base (Vùng thánh địa trong trẻo, nhìn xuyên thấu rõ tướng & máu)
                 ctx.beginPath();
                 ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(16, 85, 45, ${alpha * 0.68})`;
+                const healGrad = ctx.createRadialGradient(0, 0, pixelRadius * 0.2, 0, 0, pixelRadius);
+                healGrad.addColorStop(0, `rgba(46, 204, 113, ${alpha * 0.06})`);
+                healGrad.addColorStop(0.8, `rgba(39, 174, 96, ${alpha * 0.14})`);
+                healGrad.addColorStop(1, `rgba(46, 204, 113, ${alpha * 0.02})`);
+                ctx.fillStyle = healGrad;
                 ctx.fill();
 
-                // Dark forest border ring
+                // 2. Luminous Emerald Perimeter Ring (Vành đai ngọc lục bảo thanh thoát)
                 ctx.beginPath();
                 ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(8, 42, 22, ${alpha * 0.95})`;
-                ctx.lineWidth = 7;
+                ctx.strokeStyle = `rgba(46, 204, 113, ${alpha * 0.75})`;
+                ctx.lineWidth = 2.0;
                 ctx.stroke();
 
-                // 2. Luminous Emerald Perimeter Ring (Vành đai ngọc lục bảo nổi bật)
-                ctx.beginPath();
-                ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(46, 204, 113, ${alpha})`;
-                ctx.lineWidth = 4.5;
-                ctx.stroke();
-
-                // Inner bright white halo
+                // Inner delicate halo
                 ctx.beginPath();
                 ctx.arc(0, 0, pixelRadius - 3, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.85})`;
-                ctx.lineWidth = 1.8;
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.4})`;
+                ctx.lineWidth = 1.0;
+                ctx.setLineDash([4, 6]);
                 ctx.stroke();
+                ctx.setLineDash([]);
 
-                // 3. Sacred Lotus / Hexagram Mandala (Hoa sen ánh sáng quay êm dịu, nét đậm tinh xảo)
+                // 3. Sacred Lotus / Hexagram Mandala (Hoa văn thánh địa quay êm dịu, đường nét thanh tú)
                 ctx.save();
                 ctx.rotate(-timeNow * 1.2);
                 const petalCount = 6;
                 const mR = pixelRadius * 0.68;
 
-                // Dark back-stroke mandala
+                // Subtle emerald mandala geometry
                 ctx.beginPath();
                 for (let pt = 0; pt < petalCount; pt++) {
                     const ang = (pt * Math.PI * 2) / petalCount;
@@ -686,117 +682,113 @@ export function renderBoard(ctx, canvas) {
                     else ctx.lineTo(px, py);
                 }
                 ctx.closePath();
-                ctx.strokeStyle = `rgba(10, 45, 25, ${alpha * 0.9})`;
-                ctx.lineWidth = 5.5;
+                ctx.strokeStyle = `rgba(46, 204, 113, ${alpha * 0.5})`;
+                ctx.lineWidth = 1.4;
                 ctx.stroke();
 
-                // Brilliant white sacred geometry lines
-                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
-                ctx.lineWidth = 3.2;
-                ctx.stroke();
-
-                // 6 Floating Life Sparks on vertices (Ngọc ngọc bích phát quang tại các đỉnh)
+                // 6 Floating Life Sparks on vertices (Ngọc ngọc bích phát quang nhỏ xinh)
                 for (let pt = 0; pt < petalCount; pt++) {
                     const ang = (pt * Math.PI * 2) / petalCount;
                     const px = Math.cos(ang) * mR;
                     const py = Math.sin(ang) * mR;
                     
                     ctx.beginPath();
-                    ctx.arc(px, py, 6, 0, Math.PI * 2);
-                    ctx.fillStyle = '#082a16';
+                    ctx.arc(px, py, 2.8, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(46, 204, 113, ${alpha * 0.85})`;
                     ctx.fill();
 
                     ctx.beginPath();
-                    ctx.arc(px, py, 4.5, 0, Math.PI * 2);
-                    ctx.fillStyle = '#2ecc71';
-                    ctx.fill();
-
-                    ctx.beginPath();
-                    ctx.arc(px, py, 2.2, 0, Math.PI * 2);
-                    ctx.fillStyle = '#ffffff';
+                    ctx.arc(px, py, 1.2, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
                     ctx.fill();
                 }
 
-                // Center Healing Cross / Holy Star
+                // Center Healing Cross / Holy Star (Dấu cộng trị liệu tinh tế, không che mặt tướng)
                 ctx.beginPath();
-                ctx.moveTo(-10, 0); ctx.lineTo(10, 0);
-                ctx.moveTo(0, -10); ctx.lineTo(0, 10);
-                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-                ctx.lineWidth = 3.5;
+                ctx.moveTo(-7, 0); ctx.lineTo(7, 0);
+                ctx.moveTo(0, -7); ctx.lineTo(0, 7);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.65})`;
+                ctx.lineWidth = 1.6;
                 ctx.stroke();
 
                 ctx.restore();
             }
             else if (hit.effectType === 'mana_lock') {
-                const alpha = Math.min(1.0, currentAlpha * 1.3);
+                const alpha = Math.min(1.0, currentAlpha);
                 ctx.globalAlpha = alpha;
 
-                // 1. Dark Abyssal Seal Ground (Trận đồ phong ấn hắc ám siêu đậm)
+                // 1. Translucent Ruby Silence Field (Vùng cấm chú mờ ảo, tuyệt đối không che đen)
                 ctx.beginPath();
                 ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(12, 16, 26, ${alpha * 0.92})`;
+                const lockGrad = ctx.createRadialGradient(0, 0, pixelRadius * 0.2, 0, 0, pixelRadius);
+                lockGrad.addColorStop(0, `rgba(192, 57, 43, ${alpha * 0.06})`);
+                lockGrad.addColorStop(0.8, `rgba(231, 76, 60, ${alpha * 0.14})`);
+                lockGrad.addColorStop(1, `rgba(192, 57, 43, ${alpha * 0.02})`);
+                ctx.fillStyle = lockGrad;
                 ctx.fill();
 
-                // Outer blood-crimson runic ring
+                // Outer crimson runic ring (Vành đai phong ấn thanh mảnh)
                 ctx.beginPath();
                 ctx.arc(0, 0, pixelRadius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(192, 57, 43, ${alpha * 0.98})`;
-                ctx.lineWidth = 5.5;
+                ctx.strokeStyle = `rgba(231, 76, 60, ${alpha * 0.75})`;
+                ctx.lineWidth = 2.0;
                 ctx.stroke();
 
-                // Inner dark ring
+                // Inner dashed warning ring
                 ctx.beginPath();
                 ctx.arc(0, 0, pixelRadius - 3.5, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(20, 5, 5, ${alpha})`;
-                ctx.lineWidth = 2;
+                ctx.strokeStyle = `rgba(255, 107, 107, ${alpha * 0.45})`;
+                ctx.lineWidth = 1.0;
+                ctx.setLineDash([5, 5]);
                 ctx.stroke();
+                ctx.setLineDash([]);
 
-                // 2. Cursed Iron Chains crossed in 'X' (Xích cấm chú 3 lớp cực nặng và nổi bật)
+                // 2. Ethereal Sealing Chains crossed in 'X' (Xích cấm chú thanh thoát, nét đứt ma thuật)
                 const sz = pixelRadius * 0.72;
                 ctx.save();
                 
-                // Layer 1: Dark chain shadow
-                ctx.strokeStyle = `rgba(10, 5, 5, ${alpha * 0.95})`;
-                ctx.lineWidth = 9;
-                ctx.lineCap = 'round';
+                // Red glowing dashed chains
+                ctx.strokeStyle = `rgba(231, 76, 60, ${alpha * 0.65})`;
+                ctx.lineWidth = 2.0;
+                ctx.setLineDash([7, 6]);
                 ctx.beginPath();
                 ctx.moveTo(-sz, -sz); ctx.lineTo(sz, sz);
                 ctx.moveTo(sz, -sz); ctx.lineTo(-sz, sz);
                 ctx.stroke();
 
-                // Layer 2: Heavy cursed bloody steel
-                ctx.strokeStyle = `rgba(231, 76, 60, ${alpha})`;
-                ctx.lineWidth = 6;
-                ctx.setLineDash([12, 6]);
+                // Subtle white chain link glints
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.55})`;
+                ctx.lineWidth = 1.0;
+                ctx.setLineDash([2, 11]);
                 ctx.beginPath();
                 ctx.moveTo(-sz, -sz); ctx.lineTo(sz, sz);
                 ctx.moveTo(sz, -sz); ctx.lineTo(-sz, sz);
                 ctx.stroke();
-
-                // Layer 3: Razor white chain links
                 ctx.setLineDash([]);
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2.4;
+
+                // Center Compact Silence Lock Glyph (Biểu tượng ổ khóa cấm chú nhỏ gọn, tinh tế)
+                // Shackle arc
                 ctx.beginPath();
-                ctx.moveTo(-sz, -sz); ctx.lineTo(sz, sz);
-                ctx.moveTo(sz, -sz); ctx.lineTo(-sz, sz);
+                ctx.arc(0, -3.5, 4.5, Math.PI, 0, false);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.85})`;
+                ctx.lineWidth = 1.5;
                 ctx.stroke();
 
-                // Center heavy lock seal badge (Khóa phong ấn to bản, đậm nét)
+                // Lock body
                 ctx.beginPath();
-                ctx.arc(0, 0, 13, 0, Math.PI * 2);
-                ctx.fillStyle = '#1e0505';
+                ctx.rect(-5.5, -2, 11, 8.5);
+                ctx.fillStyle = `rgba(192, 57, 43, ${alpha * 0.85})`;
                 ctx.fill();
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.75})`;
+                ctx.lineWidth = 1.0;
+                ctx.stroke();
 
+                // Keyhole dot
                 ctx.beginPath();
-                ctx.arc(0, 0, 11, 0, Math.PI * 2);
-                ctx.fillStyle = '#c0392b';
-                ctx.fill();
-
-                ctx.beginPath();
-                ctx.arc(0, 0, 5.5, 0, Math.PI * 2);
+                ctx.arc(0, 1.5, 1.3, 0, Math.PI * 2);
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
+
                 ctx.restore();
             }
             else if (hit.effectType === 'return_to_zero') {

@@ -58,6 +58,28 @@ export function initVoiceChat() {
 // ==========================================
 // MICROPHONE ACCESS & AUDIO ANALYZER
 // ==========================================
+function attachLocalTracksToPeer() {
+    if (!peerConnection || !localStream) return;
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (!audioTrack) return;
+
+    const senders = peerConnection.getSenders();
+    const audioSender = senders.find(s => s.track?.kind === 'audio') || senders[0];
+    if (audioSender && typeof audioSender.replaceTrack === 'function') {
+        audioSender.replaceTrack(audioTrack).catch(err => {
+            console.warn("[Voice] replaceTrack error:", err);
+        });
+    } else {
+        try {
+            if (!senders.some(s => s.track === audioTrack)) {
+                peerConnection.addTrack(audioTrack, localStream);
+            }
+        } catch (e) {
+            console.warn("[Voice] addTrack error:", e);
+        }
+    }
+}
+
 async function startMicrophone(initialUnmute = false) {
     if (localStream) return true;
 
@@ -81,8 +103,8 @@ async function startMicrophone(initialUnmute = false) {
 
             sourceNode = audioContext.createMediaStreamSource(localStream);
             analyserNode = audioContext.createAnalyser();
-            analyserNode.fftSize = 256;
-            analyserNode.smoothingTimeConstant = 0.5;
+            analyserNode.fftSize = 512;
+            analyserNode.smoothingTimeConstant = 0.3;
 
             // Connect mic source ONLY to analyzer, NOT to destination (avoids self-echo)
             sourceNode.connect(analyserNode);
@@ -99,12 +121,7 @@ async function startMicrophone(initialUnmute = false) {
 
         // If peer connection is already active, attach tracks
         if (peerConnection) {
-            const senders = peerConnection.getSenders();
-            localStream.getAudioTracks().forEach(track => {
-                if (!senders.some(s => s.track === track)) {
-                    peerConnection.addTrack(track, localStream);
-                }
-            });
+            attachLocalTracksToPeer();
         }
 
         isVoiceInitialized = true;
@@ -122,33 +139,51 @@ async function startMicrophone(initialUnmute = false) {
 // ==========================================
 function startMeterLoop() {
     const meterBar = document.getElementById('voiceMeterBar');
-    const dataArray = new Uint8Array(128);
+    // Buffer for 256 time-domain samples (~5ms window at 48kHz)
+    const dataArray = new Uint8Array(256);
 
     function renderMeter() {
         if (!isMicMuted && analyserNode && localStream) {
-            analyserNode.getByteFrequencyData(dataArray);
+            analyserNode.getByteTimeDomainData(dataArray);
 
-            // Compute energy in human vocal frequency range (~100Hz - 3500Hz)
-            let sum = 0;
-            const startBin = 2;
-            const endBin = 40;
-            for (let i = startBin; i < endBin; i++) {
-                sum += dataArray[i];
+            // Compute RMS (Root Mean Square) volume across samples
+            let sumSquares = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                // Baseline silence in Uint8 is 128 (range 0 - 255 -> normalized -1.0 to +1.0)
+                const sample = (dataArray[i] - 128) / 128;
+                sumSquares += sample * sample;
             }
-            const avgEnergy = sum / (endBin - startBin);
+            const rms = Math.sqrt(sumSquares / dataArray.length);
 
-            // Noise gate threshold: ambient room noise (< 5) gives 0
+            // Convert to Decibels (dBFS)
+            const db = rms > 0.00001 ? 20 * Math.log10(rms) : -100;
+
+            // Balanced dynamic range for human speech:
+            // - Silence / background room noise: < -48 dB -> 0%
+            // - Whispering / quiet speech: -42 dB to -32 dB -> 15% - 42% (Red zone: Nhỏ)
+            // - Normal conversational speech: -30 dB to -18 dB -> 45% - 75% (Amber/Yellow zone: Vừa)
+            // - Loud speaking / shout: -16 dB to -8 dB -> 80% - 100% (Green zone: Lớn)
+            const minDb = -48;
+            const maxDb = -8;
             let targetHeight = 0;
-            if (avgEnergy > 5) {
-                // Non-linear power scale: whispering is ~20-35%, normal talk is ~50-70%, loud is ~85-100%
-                targetHeight = Math.min(100, Math.pow((avgEnergy - 5) / 58, 1.25) * 100);
+
+            if (db > minDb) {
+                const norm = Math.min(1.0, (db - minDb) / (maxDb - minDb));
+                targetHeight = norm * 100;
             }
 
-            // Easing interpolation for snappy & rhythmic bounce
-            currentMeterVolume += (targetHeight - currentMeterVolume) * 0.38;
+            // Professional VU meter ballistics:
+            // - Fast attack (0.35): jumps immediately with speech syllables
+            // - Smooth decay (0.12): gracefully glides down between words without erratic flicker
+            if (targetHeight > currentMeterVolume) {
+                currentMeterVolume += (targetHeight - currentMeterVolume) * 0.35;
+            } else {
+                currentMeterVolume += (targetHeight - currentMeterVolume) * 0.12;
+            }
         } else {
             // Smoothly drop to 0 when muted or no mic
-            currentMeterVolume += (0 - currentMeterVolume) * 0.3;
+            currentMeterVolume += (0 - currentMeterVolume) * 0.2;
+            if (currentMeterVolume < 0.5) currentMeterVolume = 0;
         }
 
         if (meterBar) {
@@ -197,12 +232,7 @@ async function handleMicButtonClick() {
     }
 
     if (peerConnection && localStream) {
-        const senders = peerConnection.getSenders();
-        localStream.getAudioTracks().forEach(track => {
-            if (!senders.some(s => s.track === track)) {
-                peerConnection.addTrack(track, localStream);
-            }
-        });
+        attachLocalTracksToPeer();
     }
 
     updateMicUi(isMicMuted);
@@ -287,11 +317,16 @@ function setupPeerConnection(isInitiator) {
     try {
         peerConnection = new RTCPeerConnection(RTC_CONFIG);
 
-        // Add local mic tracks to peer connection
+        // Pre-add transceiver for audio to ensure immediate bidirectional media readiness
+        try {
+            peerConnection.addTransceiver('audio', { direction: 'sendrecv' });
+        } catch (e) {
+            console.warn("[Voice] addTransceiver fallback:", e);
+        }
+
+        // Add local mic tracks to peer connection if already available
         if (localStream) {
-            localStream.getAudioTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-            });
+            attachLocalTracksToPeer();
         }
 
         // Receive remote opponent's audio track

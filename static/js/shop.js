@@ -143,7 +143,7 @@ export function buyChampion(champTemplate, cardElement) {
     STATE.champions.push({
         id: Math.random().toString(36).substr(2, 9),
         name: champTemplate.name,
-        team: "Team1",
+        team: STATE.myTeam || "Team1",
         star: 1,
         cost: champTemplate.cost,
         targetX: slot.x, targetY: slot.y,
@@ -321,8 +321,9 @@ export function updateSynergies(boardChamps) {
     const uniqueChamps = [];
     const countedNames = new Set();
 
+    const myTeam = STATE.myTeam || 'Team1';
     boardChamps.forEach(c => {
-        if (c.team === 'Team1' && !countedNames.has(c.name)) {
+        if ((c.team === myTeam || !STATE.isCombatPhase) && !countedNames.has(c.name)) {
             countedNames.add(c.name);
             uniqueChamps.push(c);
         }

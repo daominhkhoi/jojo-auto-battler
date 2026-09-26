@@ -16,6 +16,10 @@ socket.on('match_found', (data) => {
     STATE.roomId = data.room;
     STATE.playerLP = 0;
     STATE.botLP = 0;
+    STATE.myTeam = data.your_team || (data.isInitiator === false ? 'Team2' : 'Team1');
+    if (STATE.champions && STATE.champions.length > 0) {
+        STATE.champions.forEach(c => { c.team = STATE.myTeam; });
+    }
 
     const pText = document.getElementById('playerLpText');
     const bText = document.getElementById('botLpText');
@@ -46,6 +50,7 @@ socket.on('opponent_disconnected', () => {
     showNotification("Opponent disconnected! Match cancelled.");
     closePeerConnection();
     STATE.isCombatPhase = false;
+    STATE.myTeam = 'Team1';
     STATE.champions = [];
 
     const bottomBar = document.getElementById('bottomBar');
@@ -135,6 +140,9 @@ socket.on('combat_start', () => {
 });
 
 socket.on('sync_tick', (data) => {
+    if (data && data.your_team) {
+        STATE.myTeam = data.your_team;
+    }
     import('./combat.js').then(module => {
         module.syncTickData(data);
     });
