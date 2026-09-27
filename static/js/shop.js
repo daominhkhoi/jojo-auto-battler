@@ -503,6 +503,132 @@ function renderSynergyPanel(traitCounts) {
     });
 }
 
+function updateLiveChampStats(panel, data, template, starMult) {
+    const rawHp = Math.round(data.raw_hp !== undefined ? data.raw_hp : ((template.hp || 1000) * starMult));
+    const maxHp = Math.round(data.max_hp !== undefined ? data.max_hp : rawHp);
+    const curHp = Math.max(0, Math.round(data.hp !== undefined ? data.hp : maxHp));
+    const hpPct = Math.max(0, Math.min(100, Math.round((curHp / Math.max(1, maxHp)) * 100)));
+
+    const hpText = panel.querySelector('#liveHpText');
+    const hpBar = panel.querySelector('#liveHpBar');
+    if (hpText) hpText.innerText = `${curHp.toLocaleString()} / ${maxHp.toLocaleString()}`;
+    if (hpBar) {
+        hpBar.style.width = `${hpPct}%`;
+        if (hpPct <= 28) hpBar.classList.add('low-hp');
+        else hpBar.classList.remove('low-hp');
+    }
+
+    const shieldRow = panel.querySelector('#liveShieldRow');
+    const shieldVal = panel.querySelector('#liveShieldVal');
+    const shield = Math.round(data.shield || 0);
+    if (shieldRow) {
+        if (shield > 0) {
+            shieldRow.style.display = 'block';
+            if (shieldVal) shieldVal.innerText = shield.toLocaleString();
+        } else {
+            shieldRow.style.display = 'none';
+        }
+    }
+
+    const maxMana = data.max_mana || template.max_mana || 200;
+    const curMana = Math.max(0, Math.round(data.mana || 0));
+    const manaPct = Math.max(0, Math.min(100, Math.round((curMana / Math.max(1, maxMana)) * 100)));
+    const isManaReady = curMana >= maxMana;
+    const manaText = panel.querySelector('#liveManaText');
+    const manaBar = panel.querySelector('#liveManaBar');
+    if (manaText) manaText.innerText = `${curMana} / ${maxMana}`;
+    if (manaBar) {
+        manaBar.style.width = `${manaPct}%`;
+        if (isManaReady) manaBar.classList.add('ready');
+        else manaBar.classList.remove('ready');
+    }
+
+    const rawAtk = Math.round(data.raw_attack !== undefined ? data.raw_attack : ((template.attack || 100) * starMult));
+    const curAtk = Math.round(data.attack !== undefined ? data.attack : rawAtk);
+    const atkVal = panel.querySelector('#liveAtkVal');
+    if (atkVal) {
+        let atkStr = `<b>${curAtk.toLocaleString()}</b>`;
+        if (curAtk > rawAtk) atkStr += ` <span style="color:#2ecc71; font-weight:800; font-size:13px; text-shadow:0 0 6px rgba(46,204,113,0.5);">(+${(curAtk - rawAtk).toLocaleString()})</span>`;
+        else if (curAtk < rawAtk) atkStr += ` <span style="color:#e74c3c; font-weight:800; font-size:13px;">(-${(rawAtk - curAtk).toLocaleString()})</span>`;
+        atkVal.innerHTML = atkStr;
+    }
+
+    const rawSpd = data.raw_speed !== undefined ? data.raw_speed : (template.speed !== undefined ? template.speed : 1.0);
+    const curSpd = data.speed !== undefined ? data.speed : rawSpd;
+    const spdVal = panel.querySelector('#liveSpdVal');
+    if (spdVal) {
+        let spdStr = `<b>${curSpd.toFixed(2)}</b>`;
+        if (curSpd > rawSpd + 0.01) spdStr += ` <span style="color:#2ecc71; font-weight:800; font-size:13px; text-shadow:0 0 6px rgba(46,204,113,0.5);">(+${(curSpd - rawSpd).toFixed(2)})</span>`;
+        else if (curSpd < rawSpd - 0.01) spdStr += ` <span style="color:#e74c3c; font-weight:800; font-size:13px;">(-${(rawSpd - curSpd).toFixed(2)})</span>`;
+        spdVal.innerHTML = spdStr;
+    }
+
+    const rawRng = data.raw_range !== undefined ? data.raw_range : (template.attack_range !== undefined ? template.attack_range : 1.0);
+    const curRng = data.attack_range !== undefined ? data.attack_range : rawRng;
+    const rngVal = panel.querySelector('#liveRngVal');
+    if (rngVal) {
+        let rngStr = `<b>${curRng.toFixed(1)}</b>`;
+        if (curRng > rawRng + 0.05) rngStr += ` <span style="color:#2ecc71; font-weight:800; font-size:13px; text-shadow:0 0 6px rgba(46,204,113,0.5);">(+${(curRng - rawRng).toFixed(1)})</span>`;
+        rngVal.innerHTML = rngStr;
+    }
+
+    const statusBadge = panel.querySelector('#liveStatusBadge');
+    if (statusBadge) {
+        const isAlive = (data.is_alive !== false && (data.hp === undefined || data.hp > 0));
+        if (isAlive) {
+            statusBadge.className = 'info-live-badge alive';
+            statusBadge.innerHTML = '🟢 ALIVE';
+        } else {
+            statusBadge.className = 'info-live-badge dead';
+            statusBadge.innerHTML = '💀 DEFEATED';
+        }
+    }
+
+    const dmgRow = panel.querySelector('#liveDmgRow');
+    const dmgVal = panel.querySelector('#liveDmgVal');
+    const dmgDealt = Math.round(data.damage_dealt || 0);
+    if (dmgRow) {
+        if (dmgDealt > 0) {
+            dmgRow.style.display = 'block';
+            if (dmgVal) dmgVal.innerText = `${dmgDealt.toLocaleString()} DMG`;
+        }
+    }
+
+    const buffsRow = panel.querySelector('#liveBuffsRow');
+    const buffsList = panel.querySelector('#liveBuffsList');
+    if (buffsRow && buffsList) {
+        const activeBuffs = data.buffs || [];
+        if (activeBuffs.length > 0) {
+            buffsRow.style.display = 'block';
+            const buffLabels = {
+                'mana_lock': '🔒 SILENCED',
+                'stun': '⚡ STUNNED',
+                'time_stopped': '⏳ TIME STOPPED',
+                'polymorph': '🐌 POLYMORPHED',
+                'banish': '🌀 BANISHED',
+                'submerge': '🌑 SUBMERGED',
+                'regen': '💚 REGEN',
+                'aoe_heal': '💚 HEALING',
+                'heal': '💚 HEALING',
+                'buff_atk': '⚔️ ATK BUFF',
+                'speed_buff': '⚡ SPD BUFF',
+                'dot': '☣️ POISONED',
+                'aoe_dot': '☣️ POISONED',
+                'hp_shield': '🛡️ SHIELDED'
+            };
+            const uniqueBuffs = [...new Set(activeBuffs)];
+            buffsList.innerHTML = uniqueBuffs.map(b => {
+                const lbl = buffLabels[b] || `✨ ${b.toUpperCase()}`;
+                const isHarm = ['mana_lock', 'stun', 'time_stopped', 'polymorph', 'banish', 'dot', 'aoe_dot'].includes(b);
+                const bg = isHarm ? 'linear-gradient(135deg, #c0392b, #e74c3c)' : 'linear-gradient(135deg, #27ae60, #2ecc71)';
+                return `<span style="background: ${bg}; color: #fff; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 800; display: inline-block;">${lbl}</span>`;
+            }).join(' ');
+        } else {
+            buffsRow.style.display = 'none';
+        }
+    }
+}
+
 export function showDisplayInfo(type, data, shopContext = null) {
     const panel = document.getElementById('infoPanel');
     if (!panel) return;
@@ -510,6 +636,7 @@ export function showDisplayInfo(type, data, shopContext = null) {
     const isMobile = window.innerWidth <= 768 || window.matchMedia('(pointer: coarse)').matches;
 
     if (!type || !data) {
+        panel.removeAttribute('data-champ-key');
         if (isMobile) {
             panel.classList.remove('show');
             panel.innerHTML = '';
@@ -522,11 +649,21 @@ export function showDisplayInfo(type, data, shopContext = null) {
     if (type === 'champ') {
         const baseName = (data.name || '').replace(/\s*\(CLONE\)$/i, '').trim();
         const template = CHAMPION_POOL.find(c => c.name === data.name || c.name === baseName) || {};
-        const hp = Math.round(data.hp !== undefined ? data.hp : (data.max_hp || template.hp));
-        const traitsHTML = template.traits ? `<p>🔮 Traits: <b>${template.traits.join(', ')}</b></p>` : '';
-        const imgSrc = template.img || '';
         const currentStar = data.star || 1;
         const champCost = data.cost || template.cost || 1;
+        const starMult = 1.8 ** (currentStar - 1);
+        const skillPowerMult = 1.6 ** (currentStar - 1);
+        const champKey = String(data.id || data.name);
+
+        // FAST IN-PLACE REAL-TIME STATS UPDATE IF SAME CHAMPION ALREADY INSPECTED (ZERO FLICKER)
+        if (panel.getAttribute('data-champ-key') === champKey && !shopContext) {
+            updateLiveChampStats(panel, data, template, starMult);
+            return;
+        }
+        panel.setAttribute('data-champ-key', champKey);
+
+        const traitsHTML = template.traits ? `<p>🔮 Traits: <b>${template.traits.join(', ')}</b></p>` : '';
+        const imgSrc = template.img || '';
 
         let actionHeaderHTML = '';
         if (shopContext && shopContext.isShop) {
@@ -566,13 +703,11 @@ export function showDisplayInfo(type, data, shopContext = null) {
             `;
         }
 
-        const starMult = 1.8 ** (currentStar - 1);
-        const skillPowerMult = 1.6 ** (currentStar - 1);
-
         // --- HP & Synergy calculation ---
         const rawHp = Math.round(data.raw_hp !== undefined ? data.raw_hp : ((template.hp || 1000) * starMult));
         const maxHp = Math.round(data.max_hp !== undefined ? data.max_hp : rawHp);
-        const curHp = Math.round(data.hp !== undefined ? data.hp : maxHp);
+        const curHp = Math.max(0, Math.round(data.hp !== undefined ? data.hp : maxHp));
+        const hpPct = Math.max(0, Math.min(100, Math.round((curHp / Math.max(1, maxHp)) * 100)));
         let hpBonusHTML = '';
         if (maxHp > rawHp) {
             hpBonusHTML = ` <span style="color:#2ecc71; font-weight:800; font-size:13px; text-shadow:0 0 6px rgba(46,204,113,0.5);">(+${(maxHp - rawHp).toLocaleString()} Synergy)</span>`;
@@ -621,6 +756,8 @@ export function showDisplayInfo(type, data, shopContext = null) {
 
         // --- Mana & starting mana indicator ---
         const maxMana = data.max_mana || template.max_mana || 200;
+        const curMana = Math.max(0, Math.round(data.mana || 0));
+        const manaPct = Math.max(0, Math.min(100, Math.round((curMana / Math.max(1, maxMana)) * 100)));
         let manaExtra = '';
         if (data.start_mana && data.start_mana > 0) {
             manaExtra = ` <span style="color: #3498db; font-size: 12px; font-weight: 700;">(Start: ${data.start_mana})</span>`;
@@ -717,23 +854,52 @@ export function showDisplayInfo(type, data, shopContext = null) {
             `;
         }
 
+        const isAlive = (data.is_alive !== false && (data.hp === undefined || data.hp > 0));
+        const activeBuffs = data.buffs || [];
+        const dmgDealt = Math.round(data.damage_dealt || 0);
+
         panel.innerHTML = `
             ${actionHeaderHTML}
-            <h3 class="panel-title">${data.name} ${'⭐'.repeat(currentStar)}</h3>
+            <div class="panel-title-row">
+                <h3 class="panel-title" style="margin: 0;">${data.name} ${'⭐'.repeat(currentStar)}</h3>
+                <span id="liveStatusBadge" class="info-live-badge ${isAlive ? 'alive' : 'dead'}">
+                    ${isAlive ? '🟢 ALIVE' : '💀 DEFEATED'}
+                </span>
+            </div>
             ${imgSrc ? `<img src="${imgSrc}" class="champ-info-img" alt="${data.name}">` : ''}
             <div class="card-stats">
                 ${activeSynergiesHTML}
                 ${traitsHTML}
                 ${skillHTML}
-                <p>❤️ HP: <b>${curHp.toLocaleString()} / ${maxHp.toLocaleString()}</b>${hpBonusHTML}</p>
-                ${data.shield > 0 ? `<p>🛡️ Shield: <b style="color: #ecf0f1;">${Math.round(data.shield).toLocaleString()}</b></p>` : ''}
-                <p>⚔️ Attack: ${atkDisplay}</p>
-                <p>🎯 Range: ${rngDisplay}</p>
-                <p>⚡ Speed: ${spdDisplay}</p>
-                <p>💧 Mana: <b>${data.mana || 0} / ${maxMana}</b>${manaExtra}</p>
+                <p style="margin-bottom: 2px;">❤️ HP: <b id="liveHpText">${curHp.toLocaleString()} / ${maxHp.toLocaleString()}</b>${hpBonusHTML}</p>
+                <div class="info-stat-bar-container">
+                    <div id="liveHpBar" class="info-stat-bar-fill hp-bar ${hpPct <= 28 ? 'low-hp' : ''}" style="width: ${hpPct}%;"></div>
+                </div>
+                <div id="liveShieldRow" style="${data.shield > 0 ? '' : 'display:none;'}">
+                    <p>🛡️ Shield: <b id="liveShieldVal" style="color: #ecf0f1;">${Math.round(data.shield || 0).toLocaleString()}</b></p>
+                </div>
+                <p>⚔️ Attack: <span id="liveAtkVal">${atkDisplay}</span></p>
+                <p>🎯 Range: <span id="liveRngVal">${rngDisplay}</span></p>
+                <p>⚡ Speed: <span id="liveSpdVal">${spdDisplay}</span></p>
+                <p style="margin-bottom: 2px;">💧 Mana: <b id="liveManaText">${curMana} / ${maxMana}</b>${manaExtra}</p>
+                <div class="info-stat-bar-container">
+                    <div id="liveManaBar" class="info-stat-bar-fill mana-bar ${curMana >= maxMana ? 'ready' : ''}" style="width: ${manaPct}%;"></div>
+                </div>
+                <div id="liveBuffsRow" style="${activeBuffs.length > 0 ? '' : 'display:none;'} margin: 6px 0;">
+                    <p style="margin: 0 0 3px 0; color: #a4b0be; font-size: 11px; font-weight: 800;">ACTIVE BUFFS & STATUS:</p>
+                    <div id="liveBuffsList" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
+                </div>
+                <div id="liveDmgRow" style="${dmgDealt > 0 ? '' : 'display:none;'}">
+                    <p style="color: #f1c40f;">⚔️ Combat DMG: <b id="liveDmgVal" style="color: #f1c40f;">${dmgDealt.toLocaleString()} DMG</b></p>
+                </div>
                 <p style="margin-top: 8px; border-top: 1px dashed #7f8c8d; padding-top: 8px;">🪙 Cost: <b>${champCost} Gold</b></p>
             </div>
         `;
+
+        // If buffs present, populate list
+        if (activeBuffs.length > 0) {
+            updateLiveChampStats(panel, data, template, starMult);
+        }
 
         // Gắn sự kiện cho nút Buy
         const buyBtn = panel.querySelector('#infoActionBuy');
@@ -761,6 +927,8 @@ export function showDisplayInfo(type, data, shopContext = null) {
             backBtn.onclick = (e) => {
                 e.stopPropagation();
                 panel.classList.remove('show');
+                panel.removeAttribute('data-champ-key');
+                if (typeof STATE !== 'undefined') STATE.inspectedChampId = null;
                 if (selectedShopCard) {
                     selectedShopCard.style.transform = '';
                     if (selectedShopCard.dataset.origBorder) selectedShopCard.style.borderColor = selectedShopCard.dataset.origBorder;

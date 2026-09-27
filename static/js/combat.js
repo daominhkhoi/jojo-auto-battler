@@ -1,6 +1,6 @@
 // static/js/combat.js
 import { CONFIG, STATE, getCanvasCoords, CHAMPION_POOL } from './globals.js';
-import { updateGold, refreshShop } from './shop.js';
+import { updateGold, refreshShop, showDisplayInfo } from './shop.js';
 import { startPrepTimer, stopPrepTimer } from './network.js';
 import { showNotification } from './notifications.js';
 import { updateDamageStats, freezeDamageStatsOnCombatEnd } from './stats.js';
@@ -251,6 +251,7 @@ export function updatePhysics() {
 }
 
 export function syncTickData(data) {
+    STATE.isCombatPhase = true;
     if (data.your_team) {
         STATE.myTeam = data.your_team;
     }
@@ -366,6 +367,14 @@ export function syncTickData(data) {
 
     // Update realtime damage stats panel
     updateDamageStats(STATE.champions);
+
+    // Live update inspected champion in the info panel
+    if (STATE.inspectedChampId) {
+        const liveChamp = STATE.champions.find(c => c.id === STATE.inspectedChampId);
+        if (liveChamp) {
+            showDisplayInfo('champ', liveChamp);
+        }
+    }
 
     if (!STATE.hitEffects) STATE.hitEffects = [];
 

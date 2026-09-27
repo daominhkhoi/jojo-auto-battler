@@ -112,6 +112,7 @@ function handlePointerDown(e) {
         } else {
             // Enemy champion OR combat phase: ALWAYS inspect info!
             hoveredChamp = touchedChamp;
+            STATE.inspectedChampId = touchedChamp.id;
             showDisplayInfo('champ', touchedChamp);
             if (isTouchDevice) {
                 const infoPanel = document.getElementById('infoPanel');
@@ -127,8 +128,10 @@ function handlePointerDown(e) {
     } else {
         if (isTouchDevice) {
             hoveredChamp = null;
+            STATE.inspectedChampId = null;
             const infoPanel = document.getElementById('infoPanel');
             if (infoPanel) infoPanel.classList.remove('show');
+            showDisplayInfo(null);
         }
     }
 }
@@ -170,17 +173,27 @@ function handlePointerMove(e) {
         let foundHover = null;
         for (let i = STATE.champions.length - 1; i >= 0; i--) {
             const champ = STATE.champions[i];
-            if (STATE.isCombatPhase && (!champ.is_alive || champ.hp <= 0)) continue;
             const size = getCanvasCoords(champ.targetX, champ.targetY);
-            if (mP.x >= champ.pixelX && mP.x <= champ.pixelX + size.w &&
-                mP.y >= champ.pixelY && mP.y <= champ.pixelY + size.h) {
+            const cX = champ.pixelX !== undefined ? champ.pixelX : size.x;
+            const cY = champ.pixelY !== undefined ? champ.pixelY : size.y;
+            if (mP.x >= cX && mP.x <= cX + size.w &&
+                mP.y >= cY && mP.y <= cY + size.h) {
                 foundHover = champ;
                 break;
             }
         }
-        if (foundHover !== hoveredChamp) {
+        if (foundHover) {
             hoveredChamp = foundHover;
-            showDisplayInfo('champ', hoveredChamp);
+            STATE.inspectedChampId = foundHover.id;
+            showDisplayInfo('champ', foundHover);
+        } else {
+            // In prep phase, clear inspection on mouseout.
+            // In combat or review phase, keep showing the active champion so the user can watch their live stats!
+            if (!STATE.isCombatPhase && !STATE.isRoundReview) {
+                hoveredChamp = null;
+                STATE.inspectedChampId = null;
+                showDisplayInfo(null);
+            }
         }
     }
 }
@@ -324,11 +337,17 @@ function setupMobileUi() {
 
     closeRightPanelBtn?.addEventListener('click', closeRightDrawer);
     closeInfoPanelBtn?.addEventListener('click', () => {
+        STATE.inspectedChampId = null;
+        hoveredChamp = null;
+        showDisplayInfo(null);
         if (infoPanel) infoPanel.classList.remove('show');
     });
 
     panelBackdrop?.addEventListener('click', () => {
         closeRightDrawer();
+        STATE.inspectedChampId = null;
+        hoveredChamp = null;
+        showDisplayInfo(null);
         if (infoPanel) infoPanel.classList.remove('show');
     });
 
@@ -454,8 +473,11 @@ canvas.addEventListener('mouseleave', () => {
     const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
     if (isTouchDevice) return; // Touch devices don't have mouseleave
     if (!isDragging) {
-        hoveredChamp = null;
-        showDisplayInfo(null);
+        if (!STATE.isCombatPhase && !STATE.isRoundReview) {
+            hoveredChamp = null;
+            STATE.inspectedChampId = null;
+            showDisplayInfo(null);
+        }
     }
 });
 
@@ -466,9 +488,12 @@ function animationLoop() {
     updatePhysics();
     renderBoard(ctx, canvas);
     
-    // Keep info panel updated in real-time during combat
-    if (STATE.isCombatPhase && hoveredChamp) {
-        showDisplayInfo('champ', hoveredChamp);
+    // Keep info panel updated in real-time continuously
+    if (STATE.inspectedChampId) {
+        const liveChamp = STATE.champions.find(c => c.id === STATE.inspectedChampId);
+        if (liveChamp) {
+            showDisplayInfo('champ', liveChamp);
+        }
     }
     
     requestAnimationFrame(animationLoop);

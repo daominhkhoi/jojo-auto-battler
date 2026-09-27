@@ -620,6 +620,76 @@ button:hover {
 }
 
 /* =========================================
+   REAL-TIME COMBAT INFO PANEL STYLES
+   ========================================= */
+.panel-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.info-stat-bar-container {
+    width: 100%;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 2px 0 6px 0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.info-stat-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.15s ease-out;
+}
+
+.info-stat-bar-fill.hp-bar {
+    background: linear-gradient(90deg, #2ecc71, #27ae60);
+    box-shadow: 0 0 6px rgba(46, 204, 113, 0.5);
+}
+
+.info-stat-bar-fill.hp-bar.low-hp {
+    background: linear-gradient(90deg, #e74c3c, #c0392b);
+    box-shadow: 0 0 6px rgba(231, 76, 60, 0.6);
+}
+
+.info-stat-bar-fill.mana-bar {
+    background: linear-gradient(90deg, #0984e3, #00cec9);
+    box-shadow: 0 0 6px rgba(0, 206, 201, 0.4);
+}
+
+.info-stat-bar-fill.mana-bar.ready {
+    background: linear-gradient(90deg, #00ffff, #ffffff);
+    box-shadow: 0 0 10px #00ffff;
+}
+
+.info-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.info-live-badge.alive {
+    background: rgba(46, 204, 113, 0.2);
+    color: #2ecc71;
+    border: 1px solid #27ae60;
+}
+
+.info-live-badge.dead {
+    background: rgba(231, 76, 60, 0.2);
+    color: #ff4757;
+    border: 1px solid #e74c3c;
+}
+
+/* =========================================
    SYNERGIES PANEL (Right)
    ========================================= */
 .synergy-item {

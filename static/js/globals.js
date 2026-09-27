@@ -35,7 +35,8 @@ export const STATE = {
     playerLP: 0,   // FIX: was 100 — score starts at 0, win condition is 10
     botLP: 0,      // FIX: same
     currentRound: 1,
-    myTeam: 'Team1'
+    myTeam: 'Team1',
+    inspectedChampId: null
 };
 
 
