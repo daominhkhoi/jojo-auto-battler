@@ -319,12 +319,16 @@ export function syncTickData(data) {
             localChamp.buffs = serverChamp.buffs || [];
             localChamp.buff_details = serverChamp.buff_details || [];
             localChamp.damage_dealt = serverChamp.damage_dealt !== undefined ? serverChamp.damage_dealt : (localChamp.damage_dealt || 0);
+            localChamp.name = serverChamp.name || localChamp.name;
+            localChamp.is_clone = serverChamp.is_clone !== undefined ? serverChamp.is_clone : localChamp.is_clone;
         } else {
-            const template = CHAMPION_POOL.find(t => t.name === serverChamp.name) || {};
+            const baseName = (serverChamp.name || '').replace(/\s*\(CLONE\)$/i, '').trim();
+            const template = CHAMPION_POOL.find(t => t.name === serverChamp.name || t.name === baseName) || {};
 
             STATE.champions.push({
                 id: serverChamp.id,
                 name: serverChamp.name,
+                is_clone: !!serverChamp.is_clone,
                 team: serverChamp.team || "Team2",
                 star: serverChamp.star || 1,
                 targetX: serverChamp.x,

@@ -426,7 +426,8 @@ export function showDisplayInfo(type, data, shopContext = null) {
     const isMobile = window.innerWidth <= 768 || window.matchMedia('(pointer: coarse)').matches;
 
     if (type === 'champ') {
-        const template = CHAMPION_POOL.find(c => c.name === data.name) || {};
+        const baseName = (data.name || '').replace(/\s*\(CLONE\)$/i, '').trim();
+        const template = CHAMPION_POOL.find(c => c.name === data.name || c.name === baseName) || {};
         const hp = Math.round(data.hp !== undefined ? data.hp : (data.max_hp || template.hp));
         const traitsHTML = template.traits ? `<p>🔮 Traits: <b>${template.traits.join(', ')}</b></p>` : '';
         const imgSrc = template.img || '';

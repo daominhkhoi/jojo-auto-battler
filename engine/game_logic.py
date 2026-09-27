@@ -16,7 +16,10 @@ def register_champion_costs(cost_dict):
     _CHAMPION_COSTS.update(cost_dict)
 
 def get_champion_cost(name):
-    return _CHAMPION_COSTS.get(name, 1)
+    if not name:
+        return 1
+    base_name = str(name).replace(' (CLONE)', '').strip()
+    return _CHAMPION_COSTS.get(base_name, _CHAMPION_COSTS.get(name, 1))
 
 
 class Champion:
@@ -307,7 +310,9 @@ class Champion:
                 threshold = cost_thresholds.get(cost, 0.20)
 
             if (target.hp / max(1, target.max_hp)) < threshold:
-                dmg, evs = target.take_damage(999999, self, board_state)
+                # Sát thương kết liễu = đúng lượng máu (và khiên) hiện tại của mục tiêu, không cộng 999999
+                exec_damage = max(1, target.hp + getattr(target, 'shield', 0))
+                dmg, evs = target.take_damage(exec_damage, self, board_state)
             else:
                 dmg, evs = target.take_damage(s_power, self, board_state)
             event['extra_events'] = evs
@@ -388,9 +393,18 @@ class Champion:
             target.active_buffs.append({'type': 'mana_battery', 'power': s_power, 'duration': s_duration})
 
         # 11. DAMAGE — FIX: now routes through take_damage so shields/evasion/revive apply
-        elif s_type == 'damage' and target:
-            dmg, evs = target.take_damage(s_power, self, board_state)
-            event.setdefault('extra_events', []).extend(evs)
+        elif (s_type in ('damage', 'aoe_damage')) and target:
+            if s_radius > 0 or s_type == 'aoe_damage':
+                eff_radius = s_radius if s_radius > 0 else 2.0
+                hit_targets = [c for c in board_state if c.team != self.team and c.is_alive and calculate_distance(target.x, target.y, c.x, c.y) <= eff_radius]
+                if not hit_targets:
+                    hit_targets = [target]
+                for t in hit_targets:
+                    dmg, evs = t.take_damage(s_power, self, board_state)
+                    event.setdefault('extra_events', []).extend(evs)
+            else:
+                dmg, evs = target.take_damage(s_power, self, board_state)
+                event.setdefault('extra_events', []).extend(evs)
 
         elif s_type == 'heal' and target:
             if s_duration > 0:
@@ -409,17 +423,19 @@ class Champion:
             self.active_buffs.append({'type': 'buff_atk', 'power': s_power, 'duration': s_duration})
 
         elif s_type == 'dot' and target:
-            target.active_buffs.append({'type': 'dot', 'power': s_power, 'duration': s_duration})
+            target.active_buffs.append({'type': 'dot', 'power': s_power, 'duration': s_duration, 'caster_id': self.id})
 
         elif s_type == 'aoe_heal' and target:
             for c in board_state:
                 if c.team == self.team and c.is_alive and calculate_distance(target.x, target.y, c.x, c.y) <= s_radius:
                     c.active_buffs.append({'type': 'aoe_heal', 'power': s_power, 'duration': s_duration})
 
-        elif s_type == 'aoe_dot' and target:
-            for c in board_state:
-                if c.team != self.team and c.is_alive and calculate_distance(target.x, target.y, c.x, c.y) <= s_radius:
-                    c.active_buffs.append({'type': 'aoe_dot', 'power': s_power, 'duration': s_duration})
+        elif s_type == 'aoe_dot':
+            center_target = target or self.resolve_target('area_closest', board_state)
+            if center_target:
+                for c in board_state:
+                    if c.team != self.team and c.is_alive and calculate_distance(center_target.x, center_target.y, c.x, c.y) <= s_radius:
+                        c.active_buffs.append({'type': 'aoe_dot', 'power': s_power, 'duration': s_duration, 'caster_id': self.id})
 
         elif s_type == 'speed_buff':
             bonus_speed = self.base_speed * (s_power / 100.0)
@@ -442,14 +458,17 @@ class Champion:
             else:
                 # FIX: UUID-based clone ID — no more millisecond collision
                 clone_id = f"{self.id}_clone_{uuid.uuid4().hex[:8]}"
+                base_name = self.name.replace(' (CLONE)', '').strip()
+                clone_name = f"{base_name} (CLONE)"
                 clone = Champion(
-                    clone_id, self.name, self.team,
+                    clone_id, clone_name, self.team,
                     self.x + 0.5, self.y + 0.5,
                     self.max_hp * s_percent, self.attack * s_percent,
                     self.attack_range, self.speed, self.max_mana,
                     self.star, skill=self.skill
                 )
                 clone.is_clone = True
+                clone.base_name = base_name
                 event['spawned_clones'] = [clone]
 
         elif s_type == 'mana_lock' and target:
@@ -529,8 +548,9 @@ class Champion:
             bt = buff['type']
 
             # --- TÁC DỤNG THEO THỜI GIAN (TICK CỦA BUFF) ---
-            if bt == 'dot' or bt == 'aoe_dot':
-                dmg, evs = self.take_damage(buff['power'] / 10.0, None, board_state)
+            if bt in ('dot', 'aoe_dot'):
+                caster = next((c for c in board_state if c.id == buff.get('caster_id')), None)
+                dmg, evs = self.take_damage(buff['power'] / 10.0, caster, board_state)
                 events.extend(evs)
             elif bt in ('regen', 'aoe_heal', 'heal'):
                 self.hp = min(self.max_hp, self.hp + buff['power'] / 10.0)
@@ -595,7 +615,8 @@ class Champion:
             'mana_refund_ratio': getattr(self, 'mana_refund_ratio', 0.0),
             'double_cast_chance': getattr(self, 'double_cast_chance', 0.0),
             'buffs': [b['type'] for b in self.active_buffs],
-            'buff_details': safe_buffs
+            'buff_details': safe_buffs,
+            'is_clone': getattr(self, 'is_clone', False)
         }
 
 

@@ -63,7 +63,8 @@ export function renderBoard(ctx, canvas) {
             ctx.save();
             ctx.globalAlpha = 0.28;
             ctx.filter = 'grayscale(100%)';
-            const img = IMAGE_CACHE[champ.name];
+            const baseName = (champ.name || '').replace(/\s*\(CLONE\)$/i, '').trim();
+            const img = IMAGE_CACHE[champ.name] || IMAGE_CACHE[baseName];
             if (img) {
                 ctx.drawImage(img, pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
             } else {
@@ -106,7 +107,8 @@ export function renderBoard(ctx, canvas) {
             ctx.fillText('🐌', pX + currentSize.w / 2, pY + currentSize.h / 2);
         } else {
             // Vẽ ảnh bình thường
-            const img = IMAGE_CACHE[champ.name];
+            const baseName = (champ.name || '').replace(/\s*\(CLONE\)$/i, '').trim();
+            const img = IMAGE_CACHE[champ.name] || IMAGE_CACHE[baseName];
             if (img) {
                 ctx.drawImage(img, pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
             } else {

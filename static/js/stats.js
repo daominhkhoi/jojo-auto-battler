@@ -257,7 +257,8 @@ function renderChampionRows(list, teamTotal, maxCombatDmg, side) {
         const sharePct = teamTotal > 0 ? Math.round((champ.damage / teamTotal) * 100) : 0;
         const isMvp = index === 0 && champ.damage > 0;
         const stars = '⭐'.repeat(Math.min(3, Math.max(1, champ.star)));
-        const template = (CHAMPION_POOL || []).find(c => c.name === champ.name);
+        const baseName = (champ.name || '').replace(/\s*\(CLONE\)$/i, '').trim();
+        const template = (CHAMPION_POOL || []).find(c => c.name === champ.name || c.name === baseName);
         const cost = template ? (template.cost || 1) : 1;
         const tierBorderColors = {
             1: 'rgba(189, 195, 199, 0.45)',
@@ -267,9 +268,9 @@ function renderChampionRows(list, teamTotal, maxCombatDmg, side) {
             5: 'rgba(241, 196, 15, 0.85)'
         };
         const tierBorder = tierBorderColors[cost] || 'rgba(255, 255, 255, 0.2)';
-        const rawAvatarUrl = IMAGES[champ.name] || '';
+        const rawAvatarUrl = IMAGES[champ.name] || IMAGES[baseName] || '';
         const safeAvatarUrl = rawAvatarUrl ? encodeURI(rawAvatarUrl) : '';
-        const initials = getChampInitials(champ.name);
+        const initials = getChampInitials(baseName || champ.name);
         const statusIcon = champ.is_alive ? '🟢' : '💀';
         const rankLabel = `#${index + 1}`;
 
