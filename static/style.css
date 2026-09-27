@@ -2363,7 +2363,7 @@ button:hover {
         border: 2px solid #34495e !important;
         border-radius: 12px !important;
         box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.8) !important;
-        z-index: 500 !important;
+        z-index: 600 !important;
         padding: 10px !important;
         overflow-y: auto !important;
         transition: transform 0.25s ease-out !important;
@@ -2413,5 +2413,30 @@ button:hover {
         display: block !important;
         opacity: 1 !important;
         pointer-events: auto !important;
+    }
+
+    /* 8. Mobile Sell Zone (Positioned safely above bottom shop bar) */
+    .sell-zone {
+        top: auto !important;
+        bottom: 108px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: 160px !important;
+        height: 48px !important;
+        font-size: 16px !important;
+        font-weight: 800 !important;
+        line-height: 48px !important;
+        background: rgba(231, 76, 60, 0.28) !important;
+        border: 2px dashed #e74c3c !important;
+        color: #ff7675 !important;
+        border-radius: 10px !important;
+        box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4) !important;
+        z-index: 400 !important;
+    }
+
+    .sell-zone.active {
+        background: rgba(231, 76, 60, 0.85) !important;
+        color: #fff !important;
+        transform: translateX(-50%) scale(1.06) !important;
     }
 }

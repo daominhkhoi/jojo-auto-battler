@@ -97,7 +97,10 @@ function handlePointerDown(e) {
     const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
 
     if (touchedChamp) {
-        if (!STATE.isCombatPhase && !STATE.isRoundReview && !STATE.isBotVsBot) {
+        const isMyChamp = touchedChamp.team === (STATE.myTeam || 'Team1');
+
+        if (!STATE.isCombatPhase && !STATE.isRoundReview && !STATE.isBotVsBot && isMyChamp) {
+            // ONLY drag own champions!
             isDragging = true;
             draggedChamp = touchedChamp;
             originalX = touchedChamp.targetX;
@@ -107,14 +110,17 @@ function handlePointerDown(e) {
             
             if (sellZone && isTouchDevice) sellZone.style.display = 'block';
         } else {
+            // Enemy champion OR combat phase: ALWAYS inspect info!
             hoveredChamp = touchedChamp;
             showDisplayInfo('champ', touchedChamp);
             if (isTouchDevice) {
                 const infoPanel = document.getElementById('infoPanel');
                 if (infoPanel) {
                     infoPanel.classList.add('show');
-                    const synPanel = document.getElementById('synergyPanel');
-                    if (synPanel) synPanel.classList.remove('show');
+                    const rightSidePanel = document.getElementById('rightSidePanel');
+                    const panelBackdrop = document.getElementById('panelBackdrop');
+                    if (rightSidePanel) rightSidePanel.classList.remove('show');
+                    if (panelBackdrop) panelBackdrop.classList.remove('show');
                 }
             }
         }
@@ -154,6 +160,13 @@ function handlePointerMove(e) {
             }
         }
     } else {
+        const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+        if (isTouchDevice) {
+            // Touch devices don't have cursor hover; inspection is explicit on tap.
+            // Do NOT overwrite or wipe hoveredChamp on phantom move events!
+            return;
+        }
+
         let foundHover = null;
         for (let i = STATE.champions.length - 1; i >= 0; i--) {
             const champ = STATE.champions[i];
@@ -180,13 +193,22 @@ function handlePointerUp(e) {
         const mP = getMousePos(e);
         
         const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+        const dragDist = Math.hypot(
+            (draggedChamp.pixelX || 0) - (draggedChamp.startPixelX || 0),
+            (draggedChamp.pixelY || 0) - (draggedChamp.startPixelY || 0)
+        );
+
         if (sellZone && isTouchDevice) {
             const rect = sellZone.getBoundingClientRect();
-            if (mP.rawX >= rect.left && mP.rawX <= rect.right &&
+            // Must be dragged intentionally (> 30px) and dropped into sellZone
+            if (dragDist > 30 &&
+                mP.rawX >= rect.left && mP.rawX <= rect.right &&
                 mP.rawY >= rect.top && mP.rawY <= rect.bottom) {
-                sellChampion(draggedChamp);
-                hoveredChamp = null;
-                showDisplayInfo(null);
+                if (draggedChamp.team === (STATE.myTeam || 'Team1')) {
+                    sellChampion(draggedChamp);
+                    hoveredChamp = null;
+                    showDisplayInfo(null);
+                }
                 
                 isDragging = false;
                 draggedChamp = null;
@@ -231,18 +253,17 @@ function handlePointerUp(e) {
         draggedChamp.originalX = gridX;
         draggedChamp.originalY = gridY;
 
-        const isTouchDev = window.matchMedia("(pointer: coarse)").matches;
-        if (isTouchDev) {
-            const dx = (draggedChamp.pixelX || 0) - (draggedChamp.startPixelX || 0);
-            const dy = (draggedChamp.pixelY || 0) - (draggedChamp.startPixelY || 0);
-            if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-                showDisplayInfo('champ', draggedChamp);
-                const infoPanel = document.getElementById('infoPanel');
-                if (infoPanel) {
-                    infoPanel.classList.add('show');
-                    const synPanel = document.getElementById('synergyPanel');
-                    if (synPanel) synPanel.classList.remove('show');
-                }
+        // Tap inspection on mobile if barely moved (< 20px)
+        if (isTouchDevice && dragDist < 20) {
+            hoveredChamp = draggedChamp;
+            showDisplayInfo('champ', draggedChamp);
+            const infoPanel = document.getElementById('infoPanel');
+            if (infoPanel) {
+                infoPanel.classList.add('show');
+                const rightSidePanel = document.getElementById('rightSidePanel');
+                const panelBackdrop = document.getElementById('panelBackdrop');
+                if (rightSidePanel) rightSidePanel.classList.remove('show');
+                if (panelBackdrop) panelBackdrop.classList.remove('show');
             }
         }
 
@@ -404,10 +425,14 @@ function setupMobileUi() {
 }
 setupMobileUi();
 
-// 4. RIGHT CLICK (Sell champion)
+// 4. RIGHT CLICK (Sell champion on desktop only)
 canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     if (STATE.isCombatPhase) return;
+
+    // Mobile long-press triggers contextmenu — NEVER sell on touch devices!
+    const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+    if (isTouchDevice) return;
 
     const mP = getMousePos(e);
     const clickedChamp = STATE.champions.find(champ => {
@@ -416,7 +441,7 @@ canvas.addEventListener('contextmenu', (e) => {
             mP.y >= champ.pixelY && mP.y <= champ.pixelY + size.h;
     });
 
-    if (clickedChamp) {
+    if (clickedChamp && clickedChamp.team === (STATE.myTeam || 'Team1')) {
         sellChampion(clickedChamp);
         // Reset info panel after selling
         hoveredChamp = null;
@@ -426,6 +451,8 @@ canvas.addEventListener('contextmenu', (e) => {
 
 // 5. RESET HOVER ON CANVAS LEAVE
 canvas.addEventListener('mouseleave', () => {
+    const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+    if (isTouchDevice) return; // Touch devices don't have mouseleave
     if (!isDragging) {
         hoveredChamp = null;
         showDisplayInfo(null);

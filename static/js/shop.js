@@ -350,8 +350,10 @@ export function refreshShop() {
                     const infoPanel = document.getElementById('infoPanel');
                     if (infoPanel && window.innerWidth <= 768) {
                         infoPanel.classList.add('show');
-                        const synPanel = document.getElementById('synergyPanel');
-                        if (synPanel) synPanel.classList.remove('show');
+                        const rightSidePanel = document.getElementById('rightSidePanel');
+                        const panelBackdrop = document.getElementById('panelBackdrop');
+                        if (rightSidePanel) rightSidePanel.classList.remove('show');
+                        if (panelBackdrop) panelBackdrop.classList.remove('show');
                     }
                 }
                 e.stopPropagation();
@@ -376,6 +378,12 @@ export function refreshShop() {
 }
 
 export function sellChampion(champ) {
+    if (!champ) return;
+    const myTeam = STATE.myTeam || 'Team1';
+    if (champ.team && champ.team !== myTeam) {
+        showNotification("Cannot sell enemy champion!", "error");
+        return;
+    }
     const index = STATE.champions.indexOf(champ);
     if (index > -1) {
         const template = CHAMPION_POOL.find(t => t.name === champ.name) || {};
@@ -482,10 +490,12 @@ function renderSynergyPanel(traitCounts) {
             const traitName = e.currentTarget.getAttribute('data-trait');
             showDisplayInfo('trait', { name: traitName, count: traitCounts[traitName] });
 
-            // Close synergy panel, open info panel
-            const synergyPanel = document.getElementById('synergyPanel');
+            // Close right side drawer & backdrop, open info panel
+            const rightSidePanel = document.getElementById('rightSidePanel');
+            const panelBackdrop = document.getElementById('panelBackdrop');
             const infoPanel = document.getElementById('infoPanel');
-            if (synergyPanel) synergyPanel.classList.remove('show');
+            if (rightSidePanel) rightSidePanel.classList.remove('show');
+            if (panelBackdrop) panelBackdrop.classList.remove('show');
             if (infoPanel) infoPanel.classList.add('show');
 
             e.stopPropagation(); // prevent outside-click handler from closing immediately
@@ -497,12 +507,17 @@ export function showDisplayInfo(type, data, shopContext = null) {
     const panel = document.getElementById('infoPanel');
     if (!panel) return;
 
+    const isMobile = window.innerWidth <= 768 || window.matchMedia('(pointer: coarse)').matches;
+
     if (!type || !data) {
+        if (isMobile) {
+            panel.classList.remove('show');
+            panel.innerHTML = '';
+            return;
+        }
         panel.innerHTML = `<div class="info-placeholder">Hover over a card or synergy to view details</div>`;
         return;
     }
-
-    const isMobile = window.innerWidth <= 768 || window.matchMedia('(pointer: coarse)').matches;
 
     if (type === 'champ') {
         const baseName = (data.name || '').replace(/\s*\(CLONE\)$/i, '').trim();
@@ -796,8 +811,10 @@ export function showDisplayInfo(type, data, shopContext = null) {
             traitBackBtn.onclick = (e) => {
                 e.stopPropagation();
                 panel.classList.remove('show');
-                const synPanel = document.getElementById('synergyPanel');
-                if (synPanel) synPanel.classList.add('show');
+                const rightSidePanel = document.getElementById('rightSidePanel');
+                const panelBackdrop = document.getElementById('panelBackdrop');
+                if (rightSidePanel) rightSidePanel.classList.add('show');
+                if (panelBackdrop) panelBackdrop.classList.add('show');
             };
         }
     }
