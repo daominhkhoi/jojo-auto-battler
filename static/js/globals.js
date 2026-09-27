@@ -42,19 +42,14 @@ export const STATE = {
 export { CHAMPION_POOL };
 
 export const IMAGE_CACHE = {};
-CHAMPION_POOL.forEach(champ => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = champ.img;
-    IMAGE_CACHE[champ.name] = img;
+Object.entries(IMAGES).forEach(([name, src]) => {
+    if (src) {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = src;
+        IMAGE_CACHE[name] = img;
+    }
 });
-
-if (IMAGES["Background"]) {
-    const bgImg = new Image();
-    bgImg.crossOrigin = "anonymous";
-    bgImg.src = IMAGES["Background"];
-    IMAGE_CACHE["Background"] = bgImg;
-}
 
 // Convert grid coordinates to canvas pixel coordinates
 export function getCanvasCoords(gridX, gridY) {

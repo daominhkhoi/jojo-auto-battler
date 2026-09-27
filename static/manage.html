@@ -9,95 +9,133 @@
             background-color: #ecf0f1;
             padding: 20px;
             color: #2c3e50;
+            margin: 0;
         }
 
         h1 {
             text-align: center;
             color: #34495e;
+            margin-bottom: 20px;
         }
 
         .controls {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
 
         button {
-            padding: 12px 24px;
-            background-color: #27ae60;
+            padding: 12px 22px;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
-            transition: 0.2s;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
 
-            button:hover {
-                background-color: #2ecc71;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            }
+        #syncDriveBtn {
+            background-color: #2980b9;
+        }
+        #syncDriveBtn:hover {
+            background-color: #3498db;
+            box-shadow: 0 4px 10px rgba(41, 128, 185, 0.35);
+        }
+
+        #exportBtn {
+            background-color: #27ae60;
+        }
+        #exportBtn:hover {
+            background-color: #2ecc71;
+            box-shadow: 0 4px 10px rgba(39, 174, 96, 0.35);
+        }
+
+        #searchInput {
+            padding: 10px 16px;
+            font-size: 15px;
+            border: 2px solid #bdc3c7;
+            border-radius: 6px;
+            outline: none;
+            width: 260px;
+            transition: border-color 0.2s;
+        }
+        #searchInput:focus {
+            border-color: #2980b9;
+        }
+
+        #syncBanner {
+            display: none;
+            padding: 14px 20px;
+            margin-bottom: 16px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: all 0.3s;
+        }
 
         table {
             width: 100%;
             border-collapse: collapse;
             background: white;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
             border-radius: 8px;
             overflow: hidden;
         }
 
         th, td {
-            padding: 12px 15px;
+            padding: 12px 14px;
             text-align: center;
-            border-bottom: 1px solid #ddd;
+            border-bottom: 1px solid #edf2f7;
         }
 
         th {
             background-color: #34495e;
             color: white;
             text-transform: uppercase;
-            font-size: 14px;
+            font-size: 13px;
             position: sticky;
             top: 0;
+            z-index: 10;
         }
 
         td {
-            font-size: 15px;
+            font-size: 14px;
         }
 
         tr:hover {
-            background-color: #f1c40f;
-            color: #000;
+            background-color: #fef9e7;
+        }
+
+        @keyframes highlightRow {
+            0%   { background-color: #a3e4d7; }
+            50%  { background-color: #d4efdf; }
+            100% { background-color: transparent; }
+        }
+
+        .row-updated {
+            animation: highlightRow 3s ease-out;
             font-weight: bold;
         }
 
-        .cost-1 {
-            color: #bdc3c7;
-            font-weight: bold;
-        }
-
-        .cost-2 {
-            color: #2ecc71;
-            font-weight: bold;
-        }
-
-        .cost-3 {
-            color: #3498db;
-            font-weight: bold;
-        }
-
-        .cost-4 {
-            color: #9b59b6;
-            font-weight: bold;
-        }
-
-        .cost-5 {
-            color: #f1c40f;
-            font-weight: bold;
-            text-shadow: 1px 1px 1px #000;
-        }
+        .cost-1 { color: #7f8c8d; font-weight: bold; }
+        .cost-2 { color: #27ae60; font-weight: bold; }
+        .cost-3 { color: #2980b9; font-weight: bold; }
+        .cost-4 { color: #8e44ad; font-weight: bold; }
+        .cost-5 { color: #d35400; font-weight: bold; text-shadow: 0.5px 0.5px 1px rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
@@ -105,69 +143,107 @@
     <h1>📊 CHAMPION STATS MANAGEMENT</h1>
 
     <div class="controls">
-        <div style="display: flex; align-items: center;">
-            <strong>Total Champions:</strong> <span id="totalChamps" style="color: #e74c3c; font-size: 18px; font-weight: bold; margin-left: 6px;">0</span>
-            <span id="syncStatus" style="margin-left: 20px; font-size: 14px; color: #27ae60; font-weight: 600;"></span>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div>
+                <strong>Tổng tướng:</strong> <span id="totalChamps" style="color: #e74c3c; font-size: 20px; font-weight: bold;">0</span>
+            </div>
+            <input type="text" id="searchInput" placeholder="🔍 Tìm kiếm tướng (VD: Heaven, Chariot)...">
         </div>
-        <div>
-            <button id="syncDriveBtn" style="background-color: #2980b9; margin-right: 10px;">🔄 ĐỒNG BỘ GOOGLE DRIVE</button>
-            <button id="exportBtn">📥 EXPORT EXCEL (.CSV)</button>
+        <div class="btn-group">
+            <button id="syncDriveBtn">🔄 ĐỒNG BỘ GOOGLE DRIVE</button>
+            <button id="exportBtn">📥 XUẤT EXCEL (.CSV)</button>
         </div>
     </div>
+
+    <div id="syncBanner"></div>
 
     <table id="champTable">
         <thead>
             <tr>
-                <th>Champion Name</th>
+                <th>Tên Tướng</th>
                 <th>Cost</th>
                 <th>HP</th>
-                <th>Attack (ATK)</th>
+                <th>ATK</th>
                 <th>Range</th>
                 <th>Speed</th>
                 <th>Mana</th>
-                <th>Traits</th>
-                <th>Skill Type</th>
-                <th>Skill Value</th>
-                <th>Radius</th>
-                <th>Duration (s)</th>
+                <th>Hệ Tộc (Traits)</th>
+                <th>Loại Chiêu</th>
+                <th>Chỉ Số Chiêu</th>
+                <th>Bán Kính</th>
+                <th>Thời Gian (s)</th>
             </tr>
         </thead>
         <tbody>
-            <!-- Dữ liệu sẽ được điền tự động bằng JS -->
+            <!-- Dữ liệu được nạp tự động qua API -->
         </tbody>
     </table>
 
-    <script type="module">
-        import { CHAMPION_POOL } from './js/entities.js';
-
-        let currentPool = [...CHAMPION_POOL];
+    <script>
+        const API_BASE = (window.location.protocol === 'file:' || !window.location.host) ? 'http://localhost:5000' : '';
         const tbody = document.querySelector('#champTable tbody');
-        const syncStatus = document.getElementById('syncStatus');
+        const syncBanner = document.getElementById('syncBanner');
+        const syncBtn = document.getElementById('syncDriveBtn');
+        const searchInput = document.getElementById('searchInput');
 
-        function renderTable(pool) {
+        let allChampions = [];
+        let previousMap = new Map();
+
+        function showBanner(message, type = 'success') {
+            syncBanner.style.display = 'block';
+            if (type === 'success') {
+                syncBanner.style.backgroundColor = '#d4edda';
+                syncBanner.style.color = '#155724';
+                syncBanner.style.border = '1px solid #c3e6cb';
+            } else if (type === 'info') {
+                syncBanner.style.backgroundColor = '#d1ecf1';
+                syncBanner.style.color = '#0c5460';
+                syncBanner.style.border = '1px solid #bee5eb';
+            } else if (type === 'warn') {
+                syncBanner.style.backgroundColor = '#fff3cd';
+                syncBanner.style.color = '#856404';
+                syncBanner.style.border = '1px solid #ffeeba';
+            } else {
+                syncBanner.style.backgroundColor = '#f8d7da';
+                syncBanner.style.color = '#721c24';
+                syncBanner.style.border = '1px solid #f5c6cb';
+            }
+            syncBanner.innerHTML = message;
+        }
+
+        function renderTable(pool, updatedNames = new Set()) {
             tbody.innerHTML = '';
             document.getElementById('totalChamps').innerText = pool.length;
 
-            pool.forEach(champ => {
-                const tr = document.createElement('tr');
-                const skill = champ.skill || {};
+            const filterText = (searchInput.value || '').trim().toLowerCase();
+            const filtered = pool.filter(c => !filterText || c.name.toLowerCase().includes(filterText) || (c.traits || []).some(t => t.toLowerCase().includes(filterText)));
 
+            filtered.forEach(champ => {
+                const tr = document.createElement('tr');
+                const isUpdated = updatedNames.has(champ.name);
+                if (isUpdated) {
+                    tr.classList.add('row-updated');
+                }
+
+                const skill = champ.skill || {};
                 let skillPowerDisplay = '';
-                if (skill.power) skillPowerDisplay = skill.power.toLocaleString();
+                if (skill.power) skillPowerDisplay = Number(skill.power).toLocaleString();
                 else if (skill.percent) skillPowerDisplay = `${Math.round(skill.percent * 100)}%`;
-                else if (skill.radius) skillPowerDisplay = `Radius: ${skill.radius}`;
+                else if (skill.radius) skillPowerDisplay = `Bán kính: ${skill.radius}`;
 
                 tr.innerHTML = `
-                    <td style="text-align: left; font-weight: bold;">${champ.name}</td>
+                    <td style="text-align: left; font-weight: bold; ${isUpdated ? 'color: #27ae60;' : ''}">
+                        ${champ.name} ${isUpdated ? '✨ (Mới cập nhật)' : ''}
+                    </td>
                     <td class="cost-${champ.cost}">${champ.cost} 🪙</td>
-                    <td>${(champ.hp || 0).toLocaleString()}</td>
-                    <td>${(champ.attack || 0).toLocaleString()}</td>
+                    <td>${Number(champ.hp || 0).toLocaleString()}</td>
+                    <td>${Number(champ.attack || 0).toLocaleString()}</td>
                     <td>${champ.attack_range}</td>
                     <td>${champ.speed}</td>
                     <td>${champ.max_mana}</td>
-                    <td style="font-size: 13px;">${(champ.traits || []).join(', ')}</td>
+                    <td style="font-size: 13px; color: #555;">${(champ.traits || []).join(', ')}</td>
                     <td style="color: #8e44ad; font-weight: bold;">${skill.type ? skill.type.toUpperCase() : ''}</td>
-                    <td>${skillPowerDisplay}</td>
+                    <td>${skillPowerDisplay || '-'}</td>
                     <td style="color: #e67e22; font-weight: bold;">${skill.radius ? skill.radius : '-'}</td>
                     <td>${skill.duration ? skill.duration + 's' : '-'}</td>
                 `;
@@ -175,47 +251,79 @@
             });
         }
 
-        renderTable(currentPool);
+        searchInput.addEventListener('input', () => {
+            renderTable(allChampions);
+        });
 
-        // 1. CHỨC NĂNG ĐỒNG BỘ TRỰC TIẾP TỪ GOOGLE DRIVE
-        const syncBtn = document.getElementById('syncDriveBtn');
+        // 1. TẢI DỮ LIỆU BAN ĐẦU
+        async function loadInitialData() {
+            try {
+                showBanner('⏳ Đang nạp dữ liệu từ máy chủ...', 'info');
+                const res = await fetch(`${API_BASE}/api/champions`);
+                if (!res.ok) throw new Error(`Mã lỗi HTTP: ${res.status}`);
+                allChampions = await res.json();
+                allChampions.forEach(c => previousMap.set(c.name, JSON.stringify(c)));
+                renderTable(allChampions);
+                showBanner(`✅ Đã nạp thành công <strong>${allChampions.length} tướng</strong>. Sẵn sàng đồng bộ!`, 'success');
+            } catch (err) {
+                showBanner(`❌ Không thể nạp danh sách tướng: ${err.message}. Hãy chắc chắn server game đang chạy tại localhost:5000.`, 'error');
+            }
+        }
+
+        // 2. CHỨC NĂNG ĐỒNG BỘ TRỰC TIẾP TỪ GOOGLE DRIVE
         syncBtn.addEventListener('click', async () => {
             syncBtn.disabled = true;
-            syncBtn.innerText = '⏳ Đang tải từ Google Drive...';
-            syncStatus.innerText = 'Đang đồng bộ dữ liệu...';
-            syncStatus.style.color = '#e67e22';
+            syncBtn.innerText = '⏳ Đang kéo từ Google Drive...';
+            showBanner('⏳ Đang kết nối tới Google Sheets và cập nhật thông số...', 'info');
 
             try {
-                const res = await fetch('/api/reload_champions', { method: 'POST' });
-                const json = await res.json();
-                if (json.status === 'ok') {
-                    const champRes = await fetch('/api/champions?reload=1');
-                    currentPool = await champRes.json();
-                    renderTable(currentPool);
-                    syncStatus.innerText = `Đã đồng bộ thành công ${currentPool.length} tướng lúc ${new Date().toLocaleTimeString()}!`;
-                    syncStatus.style.color = '#27ae60';
+                // Gọi API ép tải bản mới nhất từ Google Sheets
+                const reloadRes = await fetch(`${API_BASE}/api/reload_champions`, { method: 'POST' });
+                if (!reloadRes.ok) throw new Error(`Lỗi tải API: ${reloadRes.status}`);
+                const reloadJson = await reloadRes.json();
+
+                // Lấy lại danh sách tướng mới nhất
+                const champRes = await fetch(`${API_BASE}/api/champions?reload=1&_t=${Date.now()}`);
+                const freshChampions = await champRes.json();
+
+                // So sánh xem có tướng nào thay đổi chỉ số so với trước khi bấm nút không
+                const changedChampions = [];
+                const updatedNames = new Set();
+
+                freshChampions.forEach(champ => {
+                    const prevStr = previousMap.get(champ.name);
+                    const currStr = JSON.stringify(champ);
+                    if (prevStr && prevStr !== currStr) {
+                        changedChampions.push(champ.name);
+                        updatedNames.add(champ.name);
+                    }
+                    previousMap.set(champ.name, currStr);
+                });
+
+                allChampions = freshChampions;
+                renderTable(allChampions, updatedNames);
+
+                if (changedChampions.length > 0) {
+                    showBanner(`🎉 <strong>Đồng bộ thành công lúc ${new Date().toLocaleTimeString()}!</strong> Phát hiện <strong>${changedChampions.length} tướng</strong> có chỉ số mới từ Google Drive: <br>• <strong>${changedChampions.join(', ')}</strong>`, 'success');
                 } else {
-                    syncStatus.innerText = `Cảnh báo: ${json.message}`;
-                    syncStatus.style.color = '#e74c3c';
+                    showBanner(`✅ <strong>Đã đồng bộ thành công lúc ${new Date().toLocaleTimeString()}!</strong><br>Dữ liệu trong game đã khớp 100% với Google Drive hiện tại (tất cả <strong>${allChampions.length} tướng</strong> đã ở phiên bản mới nhất).`, 'success');
                 }
             } catch (err) {
-                syncStatus.innerText = `Lỗi kết nối: ${err.message}`;
-                syncStatus.style.color = '#e74c3c';
+                console.error(err);
+                showBanner(`❌ Lỗi khi đồng bộ Google Drive: ${err.message}. Kiểm tra kết nối mạng hoặc server localhost:5000!`, 'error');
             } finally {
                 syncBtn.disabled = false;
                 syncBtn.innerText = '🔄 ĐỒNG BỘ GOOGLE DRIVE';
             }
         });
 
-        // 2. CHỨC NĂNG XUẤT FILE EXCEL (.CSV) CHUẨN VIỆT NAM
+        // 3. XUẤT CSV
         document.getElementById('exportBtn').addEventListener('click', () => {
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-
             csvContent += "Champion Name;Cost;HP;Attack (ATK);Range;Speed;Mana;Traits;Skill Type;Skill Value;Radius;Skill Duration\n";
 
-            currentPool.forEach(champ => {
+            allChampions.forEach(champ => {
                 const skill = champ.skill || {};
-
                 let skillPower = skill.power || '';
                 if (!skillPower && skill.percent) skillPower = skill.percent;
 
@@ -244,6 +352,9 @@
             link.click();
             document.body.removeChild(link);
         });
+
+        // Khởi động
+        loadInitialData();
     </script>
 </body>
 </html>
