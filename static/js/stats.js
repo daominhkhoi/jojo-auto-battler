@@ -1,7 +1,7 @@
 // static/js/stats.js
 // Realtime Combat Damage Meter & Round Performance Tracker
 
-import { STATE } from './globals.js';
+import { STATE, CHAMPION_POOL } from './globals.js';
 import { IMAGES } from './assets.js';
 
 let activeTab = 'all'; // 'all' | 'ally' | 'enemy'
@@ -257,6 +257,16 @@ function renderChampionRows(list, teamTotal, maxCombatDmg, side) {
         const sharePct = teamTotal > 0 ? Math.round((champ.damage / teamTotal) * 100) : 0;
         const isMvp = index === 0 && champ.damage > 0;
         const stars = '⭐'.repeat(Math.min(3, Math.max(1, champ.star)));
+        const template = (CHAMPION_POOL || []).find(c => c.name === champ.name);
+        const cost = template ? (template.cost || 1) : 1;
+        const tierBorderColors = {
+            1: 'rgba(189, 195, 199, 0.45)',
+            2: 'rgba(46, 204, 113, 0.65)',
+            3: 'rgba(52, 152, 219, 0.65)',
+            4: 'rgba(155, 89, 182, 0.7)',
+            5: 'rgba(241, 196, 15, 0.85)'
+        };
+        const tierBorder = tierBorderColors[cost] || 'rgba(255, 255, 255, 0.2)';
         const rawAvatarUrl = IMAGES[champ.name] || '';
         const safeAvatarUrl = rawAvatarUrl ? encodeURI(rawAvatarUrl) : '';
         const initials = getChampInitials(champ.name);
@@ -267,10 +277,10 @@ function renderChampionRows(list, teamTotal, maxCombatDmg, side) {
             <div class="stat-row ${side} ${isMvp ? 'is-mvp' : ''}">
                 <div class="stat-row-top">
                     <span class="stat-rank">${rankLabel}</span>
-                    <div class="stat-avatar-wrapper">
+                    <div class="stat-avatar-wrapper" style="border-color: ${tierBorder};">
                         <div class="stat-avatar-placeholder">${initials}</div>
                         ${safeAvatarUrl 
-                            ? `<img src="${safeAvatarUrl}" class="stat-avatar" alt="${champ.name}" onload="if(this.previousElementSibling)this.previousElementSibling.style.display='none';" onerror="this.style.display='none';">` 
+                            ? `<img src="${safeAvatarUrl}" class="stat-avatar" alt="${champ.name}" loading="lazy" onload="if(this.previousElementSibling)this.previousElementSibling.style.display='none';" onerror="this.style.display='none';if(this.previousElementSibling)this.previousElementSibling.style.display='flex';">` 
                             : ''}
                     </div>
                     <div class="stat-name-stars">
