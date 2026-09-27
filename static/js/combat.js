@@ -4,6 +4,7 @@ import { updateGold, refreshShop } from './shop.js';
 import { startPrepTimer, stopPrepTimer } from './network.js';
 import { showNotification } from './notifications.js';
 import { updateDamageStats, freezeDamageStatsOnCombatEnd } from './stats.js';
+import { playSfx, playStandSkillSfx, playStandAttackSfx } from './audio.js';
 
 export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
     if (!STATE.floatingTexts) STATE.floatingTexts = [];
@@ -125,6 +126,7 @@ export function updatePhysics() {
                             }
                         }
                     }
+                    playStandAttackSfx(proj.attackerName, isCrit);
                 }
                 STATE.hitEffects.push({
                     x: proj.targetX,
@@ -175,6 +177,7 @@ export function updatePhysics() {
                             }
                         }
                     }
+                    playStandAttackSfx(proj.attackerName, isCrit);
                 }
 
                 STATE.hitEffects.push({
@@ -267,6 +270,7 @@ export function syncTickData(data) {
 
             // Death particle burst & soul wisp
             if (localChamp.is_alive && !serverChamp.is_alive) {
+                playSfx('death');
                 STATE.screenShake = Math.max(STATE.screenShake || 0, 6);
                 if (!STATE.particles) STATE.particles = [];
                 const tarSize = getCanvasCoords(localChamp.targetX, localChamp.targetY);
@@ -417,6 +421,8 @@ export function syncTickData(data) {
             }
 
             // Cinematic visual triggers & floating text for skills
+            playStandSkillSfx(caster ? caster.name : (event.caster_name || ''), event.skill_type);
+
             if (event.skill_type === 'damage') {
                 if (target) target.shakeTimer = 30;
                 STATE.screenShake = Math.max(STATE.screenShake || 0, 7);
@@ -528,6 +534,8 @@ export function syncTickData(data) {
                 targetX: tarCenterX,
                 targetY: tarCenterY,
                 targetId: event.targetId,
+                attackerId: attacker.id,
+                attackerName: attacker.name,
                 damage: dmg,
                 isCrit: isCrit,
                 angle: angle,
@@ -754,10 +762,13 @@ export function handleCombatEnd(serverResult) {
             title = `🏆 ${bot1.toUpperCase()} WINS ROUND!`;
             subtitle = `${bot1} won this round (${STATE.playerLP} - ${STATE.botLP})`;
             color = "#2ecc71";
+            playSfx('round_win');
             showNotification(`🏆 ${bot1} wins this round!`, "success");
         } else if (winner === 'Team2') {
             title = `🏆 ${bot2.toUpperCase()} WINS ROUND!`;
             subtitle = `${bot2} won this round (${STATE.playerLP} - ${STATE.botLP})`;
+            color = "#2ecc71";
+            playSfx('round_win');
             color = "#e74c3c";
             showNotification(`🏆 ${bot2} wins this round!`, "success");
         } else {
@@ -796,9 +807,11 @@ export function handleCombatEnd(serverResult) {
         showNotification("TIME UP! IT'S A DRAW! No points awarded.", "info");
     } else if (res === 'win') {
         STATE.playerLP += 1;
+        playSfx('round_win');
         showNotification("Victory! You won this round!", "success");
     } else if (res === 'loss') {
         STATE.botLP += 1;
+        playSfx('round_lose');
         showNotification("Defeat! Opponent won this round!", "error");
     }
     updateLpUI();

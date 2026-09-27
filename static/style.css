@@ -190,6 +190,17 @@ html {
     box-shadow: 0 0 12px rgba(0, 229, 255, 0.5);
 }
 
+#sfxMuteBtn {
+    border-color: rgba(241, 196, 15, 0.45) !important;
+    color: #f1c40f !important;
+}
+
+#sfxMuteBtn:hover {
+    background: rgba(241, 196, 15, 0.2) !important;
+    border-color: #f1c40f !important;
+    box-shadow: 0 0 12px rgba(241, 196, 15, 0.5);
+}
+
 .voice-btn.muted {
     background: rgba(231, 76, 60, 0.15) !important;
     border-color: rgba(231, 76, 60, 0.5) !important;

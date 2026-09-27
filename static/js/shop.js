@@ -1,6 +1,7 @@
 // static/js/shop.js
 import { CONFIG, STATE, CHAMPION_POOL, TRAITS_INFO } from './globals.js';
 import { showNotification } from './notifications.js';
+import { playSfx } from './audio.js';
 
 // ======================================================================
 // FIX: CHAMPION POOL DEPLETION
@@ -65,6 +66,7 @@ export function buyXp() {
         document.getElementById('buyXpBtn').innerText = `Level Up (${STATE.levelCost} 🪙)`;
 
         updateUnitCount();
+        playSfx('levelup');
         showNotification(`Level ${STATE.playerLevel} Reached! +1 Slot`);
     } else {
         showNotification(`Need ${STATE.levelCost} gold to level up!`);
@@ -107,6 +109,7 @@ function checkAndMerge(champName, starLevel) {
         }
 
         STATE.champions.push(upgraded);
+        playSfx('starup');
         showNotification(`Upgraded! [${champName}] is now ${upgraded.star} ⭐!`);
         checkAndMerge(champName, upgraded.star);
     }
@@ -164,6 +167,7 @@ export function buyChampion(champTemplate, cardElement) {
 
     checkAndMerge(champTemplate.name, 1);
     updateUnitCount();
+    playSfx('buy');
     showNotification(`Purchased [${champTemplate.name}] to bench! ⭐`);
     return true;
 }
@@ -310,6 +314,7 @@ export function sellChampion(champ) {
 
         updateGold(sellPrice);
         STATE.champions.splice(index, 1);
+        playSfx('sell');
         showNotification(`Sold [${champ.name} ${'⭐'.repeat(champ.star)}] for ${sellPrice} 🪙.`);
         updateUnitCount();
     }

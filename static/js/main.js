@@ -7,6 +7,7 @@ import { showNotification } from './notifications.js';
 import { findMatch, playVsBot, playBotVsBot, leaveMatch, declareReady } from './network.js';
 import { initVoiceChat } from './voice.js';
 import { initStatsPanel, switchRightTab } from './stats.js';
+import { initAudio, playSfx, toggleSfxMute } from './audio.js';
 
 const canvas = document.getElementById('gameBoard');
 const ctx = canvas.getContext('2d');
@@ -31,10 +32,13 @@ document.getElementById('rollBtn').addEventListener('click', () => {
     if (STATE.playerGold >= 1) {
         updateGold(-1);
         refreshShop();
+        playSfx('roll');
     } else {
         showNotification("Not enough gold!");
     }
 });
+
+document.getElementById('sfxMuteBtn')?.addEventListener('click', toggleSfxMute);
 
 // ==========================================
 // DRAG AND DROP & HOVER SYSTEM
@@ -364,6 +368,9 @@ if (sessionStorage.getItem('autoPlayBot') === 'true') {
 
 // Initialize Voice Chat Controls & VU Meter
 initVoiceChat();
+
+// Initialize Game Sound Effects System
+initAudio();
 
 // Launch game
 refreshShop();

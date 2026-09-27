@@ -2,6 +2,7 @@
 import { STATE, CONFIG, CHAMPION_POOL, TRAITS_INFO } from './globals.js';
 import { showNotification } from './notifications.js';
 import { onMatchFoundVoice, closePeerConnection } from './voice.js';
+import { playSfx } from './audio.js';
 
 export const socket = io();
 
@@ -187,6 +188,7 @@ let combatTimerInterval;
 
 socket.on('combat_start', () => {
     showNotification("FIGHT!");
+    playSfx('battle_start');
 
     import('./stats.js').then(module => {
         module.resetDamageStatsForNewRound();
