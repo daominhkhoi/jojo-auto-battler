@@ -278,23 +278,44 @@
 
             try {
                 // Gọi API ép tải bản mới nhất từ Google Sheets
-                const reloadRes = await fetch(`${API_BASE}/api/reload_champions`, { method: 'POST' });
+                const reloadRes = await fetch(`${API_BASE}/api/reload_champions?_t=${Date.now()}`, { 
+                    method: 'POST', 
+                    cache: 'no-store' 
+                });
                 if (!reloadRes.ok) throw new Error(`Lỗi tải API: ${reloadRes.status}`);
                 const reloadJson = await reloadRes.json();
 
                 // Lấy lại danh sách tướng mới nhất
-                const champRes = await fetch(`${API_BASE}/api/champions?reload=1&_t=${Date.now()}`);
+                const champRes = await fetch(`${API_BASE}/api/champions?reload=1&_t=${Date.now()}`, { 
+                    cache: 'no-store' 
+                });
                 const freshChampions = await champRes.json();
 
                 // So sánh xem có tướng nào thay đổi chỉ số so với trước khi bấm nút không
-                const changedChampions = [];
+                const diffDetails = [];
                 const updatedNames = new Set();
 
                 freshChampions.forEach(champ => {
                     const prevStr = previousMap.get(champ.name);
                     const currStr = JSON.stringify(champ);
                     if (prevStr && prevStr !== currStr) {
-                        changedChampions.push(champ.name);
+                        const prevObj = JSON.parse(prevStr);
+                        const changes = [];
+                        if (prevObj.attack !== champ.attack) changes.push(`ATK: ${prevObj.attack} → ${champ.attack}`);
+                        if (prevObj.hp !== champ.hp) changes.push(`HP: ${prevObj.hp} → ${champ.hp}`);
+                        if (prevObj.speed !== champ.speed) changes.push(`Speed: ${prevObj.speed} → ${champ.speed}`);
+                        if (prevObj.max_mana !== champ.max_mana) changes.push(`Mana: ${prevObj.max_mana} → ${champ.max_mana}`);
+                        if (prevObj.attack_range !== champ.attack_range) changes.push(`Range: ${prevObj.attack_range} → ${champ.attack_range}`);
+                        
+                        const pSkill = prevObj.skill || {};
+                        const cSkill = champ.skill || {};
+                        if (pSkill.power !== cSkill.power) changes.push(`Skill Power: ${pSkill.power || '-'} → ${cSkill.power || '-'}`);
+                        if (pSkill.percent !== cSkill.percent) changes.push(`Skill %: ${pSkill.percent || '-'} → ${cSkill.percent || '-'}`);
+                        if (pSkill.duration !== cSkill.duration) changes.push(`Duration: ${pSkill.duration || '-'}s → ${cSkill.duration || '-'}s`);
+                        if (pSkill.radius !== cSkill.radius) changes.push(`Radius: ${pSkill.radius || '-'} → ${cSkill.radius || '-'}`);
+                        if (pSkill.target !== cSkill.target) changes.push(`Target: ${pSkill.target || '-'} → ${cSkill.target || '-'}`);
+
+                        diffDetails.push(`<strong>${champ.name}</strong> (${changes.join(', ') || 'Chỉ số cập nhật'})`);
                         updatedNames.add(champ.name);
                     }
                     previousMap.set(champ.name, currStr);
@@ -303,14 +324,16 @@
                 allChampions = freshChampions;
                 renderTable(allChampions, updatedNames);
 
-                if (changedChampions.length > 0) {
-                    showBanner(`🎉 <strong>Đồng bộ thành công lúc ${new Date().toLocaleTimeString()}!</strong> Phát hiện <strong>${changedChampions.length} tướng</strong> có chỉ số mới từ Google Drive: <br>• <strong>${changedChampions.join(', ')}</strong>`, 'success');
+                if (!reloadJson.is_live) {
+                    showBanner(`⚠️ <strong>Chưa lấy được bản mới nhất từ Google Sheets!</strong><br>${reloadJson.message}<br>Hệ thống đang tạm thời hiển thị dữ liệu lưu trong bộ nhớ.`, 'warn');
+                } else if (diffDetails.length > 0) {
+                    showBanner(`🎉 <strong>Đồng bộ Google Drive thành công lúc ${new Date().toLocaleTimeString()}!</strong><br>Phát hiện <strong>${diffDetails.length} tướng</strong> vừa được cập nhật:<br>• ${diffDetails.join('<br>• ')}`, 'success');
                 } else {
-                    showBanner(`✅ <strong>Đã đồng bộ thành công lúc ${new Date().toLocaleTimeString()}!</strong><br>Dữ liệu trong game đã khớp 100% với Google Drive hiện tại (tất cả <strong>${allChampions.length} tướng</strong> đã ở phiên bản mới nhất).`, 'success');
+                    showBanner(`✅ <strong>Đã đồng bộ Google Drive thành công lúc ${new Date().toLocaleTimeString()}!</strong><br>Tất cả <strong>${allChampions.length} tướng</strong> đã khớp 100% với Google Drive. Không có thêm chỉnh sửa mới nào trên Google Sheets.`, 'success');
                 }
             } catch (err) {
                 console.error(err);
-                showBanner(`❌ Lỗi khi đồng bộ Google Drive: ${err.message}. Kiểm tra kết nối mạng hoặc server localhost:5000!`, 'error');
+                showBanner(`❌ Lỗi khi đồng bộ Google Drive: ${err.message}. Hãy kiểm tra kết nối mạng hoặc trạng thái máy chủ!`, 'error');
             } finally {
                 syncBtn.disabled = false;
                 syncBtn.innerText = '🔄 ĐỒNG BỘ GOOGLE DRIVE';

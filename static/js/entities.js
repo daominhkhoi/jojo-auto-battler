@@ -1,4 +1,4 @@
-﻿// static/js/entities.js
+// static/js/entities.js
 import { IMAGES } from './assets.js';
 import { initChampPool } from './shop.js';
 
@@ -27,8 +27,31 @@ function showLoadError() {
     document.body.appendChild(overlay);
 }
 
+export async function reloadChampionPool(forceReload = false) {
+    try {
+        const url = `/api/champions?_t=${Date.now()}${forceReload ? '&reload=1' : ''}`;
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+
+        if (Array.isArray(data) && data.length > 0) {
+            CHAMPION_POOL.length = 0;
+            data.forEach(champ => {
+                champ.img = IMAGES[champ.name] || '';
+                CHAMPION_POOL.push(champ);
+            });
+            initChampPool();
+            console.log(`[SYNC] Reloaded ${CHAMPION_POOL.length} champions into pool.`);
+            return true;
+        }
+    } catch (err) {
+        console.warn('Failed to reload champion pool:', err);
+    }
+    return false;
+}
+
 try {
-    const response = await fetch('/api/champions');
+    const response = await fetch(`/api/champions?_t=${Date.now()}`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
 

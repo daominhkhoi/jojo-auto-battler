@@ -21,6 +21,7 @@ import os
 import random
 import time
 import urllib.request
+import requests
 import io
 import pandas as pd
 import gevent.lock
@@ -128,6 +129,7 @@ def _load_champion_data(force_remote=False):
     local_csv = os.path.join(os.path.dirname(__file__), 'champions.csv')
     df = None
     source = None
+    fetch_error = None
 
     # 1. Fetch from Google Sheets first (with cache-buster parameter)
     url = (
@@ -136,20 +138,32 @@ def _load_champion_data(force_remote=False):
         f"/pub?gid=1700806245&single=true&output=csv&_t={int(time.time())}"
     )
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-        with urllib.request.urlopen(req, timeout=8) as response:
-            content = response.read()
-            df = pd.read_csv(io.BytesIO(content), sep=',', encoding='utf-8')
+        resp = requests.get(
+            url,
+            timeout=10,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            }
+        )
+        if resp.status_code == 200 and len(resp.text) > 100:
+            df = pd.read_csv(io.StringIO(resp.text), sep=',', encoding='utf-8')
             source = "Google Sheets (Live)"
             # Cache locally to champions.csv for offline backup
             try:
-                with open(local_csv, 'wb') as f:
-                    f.write(content)
+                with open(local_csv, 'w', encoding='utf-8') as f:
+                    f.write(resp.text)
                 print(f"[OK] Cached Google Sheets to local '{os.path.basename(local_csv)}'.")
             except Exception as save_err:
                 print(f"[WARN] Local CSV cache write failed: {save_err}")
+        else:
+            fetch_error = f"HTTP {resp.status_code}"
     except Exception as e:
+        fetch_error = str(e)
         print(f"[WARN] Google Sheets fetch failed ({e}). Checking local CSV fallback...")
+
+    is_live = (source == "Google Sheets (Live)")
 
     # 2. Fallback to local CSV if network call fails
     if df is None:
@@ -259,9 +273,14 @@ def _load_champion_data(force_remote=False):
 
     # Register costs into game_logic for soul_swap cost lookups
     register_champion_costs({n: d['cost'] for n, d in _CHAMPION_DATA.items()})
-    msg = f"Loaded {len(_CHAMPION_DATA)} champions from {source}."
-    print(f"[OK] {msg}")
-    return True, msg
+    if is_live:
+        msg = f"Đã đồng bộ thành công {len(_CHAMPION_DATA)} tướng trực tiếp từ Google Sheets!"
+        print(f"[OK] {msg}")
+        return True, msg
+    else:
+        msg = f"Cảnh báo: Không thể tải trực tiếp từ Google Sheets ({fetch_error}). Đang dùng dữ liệu lưu tạm {source}!"
+        print(f"[WARN] {msg}")
+        return False, msg
 
 # Load immediately at import time (before first request)
 _load_champion_data()
@@ -497,23 +516,54 @@ def index():
 
 @app.route('/api/champions')
 def get_champions_api():
-    """Serve champion data to the client (for the shop/pool). Auto-syncs if older than 60s."""
+    """Serve champion data to the client (for the shop/pool). Auto-syncs if older than 60s or file changed."""
     global _LAST_CHAMPION_SYNC_TIME
     force_reload = request.args.get('reload') == '1'
-    if not _CHAMPION_DATA or force_reload or (time.time() - _LAST_CHAMPION_SYNC_TIME > 60):
+    local_csv = os.path.join(os.path.dirname(__file__), 'champions.csv')
+
+    # Detect if another worker on Render updated champions.csv
+    file_updated = False
+    if os.path.exists(local_csv):
+        try:
+            if os.path.getmtime(local_csv) > _LAST_CHAMPION_SYNC_TIME:
+                file_updated = True
+        except Exception:
+            pass
+
+    if not _CHAMPION_DATA or force_reload or file_updated or (time.time() - _LAST_CHAMPION_SYNC_TIME > 60):
         _load_champion_data()
-    return jsonify(list(_CHAMPION_DATA.values()))
+
+    resp = jsonify(list(_CHAMPION_DATA.values()))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 @app.route('/api/reload_champions', methods=['GET', 'POST'])
 def reload_champions_api():
     """Force an immediate reload from Google Sheets and return sync status."""
     success, msg = _load_champion_data(force_remote=True)
-    return jsonify({
+    try:
+        socketio.emit('champions_updated', {
+            'count': len(_CHAMPION_DATA),
+            'timestamp': int(time.time()),
+            'status': 'ok' if success else 'warning',
+            'message': msg
+        })
+    except Exception as sock_err:
+        print(f"[WARN] Socket emit failed: {sock_err}")
+
+    resp = jsonify({
         'status': 'ok' if success else 'warning',
         'message': msg,
         'count': len(_CHAMPION_DATA),
-        'timestamp': int(time.time())
+        'timestamp': int(time.time()),
+        'is_live': success
     })
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 
 # ==========================================

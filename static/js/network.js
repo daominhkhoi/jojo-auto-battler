@@ -13,6 +13,17 @@ socket.on('connect', () => {
     console.log('Connected to Server!');
 });
 
+socket.on('champions_updated', async (data) => {
+    console.log('[SOCKET] champions_updated received:', data);
+    try {
+        const { reloadChampionPool } = await import('./entities.js');
+        await reloadChampionPool(true);
+        showNotification('📊 Chỉ số tướng đã đồng bộ từ Google Drive!', 'info');
+    } catch (e) {
+        console.warn('Failed to handle champions_updated:', e);
+    }
+});
+
 socket.on('match_found', (data) => {
     STATE.roomId = data.room;
     STATE.playerLP = 0;
