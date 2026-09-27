@@ -11,6 +11,18 @@ let cachedRound = 1;
 let isCombatActive = false;
 
 /**
+ * Helper to get 2-character initials for champion avatars fallback.
+ */
+function getChampInitials(name) {
+    if (!name) return '??';
+    const words = name.trim().split(/\s+/);
+    if (words.length >= 2) {
+        return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+}
+
+/**
  * Initialize the Damage Stats Panel in the DOM.
  */
 export function initStatsPanel() {
@@ -21,15 +33,15 @@ export function initStatsPanel() {
         <div class="stat-header">
             <div class="stat-title-row">
                 <span class="stat-title">⚔️ DAMAGE METER</span>
-                <span id="statStatusBadge" class="stat-status-badge prep">⏳ CHUẨN BỊ</span>
+                <span id="statStatusBadge" class="stat-status-badge prep">⏳ PREPARATION</span>
             </div>
-            <div id="statRoundSubtitle" class="stat-subtitle">Hiệp 1 • Sẵn sàng chiến đấu</div>
+            <div id="statRoundSubtitle" class="stat-subtitle">Round 1 • Ready for battle</div>
             
             <!-- Dual Team Total Comparison Bar -->
             <div class="stat-duel-wrapper" id="statDuelWrapper">
                 <div class="stat-duel-labels">
-                    <span id="statAllyTotalLabel" class="stat-duel-ally-label">🛡️ TA: 0</span>
-                    <span id="statEnemyTotalLabel" class="stat-duel-enemy-label">ĐỊCH: 0 💀</span>
+                    <span id="statAllyTotalLabel" class="stat-duel-ally-label">🛡️ ALLY: 0</span>
+                    <span id="statEnemyTotalLabel" class="stat-duel-enemy-label">ENEMY: 0 💀</span>
                 </div>
                 <div class="stat-duel-track">
                     <div id="statDuelAllyBar" class="stat-duel-ally-bar" style="width: 50%;"></div>
@@ -39,15 +51,15 @@ export function initStatsPanel() {
 
             <!-- Segmented Filter Tabs -->
             <div class="stat-tabs">
-                <button type="button" class="stat-tab-btn active" data-tab="all" id="statTabAll">⚔️ TẤT CẢ</button>
-                <button type="button" class="stat-tab-btn" data-tab="ally" id="statTabAlly">🛡️ PHE TA</button>
-                <button type="button" class="stat-tab-btn" data-tab="enemy" id="statTabEnemy">💀 PHE ĐỊCH</button>
+                <button type="button" class="stat-tab-btn active" data-tab="all" id="statTabAll">⚔️ ALL</button>
+                <button type="button" class="stat-tab-btn" data-tab="ally" id="statTabAlly">🛡️ ALLY</button>
+                <button type="button" class="stat-tab-btn" data-tab="enemy" id="statTabEnemy">💀 ENEMY</button>
             </div>
         </div>
 
         <div id="statContentArea" class="stat-content-area">
             <div class="stat-empty-msg">
-                ⚔️ Bắt đầu trận chiến để theo dõi sát thương thời gian thực!
+                ⚔️ Start combat to track real-time damage statistics!
             </div>
         </div>
     `;
@@ -55,7 +67,7 @@ export function initStatsPanel() {
     // Tab switcher events
     const tabBtns = panel.querySelectorAll('.stat-tab-btn');
     tabBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', () => {
             tabBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             activeTab = btn.getAttribute('data-tab') || 'all';
@@ -82,7 +94,7 @@ export function resetDamageStatsForNewRound() {
 
     const sub = document.getElementById('statRoundSubtitle');
     if (sub) {
-        sub.innerText = `Hiệp ${cachedRound} • Đang diễn ra trực tiếp`;
+        sub.innerText = `Round ${cachedRound} • Live Battlefield`;
     }
 
     renderStatsList();
@@ -98,12 +110,12 @@ export function freezeDamageStatsOnCombatEnd(result) {
     const badge = document.getElementById('statStatusBadge');
     if (badge) {
         badge.className = 'stat-status-badge finished';
-        badge.innerText = '📊 KẾT QUẢ VÁN';
+        badge.innerText = '📊 ROUND REVIEW';
     }
 
     const sub = document.getElementById('statRoundSubtitle');
     if (sub) {
-        sub.innerText = `Hiệp ${cachedRound} Kết Thúc • Dùng tham khảo mua/bán tướng`;
+        sub.innerText = `Round ${cachedRound} Finished • Reference for Buy / Sell`;
     }
 
     renderStatsList();
@@ -166,7 +178,7 @@ function renderStatsList() {
     if (cachedAllies.length === 0 && cachedEnemies.length === 0) {
         container.innerHTML = `
             <div class="stat-empty-msg">
-                ⚔️ Bắt đầu trận chiến để theo dõi sát thương thời gian thực!
+                ⚔️ Start combat to track real-time damage statistics!
             </div>
         `;
         updateDuelBar(0, 0);
@@ -185,8 +197,19 @@ function renderStatsList() {
     updateDuelBar(totalAllyDmg, totalEnemyDmg);
 
     const isBvB = STATE.isBotVsBot;
-    const allyTeamTitle = isBvB ? `🤖 ${STATE.bot1Name || 'Bot 1'}` : `🛡️ PHE TA (YOU)`;
-    const enemyTeamTitle = isBvB ? `🤖 ${STATE.bot2Name || 'Bot 2'}` : `💀 ĐỐI THỦ (ENEMY)`;
+    // Strip duplicate bot icons if present
+    const allyTeamTitle = isBvB ? (STATE.bot1Name || 'Bot 1') : `🛡️ ALLY (YOU)`;
+    const enemyTeamTitle = isBvB ? (STATE.bot2Name || 'Bot 2') : `💀 ENEMY`;
+
+    // Update tab button labels dynamically if in Bot vs Bot
+    const tabAllyBtn = document.getElementById('statTabAlly');
+    const tabEnemyBtn = document.getElementById('statTabEnemy');
+    if (tabAllyBtn) {
+        tabAllyBtn.innerText = isBvB ? 'TEAM 1' : '🛡️ ALLY';
+    }
+    if (tabEnemyBtn) {
+        tabEnemyBtn.innerText = isBvB ? 'TEAM 2' : '💀 ENEMY';
+    }
 
     let html = '';
 
@@ -226,7 +249,7 @@ function renderStatsList() {
  */
 function renderChampionRows(list, teamTotal, maxCombatDmg, side) {
     if (list.length === 0) {
-        return `<div class="stat-no-units">Chưa có tướng xuất trận</div>`;
+        return `<div class="stat-no-units">No units deployed</div>`;
     }
 
     return list.map((champ, index) => {
@@ -234,7 +257,9 @@ function renderChampionRows(list, teamTotal, maxCombatDmg, side) {
         const sharePct = teamTotal > 0 ? Math.round((champ.damage / teamTotal) * 100) : 0;
         const isMvp = index === 0 && champ.damage > 0;
         const stars = '⭐'.repeat(Math.min(3, Math.max(1, champ.star)));
-        const avatarUrl = IMAGES[champ.name] || '';
+        const rawAvatarUrl = IMAGES[champ.name] || '';
+        const safeAvatarUrl = rawAvatarUrl ? encodeURI(rawAvatarUrl) : '';
+        const initials = getChampInitials(champ.name);
         const statusIcon = champ.is_alive ? '🟢' : '💀';
         const rankLabel = `#${index + 1}`;
 
@@ -243,16 +268,17 @@ function renderChampionRows(list, teamTotal, maxCombatDmg, side) {
                 <div class="stat-row-top">
                     <span class="stat-rank">${rankLabel}</span>
                     <div class="stat-avatar-wrapper">
-                        ${avatarUrl 
-                            ? `<img src="${avatarUrl}" class="stat-avatar" alt="${champ.name}" onerror="this.style.display='none'">` 
-                            : `<div class="stat-avatar-placeholder">${champ.name.slice(0, 2)}</div>`}
+                        <div class="stat-avatar-placeholder">${initials}</div>
+                        ${safeAvatarUrl 
+                            ? `<img src="${safeAvatarUrl}" class="stat-avatar" alt="${champ.name}" onload="if(this.previousElementSibling)this.previousElementSibling.style.display='none';" onerror="this.style.display='none';">` 
+                            : ''}
                     </div>
                     <div class="stat-name-stars">
                         <span class="stat-champ-name" title="${champ.name}">${champ.name}</span>
                         <span class="stat-stars">${stars}</span>
                     </div>
-                    ${isMvp ? `<span class="stat-mvp-badge" title="Top Damage Dealer">👑 MVP</span>` : ''}
-                    <span class="stat-alive-badge" title="${champ.is_alive ? 'Đang sống' : 'Đã tử trận'}">${statusIcon}</span>
+                    ${isMvp ? `<span class="stat-mvp-badge" title="Top Damage Dealer (MVP)">👑 MVP</span>` : ''}
+                    <span class="stat-alive-badge" title="${champ.is_alive ? 'Alive' : 'Defeated'}">${statusIcon}</span>
                     <div class="stat-dmg-val-box">
                         <span class="stat-dmg-number">${champ.damage.toLocaleString()}</span>
                         <span class="stat-dmg-share">${sharePct}%</span>
@@ -277,11 +303,12 @@ function updateDuelBar(allyDmg, enemyDmg) {
     const enemyBar = document.getElementById('statDuelEnemyBar');
 
     const isBvB = STATE.isBotVsBot;
-    const allyName = isBvB ? (STATE.bot1Name || 'Bot 1') : 'PHE TA';
-    const enemyName = isBvB ? (STATE.bot2Name || 'Bot 2') : 'PHE ĐỊCH';
+    // Clean names without duplicate icons
+    const allyName = isBvB ? (STATE.bot1Name || 'Bot 1') : '🛡️ ALLY';
+    const enemyName = isBvB ? (STATE.bot2Name || 'Bot 2') : 'ENEMY 💀';
 
-    if (allyLabel) allyLabel.innerText = `🛡️ ${allyName}: ${allyDmg.toLocaleString()}`;
-    if (enemyLabel) enemyLabel.innerText = `${enemyName}: ${enemyDmg.toLocaleString()} 💀`;
+    if (allyLabel) allyLabel.innerText = `${allyName}: ${allyDmg.toLocaleString()}`;
+    if (enemyLabel) enemyLabel.innerText = `${enemyName}: ${enemyDmg.toLocaleString()}`;
 
     const total = allyDmg + enemyDmg;
     let allyPct = 50;
