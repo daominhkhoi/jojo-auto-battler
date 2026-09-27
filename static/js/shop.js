@@ -63,7 +63,13 @@ export function buyXp() {
         STATE.levelCost = STATE.playerLevel * 4; // FIX: linear, not exponential
 
         document.getElementById('levelText').innerText = STATE.playerLevel;
-        document.getElementById('buyXpBtn').innerText = `Level Up (${STATE.levelCost} 🪙)`;
+        const buyXpCostEl = document.getElementById('buyXpCost');
+        if (buyXpCostEl) {
+            buyXpCostEl.innerText = `${STATE.levelCost} 🪙`;
+        } else {
+            const btn = document.getElementById('buyXpBtn');
+            if (btn) btn.innerText = `Level Up (${STATE.levelCost} 🪙)`;
+        }
 
         updateUnitCount();
         playSfx('levelup');
@@ -216,11 +222,79 @@ document.addEventListener('click', (e) => {
     }
 });
 
+let isShopDragScrollInitialized = false;
+
+export function initShopDragScroll() {
+    if (isShopDragScrollInitialized) return;
+    const container = document.getElementById('shopContainer');
+    if (!container) return;
+    isShopDragScrollInitialized = true;
+
+    let isDown = false;
+    let startX = 0;
+    let scrollLeft = 0;
+    let hasMoved = false;
+
+    // Mouse drag support for desktop & emulation
+    container.addEventListener('mousedown', (e) => {
+        isDown = true;
+        hasMoved = false;
+        startX = e.pageX - container.offsetLeft;
+        scrollLeft = container.scrollLeft;
+    });
+
+    window.addEventListener('mouseup', () => {
+        isDown = false;
+    });
+
+    container.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        const x = e.pageX - container.offsetLeft;
+        const walk = (x - startX) * 1.5;
+        if (Math.abs(walk) > 4) hasMoved = true;
+        container.scrollLeft = scrollLeft - walk;
+    });
+
+    // Touch swipe support with move threshold tracking
+    let touchStartX = 0;
+    let touchStartScroll = 0;
+    let isTouchSwiping = false;
+
+    container.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            touchStartX = e.touches[0].pageX;
+            touchStartScroll = container.scrollLeft;
+            isTouchSwiping = false;
+        }
+    }, { passive: true });
+
+    container.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1) {
+            const touchX = e.touches[0].pageX;
+            const diffX = touchX - touchStartX;
+            if (Math.abs(diffX) > 6) {
+                isTouchSwiping = true;
+            }
+            container.scrollLeft = touchStartScroll - diffX;
+        }
+    }, { passive: true });
+
+    // Prevent triggering card click when user was swiping/dragging to scroll!
+    container.addEventListener('click', (e) => {
+        if (hasMoved || isTouchSwiping) {
+            e.stopPropagation();
+            hasMoved = false;
+            isTouchSwiping = false;
+        }
+    }, true);
+}
+
 export function refreshShop() {
     selectedShopCard = null;
     const container = document.getElementById('shopContainer');
     if (!container) return;
 
+    initShopDragScroll();
     container.innerHTML = '';
     for (let i = 0; i < 7; i++) {
         const randomChamp = rollChampion();

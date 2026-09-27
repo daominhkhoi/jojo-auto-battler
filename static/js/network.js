@@ -18,7 +18,7 @@ socket.on('champions_updated', async (data) => {
     try {
         const { reloadChampionPool } = await import('./entities.js');
         await reloadChampionPool(true);
-        showNotification('📊 Chỉ số tướng đã đồng bộ từ Google Drive!', 'info');
+        showNotification('📊 Champion data synced from Google Drive!', 'info');
     } catch (e) {
         console.warn('Failed to handle champions_updated:', e);
     }
@@ -83,9 +83,9 @@ socket.on('match_found', (data) => {
     }
 
     if (data.isBot) {
-        showNotification(`🤖 Đang đấu với BOT (${data.opponentName})! (Voice chat 1-1 mở khi ghép với người)`, "info");
+        showNotification(`🤖 Playing against BOT (${data.opponentName})!`, "info");
     } else {
-        showNotification(`🎮 ĐÃ GHÉP NỐI 1-1 VỚI ${data.opponentName}! Voice Chat P2P sẵn sàng.`, "success");
+        showNotification(`🎮 Matched 1v1 with ${data.opponentName}! Voice Chat ready.`, "success");
     }
 
     // Initialize WebRTC voice chat connection for this match
@@ -93,6 +93,11 @@ socket.on('match_found', (data) => {
 
     const readyBtn = document.getElementById('readyBtn');
     if (readyBtn) readyBtn.style.display = 'inline-block';
+
+    const buyXpBtn = document.getElementById('buyXpBtn');
+    if (buyXpBtn) buyXpBtn.style.display = '';
+    const rollBtn = document.getElementById('rollBtn');
+    if (rollBtn) rollBtn.style.display = '';
 
     const bottomBar = document.getElementById('bottomBar');
     if (bottomBar) bottomBar.style.display = 'flex';
@@ -123,14 +128,14 @@ socket.on('opponent_disconnected', () => {
     const botBtn = document.getElementById('vsBotBtn');
     if (botBtn) {
         botBtn.style.display = 'inline-block';
-        botBtn.innerText = "VS BOT 🤖";
+        botBtn.innerText = "VS BOT";
         botBtn.disabled = false;
     }
 
     const bvbBtn = document.getElementById('botVsBotBtn');
     if (bvbBtn) {
         bvbBtn.style.display = 'inline-block';
-        bvbBtn.innerText = "BOT VS BOT 🤖⚔️🤖";
+        bvbBtn.innerText = "BOT VS BOT";
         bvbBtn.disabled = false;
     }
 

@@ -1,16 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Minh Khoi - Auto Battler</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=4.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=5.4">
     <style>
-        *, *::before, *::after {
+        *,
+        *::before,
+        *::after {
             scrollbar-width: none !important;
             -ms-overflow-style: none !important;
         }
-        ::-webkit-scrollbar, *::-webkit-scrollbar {
+
+        ::-webkit-scrollbar,
+        *::-webkit-scrollbar {
             display: none !important;
             width: 0 !important;
             height: 0 !important;
@@ -18,92 +24,120 @@
         }
     </style>
 </head>
+
 <body>
     <div class="fullscreen-wrapper">
         <div class="top-bar">
             <div id="notification-area"></div>
 
-            <div class="player-info">
-                <input type="text" id="playerNameInput" class="name-input" placeholder="Enter Name" value="Player1">
+            <div class="top-bar-inner">
+                <!-- 1. Player Info HUD Capsule -->
+                <div class="player-info" id="playerInfoCapsule">
+                    <input type="text" id="playerNameInput" class="name-input" placeholder="Name" value="Player1">
 
-                <span class="gold-display">Gold: <span id="goldText">10</span> 🪙</span>
-                <span class="level-display">Lv: <span id="levelText">1</span></span>
-                <span class="unit-display">Units: <span id="unitText">0/1</span></span>
+                    <span class="gold-display" title="Gold">🪙 <span id="goldText">10</span></span>
+                    <span class="level-display" title="Level">Lv.<span id="levelText">1</span></span>
+                    <span class="unit-display" title="Deployed Units">👥 <span id="unitText">0/1</span></span>
+                    <span class="round-display" title="Round">⚔️ Round <span id="roundText">1</span></span>
+                    <span class="lp-display" title="Score"><span id="p1NameDisplay" style="color: #2ecc71;">0</span> :
+                        <span id="botLpText" style="color: #e74c3c;">0</span><span id="p2NameDisplay"
+                            style="display: none;">Enemy</span><span id="playerLpText"
+                            style="display: none;">0/10</span></span>
 
-                <span class="round-display">Round: <span id="roundText">1</span></span>
-
-
-                <span class="lp-display"><span id="p1NameDisplay" style="color: #2ecc71;">Score</span>: <span id="playerLpText" style="color: #2ecc71;">0/10</span> | <span id="p2NameDisplay" style="color: #e74c3c;">Enemy</span>: <span id="botLpText" style="color: #e74c3c;">0/10</span></span>
-
-                <!-- VOICE CHAT WIDGET -->
-                <div class="voice-widget" id="voiceWidget" title="Voice Chat Controls">
-                    <span class="voice-status-dot" id="voiceStatusDot" title="Trạng thái Voice P2P 1-1"></span>
-                    <button type="button" id="voiceMicBtn" class="voice-btn muted" title="Microphone: ĐANG TẮT (Click để Bật)">
-                        <span class="voice-btn-icon" id="micIconWrapper">
-                            <svg viewBox="0 0 24 24" class="svg-mic-on" id="svgMicOn" style="display: none;">
-                                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                            </svg>
-                            <svg viewBox="0 0 24 24" class="svg-mic-off" id="svgMicOff" style="display: block;">
-                                <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9l4.19 4.18 1.27-1.27L4.27 3z"/>
-                            </svg>
-                        </span>
-                    </button>
-
-                    <!-- Realtime Vertical VU Meter Bar (Red -> Orange -> Green) -->
-                    <div class="voice-meter-track" id="voiceMeterTrack" title="Âm lượng Micro (Đỏ: Nhỏ, Xanh lá: Lớn)">
-                        <div class="voice-meter-bar" id="voiceMeterBar"></div>
+                    <!-- DESKTOP VOICE CHAT WIDGET -->
+                    <div class="voice-widget desktop-only" id="voiceWidget" title="Voice Chat Controls">
+                        <span class="voice-status-dot" id="voiceStatusDot" title="Voice Status"></span>
+                        <button type="button" id="voiceMicBtn" class="voice-btn muted" title="Microphone: OFF">
+                            <span class="voice-btn-icon" id="micIconWrapper">
+                                <svg viewBox="0 0 24 24" class="svg-mic-on" id="svgMicOn" style="display: none;">
+                                    <path
+                                        d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                                    <path
+                                        d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                                </svg>
+                                <svg viewBox="0 0 24 24" class="svg-mic-off" id="svgMicOff" style="display: block;">
+                                    <path
+                                        d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9l4.19 4.18 1.27-1.27L4.27 3z" />
+                                </svg>
+                            </span>
+                        </button>
+                        <div class="voice-meter-track" id="voiceMeterTrack" title="Microphone Volume">
+                            <div class="voice-meter-bar" id="voiceMeterBar"></div>
+                        </div>
+                        <button type="button" id="voiceAudioBtn" class="voice-btn" title="Opponent Audio: ON">
+                            <span class="voice-btn-icon" id="audioIconWrapper">
+                                <svg viewBox="0 0 24 24" class="svg-speaker-on" id="svgSpeakerOn">
+                                    <path
+                                        d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                                </svg>
+                                <svg viewBox="0 0 24 24" class="svg-speaker-off" id="svgSpeakerOff"
+                                    style="display: none;">
+                                    <path
+                                        d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                                </svg>
+                            </span>
+                        </button>
+                        <button type="button" id="sfxMuteBtn" class="voice-btn" title="Game SFX: ON">
+                            <span class="voice-btn-icon" id="sfxIconWrapper">
+                                <svg viewBox="0 0 24 24">
+                                    <path
+                                        d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                                </svg>
+                            </span>
+                        </button>
                     </div>
+                </div>
 
-                    <button type="button" id="voiceAudioBtn" class="voice-btn" title="Âm thanh đối thủ: Đang Bật (Click để Tắt tiếng)">
-                        <span class="voice-btn-icon" id="audioIconWrapper">
-                            <svg viewBox="0 0 24 24" class="svg-speaker-on" id="svgSpeakerOn">
-                                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-                            </svg>
-                            <svg viewBox="0 0 24 24" class="svg-speaker-off" id="svgSpeakerOff" style="display: none;">
-                                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
-                            </svg>
-                        </span>
+                <!-- 2. Matchmaking / State Controls -->
+                <div class="controls" id="centerControls">
+                    <button id="findMatchBtn" class="hud-main-btn">FIND MATCH</button>
+                    <button id="readyBtn" class="hud-ready-btn" style="display: none;">READY</button>
+                    <button id="exitMatchBtn" class="action-btn hud-exit-btn" style="display: none;">LEAVE 🚪</button>
+                    <span id="bvbTimerText" class="timer-badge" style="display: none;">⏳ NEXT: 10s</span>
+                    <span id="timerDisplay" class="timer-display" style="display: none;">02:00</span>
+                    <span id="timerText" class="timer-sub" style="display: none;">0s</span>
+
+                    <!-- Desktop auxiliary match buttons (on mobile accessible via ⚙️ menu) -->
+                    <button id="vsBotBtn" class="action-btn desktop-only"
+                        style="background: linear-gradient(135deg, #8e44ad, #9b59b6);">VS BOT</button>
+                    <button id="botVsBotBtn" class="action-btn desktop-only"
+                        style="background: linear-gradient(135deg, #d35400, #e67e22);">BOT VS BOT</button>
+                </div>
+
+                <!-- 3. Mobile Right Quick Action Buttons (Hidden on PC, visible on mobile) -->
+                <div class="mobile-hud-actions mobile-only">
+                    <button type="button" id="toggleSynergyBtn" class="hud-icon-btn" title="View Team Synergies">
+                        <span class="hud-emoji">🔮</span>
+                        <span class="hud-text">TRAITS</span>
                     </button>
-
-                    <!-- GAME SFX MUTE TOGGLE -->
-                    <button type="button" id="sfxMuteBtn" class="voice-btn" title="Âm thanh Game: Đang Bật (Click để Tắt)">
-                        <span class="voice-btn-icon" id="sfxIconWrapper">
-                            <svg viewBox="0 0 24 24">
-                                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-                            </svg>
-                        </span>
+                    <button type="button" id="toggleStatsBtn" class="hud-icon-btn" title="View Combat Damage Meter">
+                        <span class="hud-emoji">⚔️</span>
+                        <span class="hud-text">DPS</span>
+                    </button>
+                    <button type="button" id="toggleInfoBtn" class="hud-icon-btn" title="Inspect Champion Info">
+                        <span class="hud-emoji">ℹ️</span>
+                    </button>
+                    <button type="button" id="mobileMenuBtn" class="hud-icon-btn menu-btn" title="Settings & Modes">
+                        <span class="hud-emoji">⚙️</span>
                     </button>
                 </div>
-            </div>
-
-            <div class="controls">
-                <button id="findMatchBtn">FIND MATCH</button>
-                <button id="vsBotBtn" class="action-btn" style="background: linear-gradient(135deg, #8e44ad, #9b59b6); color: white; border: 1px solid #a29bfe; font-weight: bold;">VS BOT 🤖</button>
-                <button id="botVsBotBtn" class="action-btn" style="background: linear-gradient(135deg, #d35400, #e67e22); color: white; border: 1px solid #f39c12; font-weight: bold;">BOT VS BOT 🤖⚔️🤖</button>
-                <button id="exitMatchBtn" class="action-btn" style="display: none; background: #c0392b; color: white; font-weight: bold;">LEAVE 🚪</button>
-                <button id="readyBtn" style="display: none; background-color: #2ecc71; color: white;">READY</button>
-                <span id="bvbTimerText" style="color: #f1c40f; font-weight: bold; font-size: 15px; display: none; margin-left: 10px; background: rgba(0,0,0,0.6); padding: 4px 10px; border-radius: 6px; border: 1px solid #f39c12;">⏳ NEXT ROUND: 10s</span>
-                <span id="timerDisplay" style="color: #e74c3c; font-weight: bold; font-size: 20px; display: none; margin-left: 10px;">02:00</span>
-                <!-- FIX: timerText was referenced in network.js but missing from HTML -->
-                <span id="timerText" style="color: #f39c12; font-weight: bold; font-size: 16px; display: none; margin-left: 6px;">0s</span>
-                <button id="buyXpBtn" class="action-btn">Level Up (5 🪙)</button>
-                <button id="rollBtn" class="action-btn">Refresh (1 🪙)</button>
-                <button id="toggleInfoBtn" class="mobile-toggle">Info</button>
-                <button id="toggleSynergyBtn" class="mobile-toggle">Synergies</button>
-                <button id="toggleStatsBtn" class="mobile-toggle">DPS 📊</button>
             </div>
         </div>
 
         <div class="game-layout">
-            <!-- Desktop: side panels shown inline. Mobile: hidden, toggled as bottom drawers -->
-            <div id="infoPanel" class="side-panel">
+            <!-- Left Info Panel (Desktop: inline; Mobile: bottom popup) -->
+            <div id="infoPanel" class="side-panel info-side-panel">
+                <div class="panel-header-mobile mobile-only">
+                    <span>ℹ️ CHAMPION INFO</span>
+                    <button type="button" id="closeInfoPanelBtn" class="panel-close-btn">✖</button>
+                </div>
                 <div class="info-placeholder">Hover over a card or synergy to view details</div>
             </div>
 
+            <!-- Canvas Board: Perfectly fit into 100dvh without vertical scroll -->
             <canvas id="gameBoard" width="540" height="870"></canvas>
 
-            <!-- Right Panel: Symmetrical Unified Panel with Tabs (Synergies & Damage Meter) -->
+            <!-- Right Panel: Symmetrical Unified Panel (Synergies & Damage Meter) -->
             <div id="rightSidePanel" class="side-panel right-side-panel">
                 <div class="right-tab-bar">
                     <button type="button" id="tabBtnSynergy" class="right-tab-btn active" title="View Team Synergies">
@@ -115,6 +149,8 @@
                         <span class="tab-btn-label">DAMAGE METER</span>
                         <span id="combatLiveDot" class="live-pulse-dot" style="display: none;"></span>
                     </button>
+                    <button type="button" id="closeRightPanelBtn" class="right-panel-close-btn mobile-only"
+                        title="Close Panel">✖</button>
                 </div>
 
                 <!-- Tab Pane 1: Synergies -->
@@ -134,12 +170,61 @@
                 </div>
             </div>
 
+            <!-- Backdrop for Mobile Side Drawers -->
+            <div id="panelBackdrop" class="panel-backdrop" style="display: none;"></div>
+
             <div id="sellZone" class="sell-zone">SELL</div>
         </div>
 
-        <!-- Shop bar: hidden until match is found -->
+        <!-- TFT Mobile Style Bottom Bar: Shop Actions (Level Up & Reroll) on left, Cards on right -->
         <div class="bottom-bar" id="bottomBar" style="display: none;">
+            <div class="shop-actions" id="shopActions">
+                <button id="buyXpBtn" class="action-btn shop-action-btn xp-btn" title="Buy XP to Level Up">
+                    <span class="action-title">LEVEL UP</span>
+                    <span class="action-cost" id="buyXpCost">5 🪙</span>
+                </button>
+                <button id="rollBtn" class="action-btn shop-action-btn roll-btn" title="Reroll Shop">
+                    <span class="action-title">REFRESH</span>
+                    <span class="action-cost">1 🪙</span>
+                </button>
+            </div>
             <div class="shop-container" id="shopContainer"></div>
+        </div>
+
+        <!-- Mobile Settings & Game Mode Modal -->
+        <div id="mobileMenuModal" class="mobile-menu-modal" style="display: none;">
+            <div class="menu-modal-backdrop" id="menuModalBackdrop"></div>
+            <div class="menu-modal-card">
+                <div class="menu-modal-header">
+                    <h3>⚙️ SETTINGS & MODES</h3>
+                    <button type="button" id="closeMenuModalBtn" class="close-modal-btn">✖</button>
+                </div>
+                <div class="menu-modal-body">
+                    <div class="modal-section">
+                        <label class="modal-label">Player Name:</label>
+                        <input type="text" id="mobileNameInput" class="modal-input" placeholder="Enter name">
+                    </div>
+                    <div class="modal-section">
+                        <label class="modal-label">Game Modes (Solo / Bot):</label>
+                        <div class="modal-btn-row">
+                            <button type="button" id="modalVsBotBtn" class="modal-mode-btn bot-btn">VS BOT</button>
+                            <button type="button" id="modalBotVsBotBtn" class="modal-mode-btn bvb-btn">BOT VS
+                                BOT</button>
+                        </div>
+                    </div>
+                    <div class="modal-section">
+                        <label class="modal-label">Audio & Voice Chat:</label>
+                        <div class="modal-sound-row">
+                            <button type="button" id="modalSfxBtn" class="modal-sound-btn">🔊 SFX: ON</button>
+                            <button type="button" id="modalMicBtn" class="modal-sound-btn">🎤 Mic: OFF</button>
+                            <button type="button" id="modalAudioBtn" class="modal-sound-btn">🎧 Audio: ON</button>
+                        </div>
+                    </div>
+                    <div class="modal-section" id="modalLeaveSection" style="display: none;">
+                        <button type="button" id="modalLeaveBtn" class="modal-leave-btn">🚪 LEAVE MATCH</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -147,6 +232,7 @@
     <audio id="remoteVoiceAudio" autoplay playsinline webkit-playsinline preload="auto"></audio>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-    <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v=4.0"></script>
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v=5.3"></script>
 </body>
+
 </html>

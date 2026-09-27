@@ -259,38 +259,150 @@ function handlePointerUp(e) {
 canvas.addEventListener('mouseup', handlePointerUp);
 canvas.addEventListener('touchend', handlePointerUp);
 
-// Mobile UI Toggles
-const infoPanel = document.getElementById('infoPanel');
-const rightSidePanel = document.getElementById('rightSidePanel');
+// ==========================================
+// MOBILE UI CONTROLS & MODALS (TFT Mobile Style)
+// ==========================================
+function setupMobileUi() {
+    const infoPanel = document.getElementById('infoPanel');
+    const rightSidePanel = document.getElementById('rightSidePanel');
+    const panelBackdrop = document.getElementById('panelBackdrop');
+    const closeRightPanelBtn = document.getElementById('closeRightPanelBtn');
+    const closeInfoPanelBtn = document.getElementById('closeInfoPanelBtn');
 
-document.getElementById('toggleInfoBtn')?.addEventListener('click', () => {
-    infoPanel?.classList.toggle('show');
-    if (rightSidePanel) rightSidePanel.classList.remove('show');
-});
-
-document.getElementById('toggleSynergyBtn')?.addEventListener('click', () => {
-    const isShowing = rightSidePanel?.classList.contains('show');
-    const isSynergyActive = document.getElementById('tabBtnSynergy')?.classList.contains('active');
-    switchRightTab('synergies');
-    if (isShowing && isSynergyActive) {
-        rightSidePanel.classList.remove('show');
-    } else {
-        rightSidePanel?.classList.add('show');
+    function closeRightDrawer() {
+        if (rightSidePanel) rightSidePanel.classList.remove('show');
+        if (panelBackdrop) panelBackdrop.classList.remove('show');
     }
-    if (infoPanel) infoPanel.classList.remove('show');
-});
 
-document.getElementById('toggleStatsBtn')?.addEventListener('click', () => {
-    const isShowing = rightSidePanel?.classList.contains('show');
-    const isStatsActive = document.getElementById('tabBtnStats')?.classList.contains('active');
-    switchRightTab('stats');
-    if (isShowing && isStatsActive) {
-        rightSidePanel.classList.remove('show');
-    } else {
-        rightSidePanel?.classList.add('show');
+    function openRightDrawer(tabName) {
+        switchRightTab(tabName);
+        if (rightSidePanel) rightSidePanel.classList.add('show');
+        if (panelBackdrop) panelBackdrop.classList.add('show');
+        if (infoPanel) infoPanel.classList.remove('show');
     }
-    if (infoPanel) infoPanel.classList.remove('show');
-});
+
+    document.getElementById('toggleSynergyBtn')?.addEventListener('click', () => {
+        const isShowing = rightSidePanel?.classList.contains('show');
+        const isSynergyActive = document.getElementById('tabBtnSynergy')?.classList.contains('active');
+        if (isShowing && isSynergyActive) {
+            closeRightDrawer();
+        } else {
+            openRightDrawer('synergies');
+        }
+    });
+
+    document.getElementById('toggleStatsBtn')?.addEventListener('click', () => {
+        const isShowing = rightSidePanel?.classList.contains('show');
+        const isStatsActive = document.getElementById('tabBtnStats')?.classList.contains('active');
+        if (isShowing && isStatsActive) {
+            closeRightDrawer();
+        } else {
+            openRightDrawer('stats');
+        }
+    });
+
+    closeRightPanelBtn?.addEventListener('click', closeRightDrawer);
+    closeInfoPanelBtn?.addEventListener('click', () => {
+        if (infoPanel) infoPanel.classList.remove('show');
+    });
+
+    panelBackdrop?.addEventListener('click', () => {
+        closeRightDrawer();
+        if (infoPanel) infoPanel.classList.remove('show');
+    });
+
+    document.getElementById('toggleInfoBtn')?.addEventListener('click', () => {
+        if (infoPanel) {
+            infoPanel.classList.toggle('show');
+            if (infoPanel.classList.contains('show')) {
+                closeRightDrawer();
+            }
+        }
+    });
+
+    // Mobile Settings & Modes Modal
+    const mobileMenuModal = document.getElementById('mobileMenuModal');
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const closeMenuModalBtn = document.getElementById('closeMenuModalBtn');
+    const menuModalBackdrop = document.getElementById('menuModalBackdrop');
+    const mobileNameInput = document.getElementById('mobileNameInput');
+    const playerNameInput = document.getElementById('playerNameInput');
+    const modalVsBotBtn = document.getElementById('modalVsBotBtn');
+    const modalBotVsBotBtn = document.getElementById('modalBotVsBotBtn');
+    const modalLeaveBtn = document.getElementById('modalLeaveBtn');
+    const modalLeaveSection = document.getElementById('modalLeaveSection');
+    const modalSfxBtn = document.getElementById('modalSfxBtn');
+    const modalMicBtn = document.getElementById('modalMicBtn');
+    const modalAudioBtn = document.getElementById('modalAudioBtn');
+
+    function openMobileMenu() {
+        if (!mobileMenuModal) return;
+        if (mobileNameInput && playerNameInput) {
+            mobileNameInput.value = playerNameInput.value;
+        }
+        if (modalLeaveSection) {
+            modalLeaveSection.style.display = STATE.roomId ? 'block' : 'none';
+        }
+        mobileMenuModal.style.display = 'flex';
+    }
+
+    function closeMobileMenu() {
+        if (mobileMenuModal) mobileMenuModal.style.display = 'none';
+    }
+
+    mobileMenuBtn?.addEventListener('click', openMobileMenu);
+    closeMenuModalBtn?.addEventListener('click', closeMobileMenu);
+    menuModalBackdrop?.addEventListener('click', closeMobileMenu);
+
+    mobileNameInput?.addEventListener('input', () => {
+        if (playerNameInput) {
+            playerNameInput.value = mobileNameInput.value;
+            playerNameInput.dispatchEvent(new Event('input'));
+        }
+    });
+
+    modalVsBotBtn?.addEventListener('click', () => {
+        closeMobileMenu();
+        playVsBot();
+    });
+
+    modalBotVsBotBtn?.addEventListener('click', () => {
+        closeMobileMenu();
+        playBotVsBot();
+    });
+
+    modalLeaveBtn?.addEventListener('click', () => {
+        closeMobileMenu();
+        leaveMatch();
+    });
+
+    modalSfxBtn?.addEventListener('click', () => {
+        const isMuted = toggleSfxMute();
+        modalSfxBtn.innerText = isMuted ? '🔇 SFX: OFF' : '🔊 SFX: ON';
+        modalSfxBtn.classList.toggle('muted', isMuted);
+    });
+
+    modalMicBtn?.addEventListener('click', () => {
+        const micBtn = document.getElementById('voiceMicBtn');
+        if (micBtn) {
+            micBtn.click();
+            const isMuted = micBtn.classList.contains('muted');
+            modalMicBtn.innerText = isMuted ? '🎤 Mic: OFF' : '🎤 Mic: ON';
+            modalMicBtn.classList.toggle('muted', isMuted);
+        }
+    });
+
+    modalAudioBtn?.addEventListener('click', () => {
+        const audioBtn = document.getElementById('voiceAudioBtn');
+        if (audioBtn) {
+            audioBtn.click();
+            const isDeafened = audioBtn.classList.contains('deafened');
+            modalAudioBtn.innerText = isDeafened ? '🎧 Audio: OFF' : '🎧 Audio: ON';
+            modalAudioBtn.classList.toggle('muted', isDeafened);
+        }
+    });
+}
+setupMobileUi();
 
 // 4. RIGHT CLICK (Sell champion)
 canvas.addEventListener('contextmenu', (e) => {
