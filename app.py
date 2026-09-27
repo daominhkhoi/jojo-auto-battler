@@ -635,8 +635,8 @@ def _create_bot_vs_bot_game(player_id, player_name):
             if game.get('aborted'):
                 return
 
-            # 5s post-round review delay so spectators can visually inspect the battlefield
-            for _ in range(50):
+            # 6s post-round review delay so spectators can visually inspect the battlefield for full 5s
+            for _ in range(60):
                 if game.get('aborted'):
                     return
                 socketio.sleep(0.1)

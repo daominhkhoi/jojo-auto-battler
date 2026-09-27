@@ -625,18 +625,28 @@ export function syncTickData(data) {
 }
 
 let roundReviewInterval = null;
+let roundReviewHideTimeout = null;
 
 export function cancelRoundReview() {
     if (roundReviewInterval) {
         clearInterval(roundReviewInterval);
         roundReviewInterval = null;
     }
-    hideRoundReviewBanner();
+    if (roundReviewHideTimeout) {
+        clearTimeout(roundReviewHideTimeout);
+        roundReviewHideTimeout = null;
+    }
+    hideRoundReviewBanner(true);
     STATE.isRoundReview = false;
     STATE.roundWinner = null;
 }
 
 function showRoundReviewBanner(title, subtitle, color, secondsLeft) {
+    if (roundReviewHideTimeout) {
+        clearTimeout(roundReviewHideTimeout);
+        roundReviewHideTimeout = null;
+    }
+
     let banner = document.getElementById('roundReviewBanner');
     if (!banner) {
         banner = document.createElement('div');
@@ -672,19 +682,38 @@ function updateRoundReviewCountdown(secondsLeft) {
     }
 }
 
-function hideRoundReviewBanner() {
-    const banner = document.getElementById('roundReviewBanner');
-    if (banner) {
-        banner.style.opacity = '0';
-        banner.style.transform = 'translateX(-50%) scale(0.95)';
-        setTimeout(() => {
-            if (banner) banner.style.display = 'none';
-        }, 300);
+function hideRoundReviewBanner(immediate = false) {
+    if (roundReviewHideTimeout) {
+        clearTimeout(roundReviewHideTimeout);
+        roundReviewHideTimeout = null;
     }
+
+    const banner = document.getElementById('roundReviewBanner');
+    if (!banner) return;
+
+    if (immediate) {
+        banner.style.opacity = '0';
+        banner.style.display = 'none';
+        return;
+    }
+
+    banner.style.opacity = '0';
+    banner.style.transform = 'translateX(-50%) scale(0.95)';
+    roundReviewHideTimeout = setTimeout(() => {
+        if (banner) banner.style.display = 'none';
+        roundReviewHideTimeout = null;
+    }, 300);
 }
 
 export function handleCombatEnd(serverResult) {
-    cancelRoundReview();
+    if (roundReviewInterval) {
+        clearInterval(roundReviewInterval);
+        roundReviewInterval = null;
+    }
+    if (roundReviewHideTimeout) {
+        clearTimeout(roundReviewHideTimeout);
+        roundReviewHideTimeout = null;
+    }
 
     const res = typeof serverResult === 'object' ? serverResult.result : serverResult;
     const winner = typeof serverResult === 'object' ? serverResult.winner : (res === 'win' ? 'Team1' : (res === 'loss' ? 'Team2' : 'draw'));
