@@ -680,10 +680,9 @@ function showRoundReviewBanner(title, subtitle, color, secondsLeft) {
     }
 
     banner.innerHTML = `
-        <div style="background: rgba(13, 17, 23, 0.94); border: 2px solid ${color}; border-radius: 14px; padding: 16px 36px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.85), 0 0 25px ${color}55; backdrop-filter: blur(10px); min-width: 280px; max-width: 90vw;">
-            <div style="font-size: 28px; font-weight: 900; color: ${color}; text-shadow: 0 0 16px ${color}; letter-spacing: 1px; margin-bottom: 4px;">${title}</div>
-            <div style="font-size: 15px; color: #ecf0f1; font-weight: 500; margin-bottom: 10px; opacity: 0.9;">${subtitle}</div>
-            <div id="roundReviewTimerBadge" style="display: inline-block; background: rgba(255,255,255,0.12); color: #fff; font-size: 13px; font-weight: bold; padding: 4px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.25);">
+        <div style="background: rgba(13, 17, 23, 0.94); border: 2px solid ${color}; border-radius: 14px; padding: 18px 36px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.85), 0 0 25px ${color}55; backdrop-filter: blur(10px); min-width: 280px; max-width: 90vw;">
+            <div style="font-size: 26px; font-weight: 900; color: ${color}; text-shadow: 0 0 16px ${color}; letter-spacing: 1px; margin-bottom: 12px;">${title}</div>
+            <div id="roundReviewTimerBadge" style="display: inline-block; background: rgba(255,255,255,0.12); color: #fff; font-size: 13px; font-weight: bold; padding: 5px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.25);">
                 ⏳ Reviewing battlefield... Next in <span id="roundReviewCountdownNum" style="color: ${color}; font-size: 16px; font-weight: 900;">${secondsLeft}s</span>
             </div>
         </div>

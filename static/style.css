@@ -1593,12 +1593,14 @@ button:hover {
     display: flex;
     flex-direction: column;
     gap: 3px;
-    transition: transform 0.15s ease, background 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    transform: none !important;
 }
 
 .stat-row:hover {
-    background: rgba(30, 42, 60, 0.95);
-    transform: translateX(2px);
+    background: rgba(35, 48, 70, 0.95);
+    border-color: rgba(255, 255, 255, 0.18);
+    transform: none !important;
 }
 
 .stat-row.is-mvp {

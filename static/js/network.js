@@ -49,10 +49,11 @@ socket.on('match_found', (data) => {
         STATE.bot1Name = data.playerName || 'Bot 1';
         STATE.bot2Name = data.opponentName || 'Bot 2';
 
-        const p1Label = document.getElementById('p1NameDisplay');
-        const p2Label = document.getElementById('p2NameDisplay');
-        if (p1Label) p1Label.innerText = STATE.bot1Name;
-        if (p2Label) p2Label.innerText = STATE.bot2Name;
+        // Keep topbar displaying clean score only (no bot names)
+        const pText = document.getElementById('playerLpText');
+        const bText = document.getElementById('botLpText');
+        if (pText) pText.innerText = "0/10";
+        if (bText) bText.innerText = "0/10";
 
         const exitBtn = document.getElementById('exitMatchBtn');
         if (exitBtn) exitBtn.style.display = 'inline-block';
