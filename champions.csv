@@ -60,7 +60,7 @@ Limp Bizkit,2,110033,3592,1,0.94,100,"Green Dolphin, Bound",submerge,,,3.6,self
 Little Feet,1,53000,1804,3,0.92,80,"La Squadra, Phenomenon",polymorph,,,4.4,enemy_highest_atk
 Love Deluxe,1,79598,2406,1,0.79,120,"Morioh, Bound",stun,,,4.6,enemy_closest
 Lovers,1,83088,2536,1,0.81,120,"Tarot, Bound",damage,18800,,,enemy_closest
-Made in Heaven,5,206733,8838,1,0.75,200,"Green Dolphin, Bound",speed_buff,150,,10,self
+Made in Heaven,5,206733,8838,1,4,200,"Green Dolphin, Bound",speed_buff,150,,10,self
 Magician's Red,3,89922,3672,3,01.04,80,"Stardust, Phenomenon",dot,8800,,6.3,enemy_closest
 Man in the Mirror,1,52550,1857,3,0.86,80,"La Squadra, Phenomenon",banish,,,4.3,enemy_random
 Manhattan Transfer,1,52550,2034,4,1.21,90,"Green Dolphin, Long-Distance",ricochet,12800,1.8,,bounce_closest

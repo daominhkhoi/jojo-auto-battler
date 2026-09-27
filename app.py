@@ -21,6 +21,7 @@ import os
 import random
 import time
 import urllib.request
+import ssl
 import requests
 import io
 import pandas as pd
@@ -119,6 +120,43 @@ _SKILL_BALANCE_OVERRIDES = {
 
 _LAST_CHAMPION_SYNC_TIME = 0
 
+def _fetch_google_sheets_csv(url):
+    """
+    Fetch CSV text from Google Sheets via standard urllib.request with robust SSL context
+    to completely prevent gevent/urllib3 'maximum recursion depth exceeded' recursion loop on Render.
+    """
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+    }
+    req = urllib.request.Request(url, headers=headers)
+    
+    # 1. Try standard verified SSL context with urllib.request
+    try:
+        ctx = ssl.create_default_context()
+        with urllib.request.urlopen(req, timeout=12, context=ctx) as resp:
+            if resp.status == 200:
+                raw = resp.read()
+                return raw.decode('utf-8', errors='replace')
+    except Exception as e1:
+        # 2. Try unverified SSL context (fallback if OS CA certs missing)
+        try:
+            unverified_ctx = ssl._create_unverified_context()
+            with urllib.request.urlopen(req, timeout=12, context=unverified_ctx) as resp:
+                if resp.status == 200:
+                    raw = resp.read()
+                    return raw.decode('utf-8', errors='replace')
+        except Exception as e2:
+            # 3. Fallback to requests if available
+            try:
+                r = requests.get(url, timeout=12, headers=headers)
+                if r.status_code == 200 and len(r.text) > 100:
+                    return r.text
+            except Exception as e3:
+                raise Exception(f"urllib error: {e1} / {e2}; requests error: {e3}")
+    return None
+
 def _load_champion_data(force_remote=False):
     """
     Load champion data from Google Sheets (source of truth) or local fallback CSV.
@@ -138,27 +176,19 @@ def _load_champion_data(force_remote=False):
         f"/pub?gid=1700806245&single=true&output=csv&_t={int(time.time())}"
     )
     try:
-        resp = requests.get(
-            url,
-            timeout=10,
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache'
-            }
-        )
-        if resp.status_code == 200 and len(resp.text) > 100:
-            df = pd.read_csv(io.StringIO(resp.text), sep=',', encoding='utf-8')
+        csv_text = _fetch_google_sheets_csv(url)
+        if csv_text and len(csv_text) > 100:
+            df = pd.read_csv(io.StringIO(csv_text), sep=',', encoding='utf-8')
             source = "Google Sheets (Live)"
             # Cache locally to champions.csv for offline backup
             try:
                 with open(local_csv, 'w', encoding='utf-8') as f:
-                    f.write(resp.text)
+                    f.write(csv_text)
                 print(f"[OK] Cached Google Sheets to local '{os.path.basename(local_csv)}'.")
             except Exception as save_err:
                 print(f"[WARN] Local CSV cache write failed: {save_err}")
         else:
-            fetch_error = f"HTTP {resp.status_code}"
+            fetch_error = "Dữ liệu Google Sheets trả về rỗng"
     except Exception as e:
         fetch_error = str(e)
         print(f"[WARN] Google Sheets fetch failed ({e}). Checking local CSV fallback...")
