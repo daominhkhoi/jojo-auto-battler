@@ -261,7 +261,7 @@ class Champion:
                         elif bt == 'stat_steal_beneficiary': c.attack = max(0, c.attack - buff['power'])
                         c.active_buffs.remove(buff)
 
-                    # Gây sát thương = 20% máu bản thân cho toàn địch
+                    # Gây sát thương = 10% máu bản thân cho toàn địch
                     actual_dmg, evs = c.take_damage(dmg, self, board_state)
                     event.setdefault('extra_events', []).extend(evs)
                     event.setdefault('extra_events', []).append({

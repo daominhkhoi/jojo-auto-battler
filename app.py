@@ -108,8 +108,8 @@ _SKILL_BALANCE_OVERRIDES = {
     'Aqua Necklace': {'duration': 2.2},
     'Heaven\'s Door': {'duration': 2.2},
 
-    # 10. Return to Zero: Gây sát thương = 20% Max HP bản thân cho toàn địch
-    'Gold Experience Requiem': {'percent': 0.20},
+    # 10. Return to Zero: Gây sát thương = 10% Max HP bản thân cho toàn địch
+    'Gold Experience Requiem': {'percent': 0.10},
 }
 
 def _load_champion_data():
