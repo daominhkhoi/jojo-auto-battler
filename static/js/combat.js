@@ -443,8 +443,13 @@ export function syncTickData(data) {
                 STATE.screenFlash = { color: 'rgba(255, 215, 0, 0.5)', alpha: 1.0, decay: 0.03 };
                 spawnFloatingText(tarCenterX, tarCenterY - 30, '✨ RETURN TO ZERO!', 'status', { color: '#ffd700', glowColor: '#f39c12', scale: 1.6 });
             } else if (['heal', 'aoe_heal', 'regen'].includes(event.skill_type)) {
-                const healVal = event.power ? `+${event.power.toLocaleString()}` : '+HP';
-                spawnFloatingText(tarCenterX, tarCenterY - 20, `💚 ${healVal}`, 'heal');
+                const targetIsManaLocked = target && target.buffs && target.buffs.includes('mana_lock');
+                if (targetIsManaLocked) {
+                    spawnFloatingText(tarCenterX, tarCenterY - 20, '🚫 HEAL BLOCKED!', 'status', { color: '#e74c3c', glowColor: '#c0392b', scale: 1.35 });
+                } else {
+                    const healVal = event.power ? `+${event.power.toLocaleString()}` : '+HP';
+                    spawnFloatingText(tarCenterX, tarCenterY - 20, `💚 ${healVal}`, 'heal');
+                }
             } else if (event.skill_type === 'buff_atk') {
                 spawnFloatingText(tarCenterX, tarCenterY - 25, `⚔️ +${event.power ? event.power.toLocaleString() : 'ATK'}!`, 'status', { color: '#f39c12', scale: 1.4 });
             } else if (event.skill_type === 'speed_buff') {
@@ -588,6 +593,14 @@ export function syncTickData(data) {
                     STATE.screenFlash = { color: 'rgba(241, 196, 15, 0.45)', alpha: 1.0, decay: 0.035 };
                     spawnFloatingText(tarCenterX, tarCenterY - 30, '🌟 REVIVED!', 'status', { color: '#ffd700', scale: 1.4 });
                 }
+            }
+        } else if (event.type === 'heal_blocked') {
+            const target = STATE.champions.find(c => c.id === event.target_id || c.id === event.targetId);
+            if (target) {
+                const tarSize = getCanvasCoords(target.targetX, target.targetY);
+                const tarCenterX = (target.pixelX !== undefined ? target.pixelX : tarSize.x) + tarSize.w / 2;
+                const tarCenterY = (target.pixelY !== undefined ? target.pixelY : tarSize.y) + tarSize.h / 2;
+                spawnFloatingText(tarCenterX, tarCenterY - 25, '🚫 HEAL BLOCKED!', 'status', { color: '#e74c3c', glowColor: '#c0392b', scale: 1.35 });
             }
         } else if (event.type === 'mana_refund') {
             const target = STATE.champions.find(c => c.id === event.target_id || c.id === event.targetId);

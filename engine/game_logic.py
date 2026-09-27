@@ -407,7 +407,12 @@ class Champion:
                 event.setdefault('extra_events', []).extend(evs)
 
         elif s_type == 'heal' and target:
-            if s_duration > 0:
+            target_is_locked = getattr(target, 'is_mana_locked', False) or any(b.get('type') == 'mana_lock' for b in getattr(target, 'active_buffs', []))
+            if target_is_locked:
+                event.setdefault('extra_events', []).append({
+                    'type': 'heal_blocked', 'target_id': target.id
+                })
+            elif s_duration > 0:
                 target.active_buffs.append({'type': 'heal', 'power': s_power, 'duration': s_duration})
             else:
                 target.hp = min(target.max_hp, target.hp + s_power)
@@ -533,7 +538,7 @@ class Champion:
     def update_buffs(self, board_state):
         # FIX: ALL status flags reset at top — including is_banished (unified pattern)
         self.is_stunned    = False
-        self.is_mana_locked = False
+        self.is_mana_locked = any(b.get('type') == 'mana_lock' for b in self.active_buffs)
         self.is_submerged  = False
         self.is_polymorphed = False
         self.is_banished   = False   # Now reset here too, re-applied by active buff below
@@ -553,15 +558,18 @@ class Champion:
                 dmg, evs = self.take_damage(buff['power'] / 10.0, caster, board_state)
                 events.extend(evs)
             elif bt in ('regen', 'aoe_heal', 'heal'):
-                self.hp = min(self.max_hp, self.hp + buff['power'] / 10.0)
+                # Mana lock also blocks health recovery / regeneration
+                if not self.is_mana_locked:
+                    self.hp = min(self.max_hp, self.hp + buff['power'] / 10.0)
             elif bt == 'life_tether':
                 caster = next((c for c in board_state if c.id == buff.get('caster_id')), None)
                 dmg, evs = self.take_damage(buff['power'] / 10.0, caster, board_state)
                 events.extend(evs)
-                if caster and caster.is_alive:
+                if caster and caster.is_alive and not getattr(caster, 'is_mana_locked', False) and not any(b.get('type') == 'mana_lock' for b in getattr(caster, 'active_buffs', [])):
                     caster.hp = min(caster.max_hp, caster.hp + buff['power'] / 10.0)
             elif bt == 'mana_battery':
-                self.mana = min(self.max_mana, self.mana + buff['power'] / 10)
+                if not self.is_mana_locked:
+                    self.mana = min(self.max_mana, self.mana + buff['power'] / 10)
             elif bt in ('stun', 'time_stopped'):
                 self.is_stunned = True
             elif bt == 'mana_lock':
