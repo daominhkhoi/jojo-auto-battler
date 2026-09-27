@@ -3,6 +3,7 @@ import { CONFIG, STATE, getCanvasCoords, CHAMPION_POOL } from './globals.js';
 import { updateGold, refreshShop } from './shop.js';
 import { startPrepTimer, stopPrepTimer } from './network.js';
 import { showNotification } from './notifications.js';
+import { updateDamageStats, freezeDamageStatsOnCombatEnd } from './stats.js';
 
 export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
     if (!STATE.floatingTexts) STATE.floatingTexts = [];
@@ -317,6 +318,7 @@ export function syncTickData(data) {
             localChamp.applied_traits = serverChamp.applied_traits || localChamp.applied_traits || [];
             localChamp.buffs = serverChamp.buffs || [];
             localChamp.buff_details = serverChamp.buff_details || [];
+            localChamp.damage_dealt = serverChamp.damage_dealt !== undefined ? serverChamp.damage_dealt : (localChamp.damage_dealt || 0);
         } else {
             const template = CHAMPION_POOL.find(t => t.name === serverChamp.name) || {};
 
@@ -348,10 +350,14 @@ export function syncTickData(data) {
                 raw_skill: serverChamp.raw_skill || template.skill,
                 applied_traits: serverChamp.applied_traits || [],
                 buffs: serverChamp.buffs || [],
-                buff_details: serverChamp.buff_details || []
+                buff_details: serverChamp.buff_details || [],
+                damage_dealt: serverChamp.damage_dealt || 0
             });
         }
     });
+
+    // Update realtime damage stats panel
+    updateDamageStats(STATE.champions);
 
     if (!STATE.hitEffects) STATE.hitEffects = [];
 
@@ -714,6 +720,9 @@ export function handleCombatEnd(serverResult) {
         clearTimeout(roundReviewHideTimeout);
         roundReviewHideTimeout = null;
     }
+
+    // Freeze damage meter stats for inspection throughout review and shopping phase
+    freezeDamageStatsOnCombatEnd(serverResult);
 
     const res = typeof serverResult === 'object' ? serverResult.result : serverResult;
     const winner = typeof serverResult === 'object' ? serverResult.winner : (res === 'win' ? 'Team1' : (res === 'loss' ? 'Team2' : 'draw'));

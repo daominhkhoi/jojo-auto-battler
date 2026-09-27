@@ -62,6 +62,7 @@ class Champion:
         self.is_polymorphed = False
         self.shield = 0
         self.original_team = team  # Dùng cho Mind Control đổi phe
+        self.damage_dealt = 0      # Tổng sát thương trực tiếp gây ra trong hiệp đấu
 
     # ------------------------------------------------------------------
     def can_attack(self):
@@ -104,6 +105,10 @@ class Champion:
         actual_damage = min(actual_damage, self.hp)
         self.hp -= actual_damage
 
+        # Ghi nhận sát thương gây ra cho kẻ tấn công (damage dealt tracking)
+        if attacker and actual_damage > 0:
+            attacker.damage_dealt = getattr(attacker, 'damage_dealt', 0) + actual_damage
+
         # 2.5 Giáp phản đòn (Reflect Shield)
         # FIX: Use take_damage on the attacker so their revive/shield/evasion applies.
         # Guard with a flag to prevent infinite reflect recursion and only reflect when actual damage > 0.
@@ -114,7 +119,7 @@ class Champion:
                 reflect_dmg = actual_damage * best_power
                 if reflect_dmg > 0:
                     attacker._in_reflect = True
-                    ref_dmg, ref_evs = attacker.take_damage(reflect_dmg, None, board_state)
+                    ref_dmg, ref_evs = attacker.take_damage(reflect_dmg, self, board_state)
                     attacker._in_reflect = False
                     if ref_dmg > 0:
                         events.append({'type': 'reflect', 'targetId': attacker.id, 'defenderId': self.id, 'damage': ref_dmg})
@@ -126,6 +131,8 @@ class Champion:
                 linked_target = buff['linked_target']
                 if linked_target and linked_target.is_alive:
                     linked_target.hp -= actual_damage
+                    if attacker and actual_damage > 0:
+                        attacker.damage_dealt = getattr(attacker, 'damage_dealt', 0) + actual_damage
                     events.append({'type': 'damage_link_proc', 'caster_id': self.id,
                                    'target_id': linked_target.id, 'damage': actual_damage})
                     if linked_target.hp <= 0:
@@ -580,6 +587,7 @@ class Champion:
             'raw_range': getattr(self, 'raw_range', self.attack_range),
             'raw_speed': getattr(self, 'raw_speed', self.base_speed),
             'attack_range': self.attack_range,
+            'damage_dealt': int(round(getattr(self, 'damage_dealt', 0))),
             'is_alive': self.is_alive, 'star': getattr(self, 'star', 1),
             'skill': getattr(self, 'skill', None),
             'raw_skill': getattr(self, 'raw_skill', None),

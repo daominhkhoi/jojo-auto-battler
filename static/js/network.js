@@ -188,6 +188,10 @@ let combatTimerInterval;
 socket.on('combat_start', () => {
     showNotification("FIGHT!");
 
+    import('./stats.js').then(module => {
+        module.resetDamageStatsForNewRound();
+    });
+
     if (STATE.isBotVsBot) {
         const bvbTimer = document.getElementById('bvbTimerText');
         if (bvbTimer) {
