@@ -23,9 +23,52 @@ function getChampInitials(name) {
 }
 
 /**
+ * Switch right panel tabs between 'synergies' and 'stats'.
+ */
+export function switchRightTab(tabName) {
+    const tabSynergy = document.getElementById('tabBtnSynergy');
+    const tabStats = document.getElementById('tabBtnStats');
+    const paneSynergy = document.getElementById('synergyTabContent');
+    const paneStats = document.getElementById('statsTabContent');
+
+    if (tabName === 'stats') {
+        if (tabSynergy) tabSynergy.classList.remove('active');
+        if (tabStats) tabStats.classList.add('active');
+        if (paneSynergy) {
+            paneSynergy.classList.remove('active');
+            paneSynergy.style.display = 'none';
+        }
+        if (paneStats) {
+            paneStats.classList.add('active');
+            paneStats.style.display = 'flex';
+        }
+    } else {
+        if (tabStats) tabStats.classList.remove('active');
+        if (tabSynergy) tabSynergy.classList.add('active');
+        if (paneStats) {
+            paneStats.classList.remove('active');
+            paneStats.style.display = 'none';
+        }
+        if (paneSynergy) {
+            paneSynergy.classList.add('active');
+            paneSynergy.style.display = 'flex';
+        }
+    }
+}
+
+/**
  * Initialize the Damage Stats Panel in the DOM.
  */
 export function initStatsPanel() {
+    const tabBtnSynergy = document.getElementById('tabBtnSynergy');
+    const tabBtnStats = document.getElementById('tabBtnStats');
+    if (tabBtnSynergy) {
+        tabBtnSynergy.onclick = () => switchRightTab('synergies');
+    }
+    if (tabBtnStats) {
+        tabBtnStats.onclick = () => switchRightTab('stats');
+    }
+
     const panel = document.getElementById('statsPanel');
     if (!panel) return;
 
@@ -86,6 +129,9 @@ export function resetDamageStatsForNewRound() {
     cachedEnemies = [];
     cachedRound = STATE.currentRound || 1;
 
+    const liveDot = document.getElementById('combatLiveDot');
+    if (liveDot) liveDot.style.display = 'inline-block';
+
     const badge = document.getElementById('statStatusBadge');
     if (badge) {
         badge.className = 'stat-status-badge live';
@@ -106,6 +152,9 @@ export function resetDamageStatsForNewRound() {
  */
 export function freezeDamageStatsOnCombatEnd(result) {
     isCombatActive = false;
+
+    const liveDot = document.getElementById('combatLiveDot');
+    if (liveDot) liveDot.style.display = 'none';
 
     const badge = document.getElementById('statStatusBadge');
     if (badge) {

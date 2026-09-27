@@ -301,6 +301,10 @@ button:hover {
     background-color: #d68910;
 }
 
+.mobile-toggle {
+    display: none !important;
+}
+
 #rollBtn {
     background-color: #f39c12;
 }
@@ -335,33 +339,147 @@ button:hover {
     flex-shrink: 0;
 }
 
-/* Side Panels: Info, Synergies, và Damage Meter */
+/* Side Panels: Info (Left) & Right Side Panel (Synergies / Damage Meter) */
 .side-panel {
     height: 70vh;
     background-color: #1a2230;
     border: 2px solid #34495e;
     border-radius: 12px;
-    padding-left: 12px;
-    padding-right: 12px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
     color: #ecf0f1;
-    overflow-y: auto;
     box-sizing: border-box;
 }
 
 #infoPanel {
-    width: 230px;
+    width: 290px;
+    flex-shrink: 0;
+    padding: 12px;
+    overflow-y: auto;
+}
+
+/* Unified Symmetrical Right Side Panel */
+#rightSidePanel.right-side-panel {
+    width: 290px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Tabs Header at top of Right Panel */
+.right-tab-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    background: rgba(15, 23, 35, 0.95);
+    border-bottom: 2px solid #2c3e50;
     flex-shrink: 0;
 }
 
-#synergyPanel {
-    width: 205px;
-    flex-shrink: 0;
+.right-tab-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 7px 6px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #a4b0be;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 7px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    user-select: none;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
 }
 
-#statsPanel {
-    width: 320px;
-    flex-shrink: 0;
+.right-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #f1f2f6;
+    border-color: rgba(255, 255, 255, 0.22);
+    transform: translateY(-1px);
+}
+
+#tabBtnSynergy.active {
+    background: linear-gradient(135deg, rgba(142, 68, 173, 0.4), rgba(41, 128, 185, 0.35));
+    color: #f1c40f;
+    border-color: #f1c40f;
+    box-shadow: 0 0 10px rgba(241, 196, 15, 0.25);
+}
+
+#tabBtnStats.active {
+    background: linear-gradient(135deg, rgba(231, 76, 60, 0.35), rgba(41, 128, 185, 0.35));
+    color: #00cec9;
+    border-color: #00cec9;
+    box-shadow: 0 0 10px rgba(0, 206, 201, 0.25);
+}
+
+.tab-btn-icon {
+    font-size: 13px;
+    line-height: 1;
+}
+
+.tab-btn-label {
+    line-height: 1;
+}
+
+/* Pulsing live dot next to Damage Meter text */
+.live-pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ff4757;
+    box-shadow: 0 0 6px #ff4757;
+    display: inline-block;
+    animation: livePulseAnim 1.2s infinite ease-in-out;
+}
+
+@keyframes livePulseAnim {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.4); opacity: 0.4; }
+}
+
+/* Tab panes inside Right Panel */
+.right-tab-pane {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.right-tab-pane:not(.active) {
+    display: none !important;
+}
+
+/* Inner panels */
+.synergy-panel-inner {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+}
+
+.stats-panel-inner {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
 }
 
 .panel-title {
@@ -631,14 +749,9 @@ button:hover {
         gap: 10px;
         padding: 0 6px;
     }
-    #infoPanel {
-        width: 210px;
-    }
-    #synergyPanel {
-        width: 185px;
-    }
-    #statsPanel {
-        width: 280px;
+    #infoPanel,
+    #rightSidePanel.right-side-panel {
+        width: 250px;
     }
 }
 
@@ -646,14 +759,9 @@ button:hover {
     .game-layout {
         gap: 8px;
     }
-    #infoPanel {
-        width: 180px;
-    }
-    #synergyPanel {
-        width: 165px;
-    }
-    #statsPanel {
-        width: 250px;
+    #infoPanel,
+    #rightSidePanel.right-side-panel {
+        width: 210px;
     }
 }
 
@@ -840,12 +948,12 @@ button:hover {
         border-top-color: #3498db;
     }
 
-    #synergyPanel {
+    #rightSidePanel.right-side-panel {
         border-top-color: #f1c40f;
     }
 
     .side-panel.show {
-        display: block;
+        display: block !important;
     }
 
     /* Info panel image */

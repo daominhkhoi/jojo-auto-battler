@@ -26,6 +26,8 @@ import gevent.lock
 app = Flask(__name__)
 # FIX: Secret key from environment variable — never hardcode secrets
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24))
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # ======================================================================

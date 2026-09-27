@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Minh Khoi - Auto Battler</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3.0">
     <style>
         *, *::before, *::after {
             scrollbar-width: none !important;
@@ -94,16 +94,35 @@
 
             <canvas id="gameBoard" width="540" height="870"></canvas>
 
-            <div id="synergyPanel" class="side-panel">
-                <h3 class="panel-title">SYNERGIES</h3>
-                <div id="synergyList">
-                    <div class="info-placeholder">Deploy units to activate synergies</div>
+            <!-- Right Panel: Symmetrical Unified Panel with Tabs (Synergies & Damage Meter) -->
+            <div id="rightSidePanel" class="side-panel right-side-panel">
+                <div class="right-tab-bar">
+                    <button type="button" id="tabBtnSynergy" class="right-tab-btn active" title="View Team Synergies">
+                        <span class="tab-btn-icon">🔮</span>
+                        <span class="tab-btn-label">SYNERGIES</span>
+                    </button>
+                    <button type="button" id="tabBtnStats" class="right-tab-btn" title="View Combat Damage Meter">
+                        <span class="tab-btn-icon">⚔️</span>
+                        <span class="tab-btn-label">DAMAGE METER</span>
+                        <span id="combatLiveDot" class="live-pulse-dot" style="display: none;"></span>
+                    </button>
                 </div>
-            </div>
 
-            <!-- Damage Stats Panel (To the right of SYNERGIES) -->
-            <div id="statsPanel" class="side-panel stats-panel">
-                <!-- Dynamically populated by stats.js -->
+                <!-- Tab Pane 1: Synergies -->
+                <div id="synergyTabContent" class="right-tab-pane active">
+                    <div id="synergyPanel" class="synergy-panel-inner">
+                        <div id="synergyList">
+                            <div class="info-placeholder">Deploy units to activate synergies</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Pane 2: Damage Meter -->
+                <div id="statsTabContent" class="right-tab-pane" style="display: none;">
+                    <div id="statsPanel" class="stats-panel-inner">
+                        <!-- Populated dynamically by stats.js -->
+                    </div>
+                </div>
             </div>
 
             <div id="sellZone" class="sell-zone">SELL</div>
@@ -119,6 +138,6 @@
     <audio id="remoteVoiceAudio" autoplay playsinline webkit-playsinline preload="auto"></audio>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-    <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v=3.0"></script>
 </body>
 </html>

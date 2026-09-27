@@ -6,7 +6,7 @@ import { updatePhysics } from './combat.js';
 import { showNotification } from './notifications.js';
 import { findMatch, playVsBot, playBotVsBot, leaveMatch, declareReady } from './network.js';
 import { initVoiceChat } from './voice.js';
-import { initStatsPanel } from './stats.js';
+import { initStatsPanel, switchRightTab } from './stats.js';
 
 const canvas = document.getElementById('gameBoard');
 const ctx = canvas.getContext('2d');
@@ -257,25 +257,35 @@ canvas.addEventListener('touchend', handlePointerUp);
 
 // Mobile UI Toggles
 const infoPanel = document.getElementById('infoPanel');
-const synergyPanel = document.getElementById('synergyPanel');
-const statsPanel = document.getElementById('statsPanel');
+const rightSidePanel = document.getElementById('rightSidePanel');
 
 document.getElementById('toggleInfoBtn')?.addEventListener('click', () => {
-    infoPanel.classList.toggle('show');
-    if (synergyPanel) synergyPanel.classList.remove('show');
-    if (statsPanel) statsPanel.classList.remove('show');
+    infoPanel?.classList.toggle('show');
+    if (rightSidePanel) rightSidePanel.classList.remove('show');
 });
 
 document.getElementById('toggleSynergyBtn')?.addEventListener('click', () => {
-    synergyPanel.classList.toggle('show');
+    const isShowing = rightSidePanel?.classList.contains('show');
+    const isSynergyActive = document.getElementById('tabBtnSynergy')?.classList.contains('active');
+    switchRightTab('synergies');
+    if (isShowing && isSynergyActive) {
+        rightSidePanel.classList.remove('show');
+    } else {
+        rightSidePanel?.classList.add('show');
+    }
     if (infoPanel) infoPanel.classList.remove('show');
-    if (statsPanel) statsPanel.classList.remove('show');
 });
 
 document.getElementById('toggleStatsBtn')?.addEventListener('click', () => {
-    statsPanel?.classList.toggle('show');
+    const isShowing = rightSidePanel?.classList.contains('show');
+    const isStatsActive = document.getElementById('tabBtnStats')?.classList.contains('active');
+    switchRightTab('stats');
+    if (isShowing && isStatsActive) {
+        rightSidePanel.classList.remove('show');
+    } else {
+        rightSidePanel?.classList.add('show');
+    }
     if (infoPanel) infoPanel.classList.remove('show');
-    if (synergyPanel) synergyPanel.classList.remove('show');
 });
 
 // 4. RIGHT CLICK (Sell champion)
