@@ -33,7 +33,7 @@ Empress,1,78085,2462,1,0.83,120,"Tarot, Bound",dot,4500,,4.4,enemy_highest_atk
 Enigma,1,61188,1530,3,0.96,100,"Morioh, Utility",banish,,,3.9,enemy_closest
 Foo Fighters,3,82500,3984,5,1.43,90,"Green Dolphin, Long-Distance",regen,4600,,10,self
 Geb,3,133089,4981,1,0.94,120,"Tarot, Bound",blink_strike,38000,,,enemy_furthest
-Gold Experience Requiem,5,170475,5990,4,1.2,100,"Requiem, Long-Distance",return_to_zero,0.1,,,all_enemies
+Gold Experience Requiem,5,170475,4500,4,1.2,100,"Requiem, Long-Distance",return_to_zero,0.1,,,all_enemies
 Gold Experience,2,106559,3543,4,0.9,120,"Bucciarati, Power Type",aoe_heal,6800,2.1,5.6,ally_lowest_hp
 Goo Goo Dolls,1,52550,1819,3,0.93,80,"Green Dolphin, Phenomenon",polymorph,,,4.8,enemy_highest_atk
 Green Day,4,118711,5100,4,01.03,80,"Unita Speciale, Phenomenon",aoe_dot,6800,2,12,area_closest
@@ -60,7 +60,7 @@ Limp Bizkit,2,110033,3592,1,0.94,100,"Green Dolphin, Bound",submerge,,,3.6,self
 Little Feet,1,52550,1804,3,0.92,80,"La Squadra, Phenomenon",polymorph,,,4.4,enemy_highest_atk
 Love Deluxe,1,79598,2406,1,0.79,120,"Morioh, Bound",stun,,,4.6,enemy_closest
 Lovers,1,83088,2536,1,0.81,120,"Tarot, Bound",damage,18800,,,enemy_closest
-Made in Heaven,5,206733,8838,1.5,01.05,120,"Green Dolphin, Bound",speed_buff,135,,7,self
+Made in Heaven,5,206733,8838,1,0.75,200,"Green Dolphin, Bound",speed_buff,150,,10,self
 Magician's Red,3,89922,3672,3,01.04,80,"Stardust, Phenomenon",dot,8800,,6.3,enemy_closest
 Man in the Mirror,1,52550,1857,3,0.86,80,"La Squadra, Phenomenon",banish,,,4.3,enemy_random
 Manhattan Transfer,1,52550,2034,4,1.21,90,"Green Dolphin, Long-Distance",ricochet,12800,1.8,,bounce_closest
@@ -79,7 +79,7 @@ Red Hot Chili Pepper,2,112692,3606,1,0.88,120,"Morioh, Bound",blink_strike,25800
 Rolling Stones,2,74863,3870,2,1.13,110,"Unita Speciale, Automatic",execute,21500,,,enemy_lowest_hp
 Sethan,2,81225,2230,3,0.96,100,"Tarot, Utility",polymorph,,,4.9,enemy_highest_atk
 Sex Pistols,3,82500,4059,5,1.4,90,"Bucciarati, Long-Distance",ricochet,23200,2.4,,bounce_closest
-Silver Chariot,3,134638,4761,1,0.93,120,"Stardust, Power Type",speed_buff,66,,5.4,self
+Silver Chariot,3,134638,4761,1,0.93,120,"Stardust, Power Type",speed_buff,100,,7,self
 Sky High,1,52550,1770,3,0.91,80,"Green Dolphin, Phenomenon",dot,4800,,4.2,enemy_closest
 Soft Machine,2,85982,2230,3,0.97,100,"La Squadra, Utility",stat_steal,2662,,6,enemy_highest_atk
 Spice Girl,2,105194,3662,1,0.89,120,"Bucciarati, Power Type",hp_shield,0.25,,6.5,self

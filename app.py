@@ -20,6 +20,8 @@ from engine.bot_ai import SmartBot, BOT_ARCHETYPES
 import os
 import random
 import time
+import urllib.request
+import io
 import pandas as pd
 import gevent.lock
 
@@ -114,38 +116,67 @@ _SKILL_BALANCE_OVERRIDES = {
     'Gold Experience Requiem': {'percent': 0.10},
 }
 
-def _load_champion_data():
-    """
-    Load champion data from local CSV or Google Sheets on startup.
-    Falls back to local champions.csv if the network call fails.
-    """
-    global _CHAMPION_DATA, _CHAMPION_TRAITS
+_LAST_CHAMPION_SYNC_TIME = 0
 
-    local_csv = os.path.join(os.path.dirname(__file__), 'champions - champions.csv')
-    if not os.path.exists(local_csv):
-        local_csv = os.path.join(os.path.dirname(__file__), 'champions.csv')
+def _load_champion_data(force_remote=False):
+    """
+    Load champion data from Google Sheets (source of truth) or local fallback CSV.
+    Caches to champions.csv so offline play is supported.
+    """
+    global _CHAMPION_DATA, _CHAMPION_TRAITS, _LAST_CHAMPION_SYNC_TIME
 
+    local_csv = os.path.join(os.path.dirname(__file__), 'champions.csv')
     df = None
-    if os.path.exists(local_csv):
-        try:
-            df = pd.read_csv(local_csv, sep=',')
-            print(f"[OK] Loaded champion data from local '{os.path.basename(local_csv)}'.")
-        except Exception as e:
-            print(f"[WARN] Local CSV load failed: {e}")
+    source = None
+
+    # 1. Fetch from Google Sheets first (with cache-buster parameter)
+    url = (
+        "https://docs.google.com/spreadsheets/d/e/"
+        "2PACX-1vREGk7FjfrTa0W2mzlWKfzeJX-JOPEu7CsNgt8ksH6RxoRyo9EfS7JSoFxamK8KOdwGYZp8h7oOC9uw"
+        f"/pub?gid=1700806245&single=true&output=csv&_t={int(time.time())}"
+    )
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        with urllib.request.urlopen(req, timeout=8) as response:
+            content = response.read()
+            df = pd.read_csv(io.BytesIO(content), sep=',', encoding='utf-8')
+            source = "Google Sheets (Live)"
+            # Cache locally to champions.csv for offline backup
+            try:
+                with open(local_csv, 'wb') as f:
+                    f.write(content)
+                print(f"[OK] Cached Google Sheets to local '{os.path.basename(local_csv)}'.")
+            except Exception as save_err:
+                print(f"[WARN] Local CSV cache write failed: {save_err}")
+    except Exception as e:
+        print(f"[WARN] Google Sheets fetch failed ({e}). Checking local CSV fallback...")
+
+    # 2. Fallback to local CSV if network call fails
+    if df is None:
+        if os.path.exists(local_csv):
+            try:
+                df = pd.read_csv(local_csv, sep=',', encoding='utf-8')
+                source = f"local '{os.path.basename(local_csv)}'"
+            except Exception as e:
+                print(f"[WARN] Local CSV load failed: {e}")
+        else:
+            alt_csv = os.path.join(os.path.dirname(__file__), 'champions - champions.csv')
+            if os.path.exists(alt_csv):
+                try:
+                    df = pd.read_csv(alt_csv, sep=',', encoding='utf-8')
+                    source = f"local '{os.path.basename(alt_csv)}'"
+                except Exception as e:
+                    print(f"[WARN] Alt CSV load failed: {e}")
 
     if df is None:
-        url = ("https://docs.google.com/spreadsheets/d/e/"
-               "2PACX-1vREGk7FjfrTa0W2mzlWKfzeJX-JOPEu7CsNgt8ksH6RxoRyo9EfS7JSoFxamK8KOdwGYZp8h7oOC9uw"
-               "/pub?gid=1700806245&single=true&output=csv")
-        try:
-            df = pd.read_csv(url, sep=',', encoding='utf-8')
-            print("[OK] Loaded champion data from Google Sheets.")
-        except Exception as e:
-            print(f"[ERR] Cannot load champion data at all: {e}")
-            return
+        print("[ERR] Cannot load champion data from Google Sheets or local CSV.")
+        return False, "Failed to load from both Google Sheets and local CSV"
 
     df.columns = df.columns.str.replace('\ufeff', '').str.strip()
     df = df.fillna('')
+
+    new_champ_data = {}
+    new_champ_traits = {}
 
     for _, row in df.iterrows():
         name = str(row.get('Name', '')).strip()
@@ -161,21 +192,21 @@ def _load_champion_data():
         power_val = row.get('SkillStat', '')
         dur_val = row.get('SkillDuration', '')
 
-        mana_val = None
-        if name in _SKILL_BALANCE_OVERRIDES:
+        # User's sheet SkillStat takes precedence over _SKILL_BALANCE_OVERRIDES
+        if power_val != '' and str(power_val) != 'nan':
+            val = float(power_val)
+            if val <= 2:
+                skill['percent'] = val
+            else:
+                skill['power'] = int(val)
+        elif name in _SKILL_BALANCE_OVERRIDES:
             ov = _SKILL_BALANCE_OVERRIDES[name]
             if isinstance(ov, dict):
                 if 'power' in ov: skill['power'] = int(ov['power'])
                 if 'percent' in ov: skill['percent'] = float(ov['percent'])
-                if 'duration' in ov: dur_val = ov['duration']
-                if 'mana' in ov: mana_val = int(ov['mana'])
             elif isinstance(ov, (int, float)):
                 if ov <= 2: skill['percent'] = float(ov)
                 else:       skill['power']   = int(ov)
-        elif power_val != '' and str(power_val) != 'nan':
-            val = float(power_val)
-            if val <= 2: skill['percent'] = val
-            else:        skill['power']   = int(val)
 
         # Default execute percent threshold by cost if not explicitly provided
         if skill.get('type') == 'execute' and 'percent' not in skill:
@@ -183,8 +214,11 @@ def _load_champion_data():
             cost_thresholds = {1: 0.10, 2: 0.20, 3: 0.25, 4: 0.30, 5: 0.35}
             skill['percent'] = cost_thresholds.get(cost_val, 0.20)
 
-        if dur_val != '' and str(dur_val) != 'nan' and dur_val is not None:
+        # Duration: user sheet takes precedence
+        if dur_val != '' and str(dur_val) != 'nan':
             skill['duration'] = float(dur_val)
+        elif name in _SKILL_BALANCE_OVERRIDES and isinstance(_SKILL_BALANCE_OVERRIDES[name], dict) and 'duration' in _SKILL_BALANCE_OVERRIDES[name]:
+            skill['duration'] = float(_SKILL_BALANCE_OVERRIDES[name]['duration'])
         else:
             skill['duration'] = 0.0
 
@@ -195,9 +229,16 @@ def _load_champion_data():
         tgt_val = str(row.get('Target', 'enemy_closest')).strip()
         skill['target'] = tgt_val if tgt_val and tgt_val != 'nan' else 'enemy_closest'
 
-        final_mana = mana_val if mana_val is not None else (int(row.get('Mana', 200)) if row.get('Mana') != '' else 200)
+        # Mana: user sheet takes precedence
+        sheet_mana = row.get('Mana', '')
+        if sheet_mana != '' and str(sheet_mana) != 'nan':
+            final_mana = int(sheet_mana)
+        elif name in _SKILL_BALANCE_OVERRIDES and isinstance(_SKILL_BALANCE_OVERRIDES[name], dict) and 'mana' in _SKILL_BALANCE_OVERRIDES[name]:
+            final_mana = int(_SKILL_BALANCE_OVERRIDES[name]['mana'])
+        else:
+            final_mana = 200
 
-        _CHAMPION_DATA[name] = {
+        new_champ_data[name] = {
             'name': name,
             'cost':         int(row.get('Cost', 1))     if row.get('Cost')  != '' else 1,
             'hp':           int(row.get('HP', 1000))    if row.get('HP')    != '' else 1000,
@@ -208,11 +249,19 @@ def _load_champion_data():
             'traits': traits,
             'skill':  skill,
         }
-        _CHAMPION_TRAITS[name] = traits
+        new_champ_traits[name] = traits
+
+    _CHAMPION_DATA.clear()
+    _CHAMPION_DATA.update(new_champ_data)
+    _CHAMPION_TRAITS.clear()
+    _CHAMPION_TRAITS.update(new_champ_traits)
+    _LAST_CHAMPION_SYNC_TIME = time.time()
 
     # Register costs into game_logic for soul_swap cost lookups
     register_champion_costs({n: d['cost'] for n, d in _CHAMPION_DATA.items()})
-    print(f"[OK] Loaded {len(_CHAMPION_DATA)} champions from data source.")
+    msg = f"Loaded {len(_CHAMPION_DATA)} champions from {source}."
+    print(f"[OK] {msg}")
+    return True, msg
 
 # Load immediately at import time (before first request)
 _load_champion_data()
@@ -448,10 +497,23 @@ def index():
 
 @app.route('/api/champions')
 def get_champions_api():
-    """Serve champion data to the client (for the shop/pool)."""
-    if not _CHAMPION_DATA:
+    """Serve champion data to the client (for the shop/pool). Auto-syncs if older than 60s."""
+    global _LAST_CHAMPION_SYNC_TIME
+    force_reload = request.args.get('reload') == '1'
+    if not _CHAMPION_DATA or force_reload or (time.time() - _LAST_CHAMPION_SYNC_TIME > 60):
         _load_champion_data()
     return jsonify(list(_CHAMPION_DATA.values()))
+
+@app.route('/api/reload_champions', methods=['GET', 'POST'])
+def reload_champions_api():
+    """Force an immediate reload from Google Sheets and return sync status."""
+    success, msg = _load_champion_data(force_remote=True)
+    return jsonify({
+        'status': 'ok' if success else 'warning',
+        'message': msg,
+        'count': len(_CHAMPION_DATA),
+        'timestamp': int(time.time())
+    })
 
 
 # ==========================================

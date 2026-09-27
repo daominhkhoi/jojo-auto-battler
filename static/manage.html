@@ -105,10 +105,14 @@
     <h1>📊 CHAMPION STATS MANAGEMENT</h1>
 
     <div class="controls">
-        <div>
-            <strong>Total Champions:</strong> <span id="totalChamps" style="color: #e74c3c; font-size: 18px; font-weight: bold;">0</span>
+        <div style="display: flex; align-items: center;">
+            <strong>Total Champions:</strong> <span id="totalChamps" style="color: #e74c3c; font-size: 18px; font-weight: bold; margin-left: 6px;">0</span>
+            <span id="syncStatus" style="margin-left: 20px; font-size: 14px; color: #27ae60; font-weight: 600;"></span>
         </div>
-        <button id="exportBtn">📥 EXPORT EXCEL (.CSV)</button>
+        <div>
+            <button id="syncDriveBtn" style="background-color: #2980b9; margin-right: 10px;">🔄 ĐỒNG BỘ GOOGLE DRIVE</button>
+            <button id="exportBtn">📥 EXPORT EXCEL (.CSV)</button>
+        </div>
     </div>
 
     <table id="champTable">
@@ -134,48 +138,82 @@
     </table>
 
     <script type="module">
-        // Import trực tiếp dữ liệu từ entities.js
         import { CHAMPION_POOL } from './js/entities.js';
 
+        let currentPool = [...CHAMPION_POOL];
         const tbody = document.querySelector('#champTable tbody');
-        document.getElementById('totalChamps').innerText = CHAMPION_POOL.length;
+        const syncStatus = document.getElementById('syncStatus');
 
-        // 1. TỰ ĐỘNG VẼ BẢNG DỮ LIỆU
-        CHAMPION_POOL.forEach(champ => {
-            const tr = document.createElement('tr');
-            const skill = champ.skill || {};
+        function renderTable(pool) {
+            tbody.innerHTML = '';
+            document.getElementById('totalChamps').innerText = pool.length;
 
-            // Xử lý hiển thị thông số kỹ năng cho dễ nhìn
-            let skillPowerDisplay = '';
-            if (skill.power) skillPowerDisplay = skill.power.toLocaleString();
-            else if (skill.percent) skillPowerDisplay = `${skill.percent * 100}%`;
-            else if (skill.radius) skillPowerDisplay = `Radius: ${skill.radius}`;
+            pool.forEach(champ => {
+                const tr = document.createElement('tr');
+                const skill = champ.skill || {};
 
-            tr.innerHTML = `
-                <td style="text-align: left; font-weight: bold;">${champ.name}</td>
-                <td class="cost-${champ.cost}">${champ.cost} 🪙</td>
-                <td>${champ.hp.toLocaleString()}</td>
-                <td>${champ.attack.toLocaleString()}</td>
-                <td>${champ.attack_range}</td>
-                <td>${champ.speed}</td>
-                <td>${champ.max_mana}</td>
-                <td style="font-size: 13px;">${(champ.traits || []).join(', ')}</td>
-                <td style="color: #8e44ad; font-weight: bold;">${skill.type ? skill.type.toUpperCase() : ''}</td>
-                <td>${skillPowerDisplay}</td>
-                <td style="color: #e67e22; font-weight: bold;">${skill.radius ? skill.radius : '-'}</td>
-                <td>${skill.duration ? skill.duration + 's' : '-'}</td>
-            `;
-            tbody.appendChild(tr);
+                let skillPowerDisplay = '';
+                if (skill.power) skillPowerDisplay = skill.power.toLocaleString();
+                else if (skill.percent) skillPowerDisplay = `${Math.round(skill.percent * 100)}%`;
+                else if (skill.radius) skillPowerDisplay = `Radius: ${skill.radius}`;
+
+                tr.innerHTML = `
+                    <td style="text-align: left; font-weight: bold;">${champ.name}</td>
+                    <td class="cost-${champ.cost}">${champ.cost} 🪙</td>
+                    <td>${(champ.hp || 0).toLocaleString()}</td>
+                    <td>${(champ.attack || 0).toLocaleString()}</td>
+                    <td>${champ.attack_range}</td>
+                    <td>${champ.speed}</td>
+                    <td>${champ.max_mana}</td>
+                    <td style="font-size: 13px;">${(champ.traits || []).join(', ')}</td>
+                    <td style="color: #8e44ad; font-weight: bold;">${skill.type ? skill.type.toUpperCase() : ''}</td>
+                    <td>${skillPowerDisplay}</td>
+                    <td style="color: #e67e22; font-weight: bold;">${skill.radius ? skill.radius : '-'}</td>
+                    <td>${skill.duration ? skill.duration + 's' : '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        renderTable(currentPool);
+
+        // 1. CHỨC NĂNG ĐỒNG BỘ TRỰC TIẾP TỪ GOOGLE DRIVE
+        const syncBtn = document.getElementById('syncDriveBtn');
+        syncBtn.addEventListener('click', async () => {
+            syncBtn.disabled = true;
+            syncBtn.innerText = '⏳ Đang tải từ Google Drive...';
+            syncStatus.innerText = 'Đang đồng bộ dữ liệu...';
+            syncStatus.style.color = '#e67e22';
+
+            try {
+                const res = await fetch('/api/reload_champions', { method: 'POST' });
+                const json = await res.json();
+                if (json.status === 'ok') {
+                    const champRes = await fetch('/api/champions?reload=1');
+                    currentPool = await champRes.json();
+                    renderTable(currentPool);
+                    syncStatus.innerText = `Đã đồng bộ thành công ${currentPool.length} tướng lúc ${new Date().toLocaleTimeString()}!`;
+                    syncStatus.style.color = '#27ae60';
+                } else {
+                    syncStatus.innerText = `Cảnh báo: ${json.message}`;
+                    syncStatus.style.color = '#e74c3c';
+                }
+            } catch (err) {
+                syncStatus.innerText = `Lỗi kết nối: ${err.message}`;
+                syncStatus.style.color = '#e74c3c';
+            } finally {
+                syncBtn.disabled = false;
+                syncBtn.innerText = '🔄 ĐỒNG BỘ GOOGLE DRIVE';
+            }
         });
 
         // 2. CHỨC NĂNG XUẤT FILE EXCEL (.CSV) CHUẨN VIỆT NAM
         document.getElementById('exportBtn').addEventListener('click', () => {
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
 
-            // THÊM "Bán Kính" VÀO TIÊU ĐỀ
             csvContent += "Champion Name;Cost;HP;Attack (ATK);Range;Speed;Mana;Traits;Skill Type;Skill Value;Radius;Skill Duration\n";
 
-            CHAMPION_POOL.forEach(champ => {
+            currentPool.forEach(champ => {
                 const skill = champ.skill || {};
 
                 let skillPower = skill.power || '';
@@ -192,13 +230,12 @@
                     `"${(champ.traits || []).join(', ')}"`,
                     skill.type || '',
                     skillPower,
-                    skill.radius || '', // THÊM CỘT BÁN KÍNH VÀO ĐÂY
+                    skill.radius || '',
                     skill.duration || ''
                 ];
                 csvContent += row.join(';') + "\n";
             });
 
-            // Gói thành file và tự động tải xuống
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
