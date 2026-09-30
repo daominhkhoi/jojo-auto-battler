@@ -6,7 +6,7 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Minh Khoi - Auto Battler</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=5.9">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=6.1">
     <style>
         *,
         *::before,
@@ -177,11 +177,11 @@
         <div class="bottom-bar" id="bottomBar" style="display: none;">
             <div class="shop-actions" id="shopActions">
                 <button id="buyXpBtn" class="action-btn shop-action-btn xp-btn" title="Buy XP to Level Up">
-                    <span class="action-title">LEVEL UP</span>
-                    <span class="action-cost" id="buyXpCost">5 🪙</span>
+                    <span class="action-title">LEVEL UP <span class="shortcut-hint">[F]</span></span>
+                    <span class="action-cost" id="buyXpCost">4 🪙</span>
                 </button>
                 <button id="rollBtn" class="action-btn shop-action-btn roll-btn" title="Reroll Shop">
-                    <span class="action-title">REFRESH</span>
+                    <span class="action-title">REFRESH <span class="shortcut-hint">[D]</span></span>
                     <span class="action-cost">1 🪙</span>
                 </button>
             </div>
@@ -229,7 +229,7 @@
     <audio id="remoteVoiceAudio" autoplay playsinline webkit-playsinline preload="auto"></audio>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-    <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v=5.3"></script>
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v=6.1"></script>
 </body>
 
 </html>

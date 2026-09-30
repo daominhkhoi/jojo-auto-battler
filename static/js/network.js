@@ -1,8 +1,10 @@
 // static/js/network.js
-import { STATE, CONFIG, CHAMPION_POOL, TRAITS_INFO } from './globals.js';
+import { STATE, CHAMPION_POOL, getCanvasCoords } from './globals.js';
+import { resetPlayerForNewMatch, updateSynergies } from './shop.js';
 import { showNotification } from './notifications.js';
 import { onMatchFoundVoice, closePeerConnection } from './voice.js';
 import { playSfx } from './audio.js';
+import { showBigBanner } from './fx.js';
 
 export const socket = io();
 
@@ -25,6 +27,14 @@ socket.on('champions_updated', async (data) => {
 });
 
 socket.on('match_found', (data) => {
+    // FIX: a new match (e.g. after the opponent left) used to keep the previous
+    // match's gold, level, round, bench and running timers
+    stopPrepTimer();
+    clearInterval(combatTimerInterval);
+    import('./combat.js').then(module => module.cancelRoundReview && module.cancelRoundReview());
+    resetPlayerForNewMatch();
+    STATE.myPlayerPrefix = null;
+
     STATE.roomId = data.room;
     STATE.playerLP = 0;
     STATE.botLP = 0;
@@ -88,6 +98,7 @@ socket.on('match_found', (data) => {
     } else {
         showNotification(`🎮 Matched 1v1 with ${data.opponentName}! Voice Chat ready.`, "success");
     }
+    showBigBanner('ROUND 1', `VS ${data.opponentName || 'Opponent'}`, 'match');
 
     // Initialize WebRTC voice chat connection for this match
     onMatchFoundVoice(data);
@@ -107,17 +118,32 @@ socket.on('match_found', (data) => {
 });
 
 socket.on('opponent_disconnected', () => {
-    showNotification("Opponent disconnected! Match cancelled.");
+    showNotification("Opponent left! Match cancelled.", "error");
     closePeerConnection();
+    // FIX: stop every timer of the dead match (the prep timer kept auto-clicking READY)
+    stopPrepTimer();
+    clearInterval(combatTimerInterval);
+    import('./combat.js').then(module => module.cancelRoundReview && module.cancelRoundReview());
+    const timerText = document.getElementById('timerText');
+    if (timerText) timerText.style.display = 'none';
+
+    STATE.roomId = null;
     STATE.isCombatPhase = false;
+    STATE.isRoundReview = false;
     STATE.myTeam = 'Team1';
     STATE.champions = [];
+    STATE.activeProjectiles = [];
+    STATE.hitEffects = [];
 
     const bottomBar = document.getElementById('bottomBar');
     if (bottomBar) bottomBar.style.display = 'none';
 
     const readyBtn = document.getElementById('readyBtn');
-    if (readyBtn) readyBtn.style.display = 'none';
+    if (readyBtn) {
+        readyBtn.style.display = 'none';
+        readyBtn.disabled = false;
+        readyBtn.innerText = 'READY';
+    }
 
     const findBtn = document.getElementById('findMatchBtn');
     if (findBtn) {
@@ -151,6 +177,7 @@ socket.on('opponent_disconnected', () => {
 });
 
 socket.on('match_locked', () => {
+    STATE.isInspecting = true;
     if (STATE.isBotVsBot) {
         showNotification("🔒 Battlefield locked! Starting combat...", "info");
         const bvbTimer = document.getElementById('bvbTimerText');
@@ -159,7 +186,24 @@ socket.on('match_locked', () => {
         }
     } else {
         showNotification("Both ready! 5s to inspect opponent!");
+        const readyBtn = document.getElementById('readyBtn');
+        if (readyBtn) readyBtn.innerText = "⚔️ BATTLE!";
     }
+});
+
+socket.on('opponent_ready', () => {
+    showNotification("Opponent is READY!", "info");
+});
+
+socket.on('submit_rejected', (data) => {
+    showNotification((data && data.reason) || "Board rejected by server!", "error");
+    STATE.isCombatPhase = false;
+    const readyBtn = document.getElementById('readyBtn');
+    if (readyBtn) {
+        readyBtn.innerText = "READY";
+        readyBtn.disabled = false;
+    }
+    startPrepTimer();
 });
 
 let prepTimerInterval;
@@ -179,17 +223,20 @@ export function startPrepTimer() {
             const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
             const s = (timeLeft % 60).toString().padStart(2, '0');
             timerDisplay.innerText = `${m}:${s}`;
+            timerDisplay.classList.toggle('urgent', timeLeft <= 15);
         }
+        const readyPulseBtn = document.getElementById('readyBtn');
+        if (readyPulseBtn) readyPulseBtn.classList.toggle('pulse', timeLeft <= 15 && !readyPulseBtn.disabled);
 
         if (timeLeft <= 0) {
             clearInterval(prepTimerInterval);
             const readyBtn = document.getElementById('readyBtn');
             // FIX: Guard against auto-ready with 0 board units
-            const boardUnits = STATE.champions.filter(c => c.targetY < 6).length;
+            const boardUnits = STATE.champions.filter(c => c.targetY < 6 && c.originalX !== undefined).length;
             if (readyBtn && !readyBtn.disabled && boardUnits > 0) {
                 readyBtn.click();
             } else if (boardUnits === 0) {
-                showNotification("Timer expired — deploy at least 1 unit to submit!");
+                showNotification("Timer expired — deploy at least 1 unit to submit!", "error");
             }
         }
     }, 1000);
@@ -198,13 +245,19 @@ export function startPrepTimer() {
 export function stopPrepTimer() {
     clearInterval(prepTimerInterval);
     const timerDisplay = document.getElementById('timerDisplay');
-    if (timerDisplay) timerDisplay.style.display = 'none';
+    if (timerDisplay) {
+        timerDisplay.style.display = 'none';
+        timerDisplay.classList.remove('urgent');
+    }
+    const readyBtn = document.getElementById('readyBtn');
+    if (readyBtn) readyBtn.classList.remove('pulse');
 }
 
 let combatTimerInterval;
 
 socket.on('combat_start', () => {
-    showNotification("FIGHT!");
+    STATE.isInspecting = false;
+    showBigBanner('FIGHT!', '', 'fight');
     playSfx('battle_start');
 
     import('./stats.js').then(module => {
@@ -242,13 +295,18 @@ socket.on('sync_tick', (data) => {
 });
 
 socket.on('combat_end', (data) => {
+    STATE.isInspecting = false;
     clearInterval(combatTimerInterval);
+    const timerText = document.getElementById('timerText');
+    if (timerText) timerText.style.display = 'none';
     import('./combat.js').then(module => {
         module.handleCombatEnd(data || { result: 'draw' });
     });
 });
 
 socket.on('bvb_round_prep', (data) => {
+    STATE.isInspecting = false;
+    showBigBanner(`ROUND ${data.round || 1}`, `${data.bot1_name || 'Bot 1'}  VS  ${data.bot2_name || 'Bot 2'}`, 'match');
     STATE.isCombatPhase = false;
     STATE.isRoundReview = false;
     import('./combat.js').then(module => {
@@ -273,6 +331,7 @@ socket.on('bvb_round_prep', (data) => {
     if (data.champions) {
         data.champions.forEach(c => {
             const template = CHAMPION_POOL.find(t => t.name === c.name) || {};
+            const coords = getCanvasCoords(c.x, c.y);
             STATE.champions.push({
                 id: c.id,
                 name: c.name,
@@ -280,8 +339,9 @@ socket.on('bvb_round_prep', (data) => {
                 star: c.star || 1,
                 targetX: c.x,
                 targetY: c.y,
-                pixelX: c.x * 90,
-                pixelY: c.y * 90,
+                // FIX: was c.x * 90 — cells are 108x130, units flew in from the wrong spot
+                pixelX: coords.x,
+                pixelY: coords.y,
                 hp: c.hp,
                 max_hp: c.max_hp,
                 raw_hp: c.raw_hp,
@@ -304,9 +364,8 @@ socket.on('bvb_round_prep', (data) => {
         });
     }
 
-    import('./shop.js').then(module => {
-        module.updateSynergyUI();
-    });
+    // FIX: updateSynergyUI() never existed (threw every BvB round); show bot 1's synergies
+    updateSynergies(STATE.champions.filter(c => c.team === 'Team1'));
 
     const bvbTimer = document.getElementById('bvbTimerText');
     if (bvbTimer) {
@@ -418,7 +477,8 @@ export function leaveMatch() {
 
 export function declareReady() {
     // FIX: Guard — refuse to submit with 0 units on the board
-    const boardUnits = STATE.champions.filter(c => c.targetY < 6);
+    if (!STATE.roomId || STATE.isCombatPhase || STATE.isRoundReview) return;
+    const boardUnits = STATE.champions.filter(c => c.targetY < 6 && c.originalX !== undefined);
     if (boardUnits.length === 0) {
         showNotification("Deploy at least 1 unit before pressing READY!");
         return;
@@ -431,6 +491,8 @@ export function declareReady() {
     }
     STATE.isCombatPhase = true;
     stopPrepTimer();
+    // main.js owns drag state; importing it here would load a second copy (main.js?v=... URL)
+    window.dispatchEvent(new Event('wa:cancel-drag'));
 
     // Assign a unique prefix so IDs never collide with opponent
     if (!STATE.myPlayerPrefix) {
@@ -448,22 +510,16 @@ export function declareReady() {
     // The server looks up base stats from its own champion registry,
     // applies trait buffs, then sends back the final values.
     // ---------------------------------------------------------------
-    const championsToSend = boardUnits.map(c => {
-        const template = CHAMPION_POOL.find(t => t.name === c.name) || {};
-        return {
-            id:   c.id,
-            name: c.name,
-            star: c.star || 1,
-            x:    c.targetX,
-            y:    c.targetY,
-            // Include traits so server can compute counts (no trust needed, server validates from its own data)
-            traits: template.traits || [],
-        };
-    });
+    const championsToSend = boardUnits.map(c => ({
+        id:   c.id,
+        name: c.name,
+        star: c.star || 1,
+        x:    c.targetX,
+        y:    c.targetY,
+    }));
 
     socket.emit('submit_board', {
         room:      STATE.roomId,
-        champions: championsToSend,
-        lp:        STATE.playerLP
+        champions: championsToSend
     });
 }

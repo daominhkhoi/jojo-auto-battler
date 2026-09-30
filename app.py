@@ -11,15 +11,16 @@ if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
         pass
 
 from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO, join_room, leave_room
+from flask_socketio import SocketIO
 from engine.game_logic import (
     Champion, find_closest_target, calculate_distance, move_towards,
-    register_champion_costs
+    register_champion_costs, CRIT_CHANCE, CRIT_MULTIPLIER
 )
 from engine.bot_ai import SmartBot, BOT_ARCHETYPES
 import os
 import random
 import time
+import uuid
 import urllib.request
 import ssl
 import requests
@@ -537,12 +538,120 @@ _matchmaking_lock = gevent.lock.RLock()   # FIX: guard waiting_players
 waiting_players = []
 games = {}
 
+MAX_BOARD_UNITS = 10
+WIN_SCORE = 10            # rounds needed to win a match
+COMBAT_TIME_LIMIT = 120   # seconds before a round is decided on survivors / HP
+PVP_WAIT_SECONDS = 25     # queue time before falling back to a bot opponent
+
+
+def _enter_room(sid, room):
+    # FIX: flask_socketio.join_room() needs a request context, so calling it from
+    # background tasks (the 25s PvP -> bot fallback) raised and left the player
+    # stuck on "SEARCHING..." forever. The server-level API works anywhere.
+    socketio.server.enter_room(sid, room, namespace='/')
+
+
+def _leave_room(sid, room):
+    try:
+        socketio.server.leave_room(sid, room, namespace='/')
+    except Exception:
+        pass
+
+
+def _human_opponent(game, sid):
+    """The other player's sid if it is a real client (not a bot), else None."""
+    if game.get('bot') or game.get('is_bot_vs_bot'):
+        return None
+    return game['player2'] if game['player1'] == sid else game['player1']
+
+
+def _count_traits(champs_raw):
+    """Trait counts from unique champion names (duplicates don't stack)."""
+    counted = set()
+    counts = {}
+    for c in champs_raw:
+        if c['name'] in counted:
+            continue
+        counted.add(c['name'])
+        for t in _CHAMPION_TRAITS.get(c['name'], []):
+            counts[t] = counts.get(t, 0) + 1
+    return counts
+
+
+def _deploy_team(board_state, champs_raw, team, mirror):
+    """Apply trait buffs and append Champion objects for one side of the board."""
+    for champ in _compute_trait_buffs(champs_raw, _count_traits(champs_raw)):
+        x, y = float(champ['x']), float(champ['y'])
+        if mirror:
+            x, y = 4 - x, 5 - y
+        board_state.append(Champion(
+            id=champ['id'], name=champ['name'], team=team,
+            x=x, y=y,
+            hp=champ['max_hp'], attack=champ['attack'],
+            attack_range=champ['attack_range'], speed=champ['speed'],
+            max_mana=champ['max_mana'], star=champ.get('star', 1),
+            skill=champ.get('skill'), raw_skill=champ.get('raw_skill'),
+            start_mana=champ.get('start_mana', 0),
+            active_buffs=champ.get('active_buffs', []),
+            raw_hp=champ.get('raw_hp'), raw_attack=champ.get('raw_attack'),
+            raw_range=champ.get('raw_range'), raw_speed=champ.get('raw_speed'),
+            applied_traits=champ.get('applied_traits', []),
+            mana_refund_ratio=champ.get('mana_refund_ratio', 0.0),
+            double_cast_chance=champ.get('double_cast_chance', 0.0)
+        ))
+
+
+def _sanitize_board(champs_raw):
+    """
+    Keep only well-formed, known champions placed on the player's half of the
+    board (rows 3-5). Stars are clamped to 1-3, duplicate ids/cells dropped.
+    """
+    clean, seen_ids, seen_cells = [], set(), set()
+    for c in champs_raw:
+        if not isinstance(c, dict):
+            continue
+        name = c.get('name')
+        if name not in _CHAMPION_DATA:
+            continue
+        try:
+            x, y = int(c.get('x')), int(c.get('y'))
+            star = int(c.get('star', 1))
+        except (TypeError, ValueError):
+            continue
+        cid = str(c.get('id', ''))[:64]
+        if not cid or cid in seen_ids or not (0 <= x <= 4 and 3 <= y <= 5) or (x, y) in seen_cells:
+            continue
+        seen_ids.add(cid)
+        seen_cells.add((x, y))
+        clean.append({'id': cid, 'name': name, 'star': max(1, min(3, star)), 'x': x, 'y': y})
+        if len(clean) >= MAX_BOARD_UNITS:
+            break
+    return clean
+
 # ======================================================================
 # ROUTES
 # ======================================================================
 @app.route('/')
 def index():
     return render_template('index.html')
+
+_reload_in_progress = False
+
+def _schedule_background_reload():
+    global _reload_in_progress
+    if _reload_in_progress:
+        return
+    _reload_in_progress = True
+
+    def _task():
+        global _reload_in_progress
+        try:
+            _load_champion_data()
+        finally:
+            _reload_in_progress = False
+
+    socketio.start_background_task(_task)
+
 
 @app.route('/api/champions')
 def get_champions_api():
@@ -560,8 +669,12 @@ def get_champions_api():
         except Exception:
             pass
 
-    if not _CHAMPION_DATA or force_reload or file_updated or (time.time() - _LAST_CHAMPION_SYNC_TIME > 60):
+    if not _CHAMPION_DATA or force_reload:
         _load_champion_data()
+    elif file_updated or (time.time() - _LAST_CHAMPION_SYNC_TIME > 60):
+        # FIX: refresh in the background instead of blocking this request on a
+        # Google Sheets fetch (up to 3 x 12s timeouts) — serve the cached data now
+        _schedule_background_reload()
 
     resp = jsonify(list(_CHAMPION_DATA.values()))
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
@@ -599,23 +712,44 @@ def reload_champions_api():
 # ==========================================
 # 1. MATCHMAKING & DISCONNECTION SYSTEM
 # ==========================================
+def _new_game(player1, p1_name, player2, p2_name, **extra):
+    game = {
+        'player1': player1, 'p1_name': p1_name,
+        'player2': player2, 'p2_name': p2_name,
+        'board_state': [],
+        'submitted': set(),   # FIX: who has readied this round (a double submit used to count as both players)
+        'in_combat': False,
+        'p1_lp': 0, 'p2_lp': 0,
+        'aborted': False,
+    }
+    game.update(extra)
+    return game
+
+
+def _abort_games_of(player_id):
+    """Abort and delete every room the player is in. Caller must hold _matchmaking_lock."""
+    for room_name, game in list(games.items()):
+        if player_id not in (game['player1'], game['player2']):
+            continue
+        game['aborted'] = True   # signal running game loop to stop
+        _leave_room(player_id, room_name)
+        other = _human_opponent(game, player_id)
+        if other:
+            socketio.emit('opponent_disconnected', to=other)
+            _leave_room(other, room_name)
+        del games[room_name]
+
+
 def _create_bot_game(player_id, player_name):
     """Instantiate a SmartBot game room for solo play or fallback."""
     bot = SmartBot()
-    room_name = f"room_{player_id[:5]}_bot"
+    room_name = f"room_{uuid.uuid4().hex[:10]}_bot"
     try:
-        join_room(room_name, sid=player_id)
-    except KeyError:
-        return
+        _enter_room(player_id, room_name)
+    except Exception:
+        return  # client vanished in the meantime
 
-    games[room_name] = {
-        'player1': player_id, 'p1_name': player_name,
-        'player2': f"bot_{player_id[:5]}", 'p2_name': bot.name,
-        'board_state': [], 'ready_count': 0,
-        'p1_lp': 0, 'p2_lp': 0,
-        'aborted': False,
-        'bot': bot,
-    }
+    games[room_name] = _new_game(player_id, player_name, f"bot_{player_id[:5]}", bot.name, bot=bot)
 
     socketio.emit('match_found', {
         'room': room_name,
@@ -623,10 +757,7 @@ def _create_bot_game(player_id, player_name):
         'isBot': True,
         'your_team': 'Team1'
     }, to=player_id)
-    try:
-        print(f"[BOT MATCH] {player_name} matched with {bot.name} in {room_name}")
-    except Exception:
-        print(f"[BOT MATCH] {player_name} matched in {room_name}")
+    print(f"[BOT MATCH] {player_name!a} matched with {bot.name!a} in {room_name}")
 
 
 def _create_bot_vs_bot_game(player_id, player_name):
@@ -635,24 +766,15 @@ def _create_bot_vs_bot_game(player_id, player_name):
     random.shuffle(keys)
     bot1 = SmartBot(keys[0])
     bot2 = SmartBot(keys[1])
-    room_name = f"room_{player_id[:5]}_bvb"
+    room_name = f"room_{uuid.uuid4().hex[:10]}_bvb"
 
     try:
-        join_room(room_name, sid=player_id)
-    except KeyError:
+        _enter_room(player_id, room_name)
+    except Exception:
         return
 
-    game = {
-        'player1': player_id, 'p1_name': bot1.name,
-        'player2': f"bot2_{player_id[:5]}", 'p2_name': bot2.name,
-        'board_state': [], 'ready_count': 0,
-        'p1_lp': 0, 'p2_lp': 0,
-        'aborted': False,
-        'bot1': bot1,
-        'bot2': bot2,
-        'is_bot_vs_bot': True,
-        'round_number': 1
-    }
+    game = _new_game(player_id, bot1.name, f"bot2_{player_id[:5]}", bot2.name,
+                     bot1=bot1, bot2=bot2, is_bot_vs_bot=True, round_number=1)
     games[room_name] = game
 
     socketio.emit('match_found', {
@@ -664,14 +786,22 @@ def _create_bot_vs_bot_game(player_id, player_name):
         'your_team': 'Team1'
     }, to=player_id)
 
-    print(f"[BOT VS BOT] {player_name} watching {bot1.name} VS {bot2.name} in {room_name}")
+    print(f"[BOT VS BOT] {player_name!a} watching {bot1.name!a} VS {bot2.name!a} in {room_name}")
+
+    def sleep_unless_aborted(seconds):
+        """Sleep in 0.1s slices; returns False as soon as the game is aborted."""
+        for _ in range(int(seconds * 10)):
+            if game.get('aborted'):
+                return False
+            socketio.sleep(0.1)
+        return not game.get('aborted')
 
     def bot_vs_bot_match_flow():
         socketio.sleep(0.5)
 
         while not game.get('aborted'):
-            if game.get('p1_lp', 0) >= 10 or game.get('p2_lp', 0) >= 10:
-                winner_name = bot1.name if game['p1_lp'] >= 10 else bot2.name
+            if game.get('p1_lp', 0) >= WIN_SCORE or game.get('p2_lp', 0) >= WIN_SCORE:
+                winner_name = bot1.name if game['p1_lp'] >= WIN_SCORE else bot2.name
                 socketio.emit('bvb_game_over', {
                     'winner': winner_name,
                     'p1_lp': game['p1_lp'],
@@ -680,74 +810,16 @@ def _create_bot_vs_bot_game(player_id, player_name):
                 break
 
             round_num = game.get('round_number', 1)
-            print(f"[BvB] Round {round_num} preparation starting (10s timer) in {room_name}")
 
             # Both bots independently purchase champions, level up, and position units
-            bot1_team_raw = bot1.build_team(_CHAMPION_DATA, _CHAMPION_TRAITS)
-            bot2_team_raw = bot2.build_team(_CHAMPION_DATA, _CHAMPION_TRAITS)
-
-            # Count traits Bot 1
-            bot1_counted = set()
-            bot1_traits = {}
-            for c in bot1_team_raw:
-                if c['name'] not in bot1_counted:
-                    bot1_counted.add(c['name'])
-                    for t in _CHAMPION_TRAITS.get(c['name'], []):
-                        bot1_traits[t] = bot1_traits.get(t, 0) + 1
-            buffed_bot1 = _compute_trait_buffs(bot1_team_raw, bot1_traits)
-
-            # Count traits Bot 2
-            bot2_counted = set()
-            bot2_traits = {}
-            for c in bot2_team_raw:
-                if c['name'] not in bot2_counted:
-                    bot2_counted.add(c['name'])
-                    for t in _CHAMPION_TRAITS.get(c['name'], []):
-                        bot2_traits[t] = bot2_traits.get(t, 0) + 1
-            buffed_bot2 = _compute_trait_buffs(bot2_team_raw, bot2_traits)
-
-            # Deploy both teams onto the board
             game['board_state'] = []
-            for champ in buffed_bot1:
-                game['board_state'].append(Champion(
-                    id=champ['id'], name=champ['name'], team="Team1",
-                    x=float(champ['x']), y=float(champ['y']),
-                    hp=champ['max_hp'], attack=champ['attack'],
-                    attack_range=champ['attack_range'], speed=champ['speed'],
-                    max_mana=champ['max_mana'], star=champ.get('star', 1),
-                    skill=champ.get('skill'), raw_skill=champ.get('raw_skill'),
-                    start_mana=champ.get('start_mana', 0),
-                    active_buffs=champ.get('active_buffs', []),
-                    raw_hp=champ.get('raw_hp'), raw_attack=champ.get('raw_attack'),
-                    raw_range=champ.get('raw_range'), raw_speed=champ.get('raw_speed'),
-                    applied_traits=champ.get('applied_traits', []),
-                    mana_refund_ratio=champ.get('mana_refund_ratio', 0.0),
-                    double_cast_chance=champ.get('double_cast_chance', 0.0)
-                ))
-
-            for champ in buffed_bot2:
-                game['board_state'].append(Champion(
-                    id=champ['id'], name=champ['name'], team="Team2",
-                    x=4 - float(champ['x']), y=5 - float(champ['y']),
-                    hp=champ['max_hp'], attack=champ['attack'],
-                    attack_range=champ['attack_range'], speed=champ['speed'],
-                    max_mana=champ['max_mana'], star=champ.get('star', 1),
-                    skill=champ.get('skill'), raw_skill=champ.get('raw_skill'),
-                    start_mana=champ.get('start_mana', 0),
-                    active_buffs=champ.get('active_buffs', []),
-                    raw_hp=champ.get('raw_hp'), raw_attack=champ.get('raw_attack'),
-                    raw_range=champ.get('raw_range'), raw_speed=champ.get('raw_speed'),
-                    applied_traits=champ.get('applied_traits', []),
-                    mana_refund_ratio=champ.get('mana_refund_ratio', 0.0),
-                    double_cast_chance=champ.get('double_cast_chance', 0.0)
-                ))
-
-            base_champions = [c.to_dict() for c in game['board_state']]
+            _deploy_team(game['board_state'], bot1.build_team(_CHAMPION_DATA, _CHAMPION_TRAITS), 'Team1', mirror=False)
+            _deploy_team(game['board_state'], bot2.build_team(_CHAMPION_DATA, _CHAMPION_TRAITS), 'Team2', mirror=True)
 
             # Sync prep board state to spectator immediately
             socketio.emit('bvb_round_prep', {
                 'round': round_num,
-                'champions': base_champions,
+                'champions': [c.to_dict() for c in game['board_state']],
                 'bot1_name': bot1.name,
                 'bot2_name': bot2.name,
                 'p1_lp': game.get('p1_lp', 0),
@@ -755,35 +827,25 @@ def _create_bot_vs_bot_game(player_id, player_name):
                 'seconds': 10
             }, to=player_id)
 
-            # 10s countdown between rounds as requested by user (10 down to 0)
+            # 10s countdown between rounds (10 down to 0)
             for sec_left in range(10, -1, -1):
                 if game.get('aborted'):
                     return
                 socketio.emit('bvb_countdown_tick', {'seconds': sec_left}, to=player_id)
                 socketio.sleep(1.0)
 
-            if game.get('aborted'):
-                return
-
             # Lock inspection for 2s
             socketio.emit('match_locked', to=room_name)
-            for _ in range(20):
-                if game.get('aborted'):
-                    return
-                socketio.sleep(0.1)
+            if not sleep_unless_aborted(2):
+                return
 
             # Start combat
             socketio.emit('combat_start', to=room_name)
             run_game_loop(room_name)
 
-            if game.get('aborted'):
+            # 6s post-round review so the spectator can inspect the battlefield
+            if not sleep_unless_aborted(6):
                 return
-
-            # 6s post-round review delay so spectators can visually inspect the battlefield for full 5s
-            for _ in range(60):
-                if game.get('aborted'):
-                    return
-                socketio.sleep(0.1)
 
             game['round_number'] = round_num + 1
 
@@ -792,28 +854,15 @@ def _create_bot_vs_bot_game(player_id, player_name):
 
 @socketio.on('find_match')
 def handle_find_match(data=None):
-    data        = data or {}
+    global waiting_players
+    data        = data if isinstance(data, dict) else {}
     player_id   = request.sid
-    player_name = data.get('name', 'Player')
-    vs_bot      = data.get('vs_bot', False)
+    player_name = str(data.get('name') or 'Player').strip()[:20] or 'Player'
 
     with _matchmaking_lock:
-        global waiting_players
-        # Remove player from waiting list if already there
+        # Remove player from waiting list and any room they were in
         waiting_players = [p for p in waiting_players if p['sid'] != player_id]
-
-        # Clean up any existing room for this player
-        rooms_to_delete = []
-        for room_name, game in games.items():
-            if game['player1'] == player_id or game['player2'] == player_id:
-                game['aborted'] = True   # signal running game loop to stop
-                leave_room(room_name, sid=player_id)
-                other = game['player2'] if game['player1'] == player_id else game['player1']
-                if not str(other).startswith('bot_'):
-                    socketio.emit('opponent_disconnected', to=other)
-                rooms_to_delete.append(room_name)
-        for r in rooms_to_delete:
-            del games[r]
+        _abort_games_of(player_id)
 
         # 1. Direct BOT VS BOT spectator request
         if data.get('bot_vs_bot'):
@@ -821,46 +870,39 @@ def handle_find_match(data=None):
             return
 
         # 2. Direct VS BOT request
-        if vs_bot:
+        if data.get('vs_bot'):
             _create_bot_game(player_id, player_name)
             return
 
-        # 2. PVP Queue
+        # 3. PVP Queue
         waiting_players.append({'sid': player_id, 'name': player_name})
-        print(f"[SEARCH] {player_name} is searching for a match...")
+        print(f"[SEARCH] {player_name!a} is searching for a match...")
 
         if len(waiting_players) >= 2:
             p1 = waiting_players.pop(0)
             p2 = waiting_players.pop(0)
-            room_name = f"room_{p1['sid'][:5]}_{p2['sid'][:5]}"
+            room_name = f"room_{uuid.uuid4().hex[:10]}_pvp"
 
             try:
-                join_room(room_name, sid=p1['sid'])
-                join_room(room_name, sid=p2['sid'])
-            except KeyError:
+                _enter_room(p1['sid'], room_name)
+                _enter_room(p2['sid'], room_name)
+            except Exception:
                 print("[WARN] One player disconnected during matchmaking.")
                 return
 
-            games[room_name] = {
-                'player1': p1['sid'], 'p1_name': p1['name'],
-                'player2': p2['sid'], 'p2_name': p2['name'],
-                'board_state': [], 'ready_count': 0,
-                'p1_lp': 0, 'p2_lp': 0,
-                'aborted': False,
-            }
+            games[room_name] = _new_game(p1['sid'], p1['name'], p2['sid'], p2['name'])
 
             socketio.emit('match_found', {'room': room_name, 'opponentName': p2['name'], 'isInitiator': True, 'isBot': False, 'your_team': 'Team1'}, to=p1['sid'])
             socketio.emit('match_found', {'room': room_name, 'opponentName': p1['name'], 'isInitiator': False, 'isBot': False, 'your_team': 'Team2'}, to=p2['sid'])
         else:
-            # Wait up to 25s for human opponent in PVP queue before falling back to bot
+            # Wait up to 25s for a human opponent before falling back to a bot
             def bot_fallback_timer(pid, pname):
-                socketio.sleep(25.0)
+                global waiting_players
+                socketio.sleep(PVP_WAIT_SECONDS)
                 with _matchmaking_lock:
-                    global waiting_players
-                    match_candidate = next((p for p in waiting_players if p['sid'] == pid), None)
-                    if match_candidate:
+                    if any(p['sid'] == pid for p in waiting_players):
                         waiting_players = [p for p in waiting_players if p['sid'] != pid]
-                        print(f"[SEARCH] No opponent after 25s for {pname}, falling back to SmartBot.")
+                        print(f"[SEARCH] No opponent after {PVP_WAIT_SECONDS}s for {pname!a}, falling back to SmartBot.")
                         _create_bot_game(pid, pname)
 
             socketio.start_background_task(bot_fallback_timer, player_id, player_name)
@@ -871,24 +913,22 @@ def handle_voice_signal(data):
     """
     Relay WebRTC signaling messages (offer, answer, candidate) between peers in a 1v1 match.
     """
-    room_name = data.get('room')
+    if not isinstance(data, dict):
+        return
     signal_data = data.get('signal')
     if not signal_data:
         return
 
     sender_id = request.sid
-    game = games.get(room_name) if room_name else None
-    if not game:
+    game = games.get(data.get('room'))
+    if not game or sender_id not in (game['player1'], game['player2']):
         # Fallback: search active games by sender's socket ID
-        for g in games.values():
-            if g.get('player1') == sender_id or g.get('player2') == sender_id:
-                game = g
-                break
+        game = next((g for g in games.values() if sender_id in (g['player1'], g['player2'])), None)
     if not game:
         return
 
-    recipient_id = game['player2'] if game['player1'] == sender_id else game['player1']
-    if recipient_id and not str(recipient_id).startswith('bot_'):
+    recipient_id = _human_opponent(game, sender_id)
+    if recipient_id:
         socketio.emit('voice_signal', {
             'sender': sender_id,
             'signal': signal_data
@@ -897,212 +937,153 @@ def handle_voice_signal(data):
 
 @socketio.on('leave_match')
 def handle_leave_match(data=None):
+    global waiting_players
     player_id = request.sid
     with _matchmaking_lock:
-        rooms_to_delete = []
-        for room_name, game in games.items():
-            if game['player1'] == player_id or game['player2'] == player_id:
-                game['aborted'] = True
-                leave_room(room_name, sid=player_id)
-                rooms_to_delete.append(room_name)
-        for r in rooms_to_delete:
-            del games[r]
+        waiting_players = [p for p in waiting_players if p['sid'] != player_id]
+        # FIX: the opponent is now told the match ended instead of waiting forever
+        _abort_games_of(player_id)
     socketio.emit('match_left', to=player_id)
 
 
 @socketio.on('disconnect')
-def handle_disconnect():
+def handle_disconnect(*args):
     global waiting_players
     player_id = request.sid
 
     with _matchmaking_lock:
         waiting_players = [p for p in waiting_players if p['sid'] != player_id]
+        _abort_games_of(player_id)
 
-        rooms_to_delete = []
-        for room_name, game in games.items():
-            if game['player1'] == player_id or game['player2'] == player_id:
-                game['aborted'] = True   # FIX: abort flag stops running game loop
-                other = game['player2'] if game['player1'] == player_id else game['player1']
-                socketio.emit('opponent_disconnected', to=other)
-                rooms_to_delete.append(room_name)
-
-        for r in rooms_to_delete:
-            del games[r]
-
-    print(f"[ERR] Client {player_id} disconnected.")
+    print(f"[DISCONNECT] Client {player_id} disconnected.")
 
 
 # ==========================================
 # 2. READY STATE & PRE-COMBAT INSPECTION
 # ==========================================
+def _emit_board(game, events):
+    """Send the current board to player 1 as-is and (if human) mirrored to player 2."""
+    base_champions = [c.to_dict() for c in game['board_state']]
+
+    socketio.emit('sync_tick', {
+        "champions":   base_champions,
+        "events":      events,
+        "opponent_lp": game.get('p2_lp', 0),
+        "your_team":   "Team1"
+    }, to=game['player1'])
+
+    p2 = _human_opponent(game, game['player1'])
+    if p2:
+        p2_champions = []
+        for c in base_champions:
+            c_copy = dict(c)
+            c_copy['x'] = 4 - float(c_copy['x'])
+            c_copy['y'] = 5 - float(c_copy['y'])
+            p2_champions.append(c_copy)
+
+        socketio.emit('sync_tick', {
+            "champions":   p2_champions,
+            "events":      events,
+            "opponent_lp": game.get('p1_lp', 0),
+            "your_team":   "Team2"
+        }, to=p2)
+
+    return base_champions
+
+
 @socketio.on('submit_board')
 def handle_submit_board(data):
-    room_name   = data.get('room')
-    player_id   = request.sid
-    champs_raw  = data.get('champions', [])
-    current_lp  = data.get('lp', 0)
-
+    if not isinstance(data, dict):
+        return
+    room_name  = data.get('room')
+    player_id  = request.sid
+    champs_raw = data.get('champions', [])
     if not isinstance(champs_raw, list):
         return
 
     game = games.get(room_name)
-    if not game:
+    if not game or game.get('is_bot_vs_bot') or player_id not in (game['player1'], game['player2']):
+        return
+    # FIX: ignore double submits (auto-ready timer + click, or ready during combat)
+    if game['in_combat'] or player_id in game['submitted']:
         return
 
     is_player_1 = (player_id == game['player1'])
     team_name   = "Team1" if is_player_1 else "Team2"
 
-    if is_player_1:
-        game['p1_lp'] = current_lp
-    else:
-        game['p2_lp'] = current_lp
+    # Only well-formed board units (bench y == 6 is dropped); stats come from server data
+    board_only = _sanitize_board(champs_raw)
+    if not board_only:
+        socketio.emit('submit_rejected', {'reason': 'Deploy at least 1 unit on the board!'}, to=player_id)
+        return
 
-    # FIX: Strictly skip any champion that was on the bench (y == 6)
-    board_only = [c for c in champs_raw if c.get('y', 6) != 6]
+    # Player 2's coordinates are mirrored so both teams face each other
+    _deploy_team(game['board_state'], board_only, team_name, mirror=not is_player_1)
+    game['submitted'].add(player_id)
 
-    # ----------------------------------------------------------------
-    # SERVER-SIDE TRAIT COMPUTATION (moved from network.js)
-    # ----------------------------------------------------------------
-    # Count traits from unique champion names
-    counted_names = set()
-    unique_champs = []
-    for c in board_only:
-        if c['name'] not in counted_names:
-            counted_names.add(c['name'])
-            unique_champs.append(c)
-
-    trait_counts = {}
-    for c in unique_champs:
-        for trait in _CHAMPION_TRAITS.get(c['name'], []):
-            trait_counts[trait] = trait_counts.get(trait, 0) + 1
-
-    # Apply all trait buffs server-side
-    buffed_champs = _compute_trait_buffs(board_only, trait_counts)
-
-    # ----------------------------------------------------------------
-    # Build Champion objects on the board
-    # ----------------------------------------------------------------
-    for champ in buffed_champs:
-        # Mirror Player 2's coordinates so both teams face each other
-        final_x = champ['x'] if is_player_1 else (4 - float(champ['x']))
-        final_y = champ['y'] if is_player_1 else (5 - float(champ['y']))
-
-        new_champ = Champion(
-            id=champ['id'], name=champ['name'], team=team_name,
-            x=final_x, y=final_y,
-            hp=champ['max_hp'],
-            attack=champ['attack'],
-            attack_range=champ['attack_range'],
-            speed=champ['speed'],
-            max_mana=champ['max_mana'],
-            star=champ.get('star', 1),
-            skill=champ.get('skill'),
-            raw_skill=champ.get('raw_skill'),
-            start_mana=champ.get('start_mana', 0),
-            active_buffs=champ.get('active_buffs', []),
-            raw_hp=champ.get('raw_hp'),
-            raw_attack=champ.get('raw_attack'),
-            raw_range=champ.get('raw_range'),
-            raw_speed=champ.get('raw_speed'),
-            applied_traits=champ.get('applied_traits', []),
-            mana_refund_ratio=champ.get('mana_refund_ratio', 0.0),
-            double_cast_chance=champ.get('double_cast_chance', 0.0)
-        )
-        game['board_state'].append(new_champ)
-
-    game['ready_count'] += 1
-
-    # IF THIS IS A BOT GAME: auto-deploy SmartBot's intelligent composition
-    if game.get('bot') and game['ready_count'] == 1:
+    # IF THIS IS A BOT GAME: auto-deploy SmartBot's composition
+    if game.get('bot') and game['player2'] not in game['submitted']:
         bot = game['bot']
         bot.prev_player_champs = board_only
-        bot_team_raw = bot.build_team(_CHAMPION_DATA, _CHAMPION_TRAITS)
+        _deploy_team(game['board_state'], bot.build_team(_CHAMPION_DATA, _CHAMPION_TRAITS), 'Team2', mirror=True)
+        game['submitted'].add(game['player2'])
 
-        # Count bot traits
-        bot_counted = set()
-        bot_traits = {}
-        for c in bot_team_raw:
-            if c['name'] not in bot_counted:
-                bot_counted.add(c['name'])
-                for t in _CHAMPION_TRAITS.get(c['name'], []):
-                    bot_traits[t] = bot_traits.get(t, 0) + 1
+    if len(game['submitted']) < 2:
+        other = _human_opponent(game, player_id)
+        if other:
+            socketio.emit('opponent_ready', to=other)
+        return
 
-        buffed_bot = _compute_trait_buffs(bot_team_raw, bot_traits)
+    game['in_combat'] = True
+    print(f"[LOCK] BOTH READY! Starting 5s inspection for {room_name}")
+    socketio.emit('match_locked', to=room_name)
+    _emit_board(game, [])
 
-        for champ in buffed_bot:
-            # Mirror Bot's coordinates (Team 2 facing Player 1)
-            final_x = 4 - float(champ['x'])
-            final_y = 5 - float(champ['y'])
+    def delay_start():
+        socketio.sleep(5)
+        if game.get('aborted'):
+            return
+        print(f"[FIRE] INSPECTION OVER! COMBAT STARTED at {room_name}")
+        socketio.emit('combat_start', to=room_name)
+        run_game_loop(room_name)
 
-            new_champ = Champion(
-                id=champ['id'], name=champ['name'], team="Team2",
-                x=final_x, y=final_y,
-                hp=champ['max_hp'],
-                attack=champ['attack'],
-                attack_range=champ['attack_range'],
-                speed=champ['speed'],
-                max_mana=champ['max_mana'],
-                star=champ.get('star', 1),
-                skill=champ.get('skill'),
-                raw_skill=champ.get('raw_skill'),
-                start_mana=champ.get('start_mana', 0),
-                active_buffs=champ.get('active_buffs', []),
-                raw_hp=champ.get('raw_hp'),
-                raw_attack=champ.get('raw_attack'),
-                raw_range=champ.get('raw_range'),
-                raw_speed=champ.get('raw_speed'),
-                applied_traits=champ.get('applied_traits', []),
-                mana_refund_ratio=champ.get('mana_refund_ratio', 0.0),
-                double_cast_chance=champ.get('double_cast_chance', 0.0)
-            )
-            game['board_state'].append(new_champ)
-
-        game['ready_count'] += 1
-
-    if game['ready_count'] == 2:
-        print(f"[LOCK] BOTH READY! Starting 5s inspection for {room_name}")
-        socketio.emit('match_locked', to=room_name)
-
-        base_champions = [c.to_dict() for c in game['board_state']]
-
-        # Player 1 sees board as-is
-        socketio.emit('sync_tick', {
-            "champions": base_champions,
-            "events":    [],
-            "opponent_lp": game.get('p2_lp', 0),
-            "your_team":  "Team1"
-        }, to=game['player1'])
-
-        # Player 2 (if human) gets mirrored coordinates
-        if not game.get('bot'):
-            p2_champions = []
-            for c in base_champions:
-                c_copy = c.copy()
-                c_copy['x'] = 4 - float(c_copy['x'])
-                c_copy['y'] = 5 - float(c_copy['y'])
-                p2_champions.append(c_copy)
-
-            socketio.emit('sync_tick', {
-                "champions": p2_champions,
-                "events":    [],
-                "opponent_lp": game.get('p1_lp', 0),
-                "your_team":  "Team2"
-            }, to=game['player2'])
-
-        def delay_start():
-            socketio.sleep(5)
-            if game.get('aborted'):
-                return
-            print(f"[FIRE] INSPECTION OVER! COMBAT STARTED at {room_name}")
-            socketio.emit('combat_start', to=room_name)
-            socketio.start_background_task(run_game_loop, room_name)
-
-        socketio.start_background_task(delay_start)
+    socketio.start_background_task(delay_start)
 
 
 # ==========================================
 # 3. COMBAT LOOP (SERVER REFEREE)
 # ==========================================
+def _cast(champ, target, board_state, events, new_clones, is_bonus_cast=False):
+    skill_event = champ.cast_skill(target, board_state, is_bonus_cast=is_bonus_cast)
+    if not skill_event:
+        return None
+    if 'spawned_clones' in skill_event:
+        new_clones.extend(skill_event.pop('spawned_clones'))
+    if 'extra_events' in skill_event:
+        events.extend(skill_event.pop('extra_events'))
+    events.append(skill_event)
+    return skill_event
+
+
+def _decide_winner(board_state, time_out):
+    team1_alive = [c for c in board_state if c.team == 'Team1' and c.is_alive]
+    team2_alive = [c for c in board_state if c.team == 'Team2' and c.is_alive]
+    if team1_alive and not team2_alive:
+        return 'Team1'
+    if team2_alive and not team1_alive:
+        return 'Team2'
+    if not time_out:
+        return 'Draw'
+    # Timeout: more survivors wins, then more total HP
+    if len(team1_alive) != len(team2_alive):
+        return 'Team1' if len(team1_alive) > len(team2_alive) else 'Team2'
+    t1_hp = sum(c.hp for c in team1_alive)
+    t2_hp = sum(c.hp for c in team2_alive)
+    if t1_hp != t2_hp:
+        return 'Team1' if t1_hp > t2_hp else 'Team2'
+    return 'Draw'
+
+
 def run_game_loop(room_name):
     game = games.get(room_name)
     if not game:
@@ -1113,176 +1094,141 @@ def run_game_loop(room_name):
     while True:
         socketio.sleep(0.1)
 
-        # FIX: Abort check — stops loop when room deleted (disconnect mid-game)
+        # Abort check — stops loop when room deleted (disconnect mid-game)
         if game.get('aborted'):
             print(f"[WARN] Game loop aborted for {room_name}")
-            break
+            return
 
+        board = game['board_state']
         all_tick_events = []
         new_clones = []
 
-        for champ in game['board_state']:
+        for champ in board:
             if not champ.is_alive:
                 continue
 
             # 1. Update buffs first
-            buff_events = champ.update_buffs(game['board_state'])
+            buff_events = champ.update_buffs(board)
             if buff_events:
                 all_tick_events.extend(buff_events)
 
-            # Check pending Bucciarati Double Cast (1.0s delay = 10 ticks)
-            if getattr(champ, 'pending_double_cast_ticks', 0) > 0:
-                champ.pending_double_cast_ticks -= 1
-                if champ.pending_double_cast_ticks == 0:
-                    if champ.is_alive and not getattr(champ, 'is_stunned', False) and not getattr(champ, 'is_banished', False):
-                        second_target = find_closest_target(champ, game['board_state'])
-                        if second_target:
-                            second_event = champ.cast_skill(second_target, game['board_state'], is_bonus_cast=True)
-                            if second_event:
-                                if 'spawned_clones' in second_event:
-                                    new_clones.extend(second_event.pop('spawned_clones'))
-                                if 'extra_events' in second_event:
-                                    all_tick_events.extend(second_event.pop('extra_events'))
-                                second_event['is_double_cast'] = True
-                                all_tick_events.append(second_event)
-                                all_tick_events.append({
-                                    'type': 'double_cast',
-                                    'casterId': champ.id
-                                })
-                            champ.reset_attack_cooldown()
+            # FIX: banished units are out of the fight entirely (they used to keep walking)
+            if not champ.is_alive or champ.is_banished:
                 continue
 
-            target = find_closest_target(champ, game['board_state'])
-            if target:
-                dist = calculate_distance(champ.x, champ.y, target.x, target.y)
+            # Pending Bucciarati Double Cast (1.0s delay = 10 ticks)
+            if champ.pending_double_cast_ticks > 0:
+                champ.pending_double_cast_ticks -= 1
+                if champ.pending_double_cast_ticks == 0 and not champ.is_stunned:
+                    second_target = find_closest_target(champ, board)
+                    if second_target:
+                        second_event = _cast(champ, second_target, board, all_tick_events, new_clones, is_bonus_cast=True)
+                        if second_event:
+                            second_event['is_double_cast'] = True
+                            all_tick_events.append({'type': 'double_cast', 'casterId': champ.id})
+                        champ.reset_attack_cooldown()
+                continue
 
-                if dist <= champ.attack_range:
-                    if champ.can_attack():
-                        if champ.mana >= champ.max_mana:
-                            # 2. Cast skill
-                            skill_event = champ.cast_skill(target, game['board_state'])
-                            if skill_event:
-                                if 'spawned_clones' in skill_event:
-                                    new_clones.extend(skill_event.pop('spawned_clones'))
-                                if 'extra_events' in skill_event:
-                                    all_tick_events.extend(skill_event.pop('extra_events'))
-                                all_tick_events.append(skill_event)
+            target = find_closest_target(champ, board)
+            if not target:
+                continue
 
-                            # Bucciarati Trait: Schedule Double Cast after 1.0s (10 ticks)
-                            dc_chance = getattr(champ, 'double_cast_chance', 0.0)
-                            if dc_chance > 0 and random.random() < dc_chance and champ.is_alive and not getattr(champ, 'is_stunned', False) and not getattr(champ, 'is_banished', False):
-                                champ.pending_double_cast_ticks = 10
-                                all_tick_events.append({
-                                    'type': 'double_cast_charge',
-                                    'casterId': champ.id
-                                })
+            dist = calculate_distance(champ.x, champ.y, target.x, target.y)
+            if dist > champ.attack_range:
+                # Move toward target only if not stunned
+                if not champ.is_stunned:
+                    move_towards(champ, target.x, target.y)
+                continue
 
-                            champ.reset_attack_cooldown()
-                        else:
-                            # 3. Normal attack — only gain mana if not mana-locked
-                            if not getattr(champ, 'is_mana_locked', False):
-                                champ.mana += 10
-                            damage = champ.attack
-                            actual_damage, evs = target.take_damage(damage, champ, game['board_state'])
-                            all_tick_events.append({
-                                'type': 'attack', 'attackerId': champ.id,
-                                'targetId': target.id, 'damage': actual_damage
-                            })
-                            all_tick_events.extend(evs)
-                            champ.reset_attack_cooldown()
-                else:
-                    # Move toward target only if not stunned
-                    if not getattr(champ, 'is_stunned', False):
-                        move_towards(champ, target.x, target.y)
+            if not champ.can_attack():
+                continue
+
+            if champ.mana >= champ.max_mana:
+                # 2. Cast skill
+                _cast(champ, target, board, all_tick_events, new_clones)
+
+                # Bucciarati Trait: Schedule Double Cast after 1.0s (10 ticks)
+                dc_chance = champ.double_cast_chance
+                if dc_chance > 0 and random.random() < dc_chance and champ.is_alive \
+                        and not champ.is_stunned and not champ.is_banished:
+                    champ.pending_double_cast_ticks = 10
+                    all_tick_events.append({'type': 'double_cast_charge', 'casterId': champ.id})
+            else:
+                # 3. Normal attack — only gain mana if not mana-locked
+                if not champ.is_mana_locked:
+                    champ.mana = min(champ.max_mana, champ.mana + 10)
+                is_crit = random.random() < CRIT_CHANCE
+                damage = champ.attack * (CRIT_MULTIPLIER if is_crit else 1)
+                actual_damage, evs = target.take_damage(damage, champ, board)
+                all_tick_events.append({
+                    'type': 'attack', 'attackerId': champ.id,
+                    'targetId': target.id, 'damage': round(actual_damage),
+                    'is_crit': is_crit
+                })
+                all_tick_events.extend(evs)
+            champ.reset_attack_cooldown()
 
         if new_clones:
-            game['board_state'].extend(new_clones)
+            board.extend(new_clones)
 
         # Broadcast state to both players
-        base_champions = [c.to_dict() for c in game['board_state']]
-
-        socketio.emit('sync_tick', {
-            "champions": base_champions,
-            "events":    all_tick_events,
-            "opponent_lp": game.get('p2_lp', 0),
-            "your_team":  "Team1"
-        }, to=game['player1'])
-
-        if not game.get('bot'):
-            p2_champions = []
-            for c in base_champions:
-                c_copy = c.copy()
-                c_copy['x'] = 4 - float(c_copy['x'])
-                c_copy['y'] = 5 - float(c_copy['y'])
-                p2_champions.append(c_copy)
-
-            socketio.emit('sync_tick', {
-                "champions": p2_champions,
-                "events":    all_tick_events,
-                "opponent_lp": game.get('p1_lp', 0),
-                "your_team":  "Team2"
-            }, to=game['player2'])
+        base_champions = _emit_board(game, all_tick_events)
 
         # Check end conditions
-        team1_alive = any(c.team == 'Team1' and c.is_alive for c in game['board_state'])
-        team2_alive = any(c.team == 'Team2' and c.is_alive for c in game['board_state'])
-        elapsed_time = time.time() - start_time
-        time_out = elapsed_time > 120
+        team1_alive = any(c.team == 'Team1' and c.is_alive for c in board)
+        team2_alive = any(c.team == 'Team2' and c.is_alive for c in board)
+        time_out = (time.time() - start_time) > COMBAT_TIME_LIMIT
 
-        if not team1_alive or not team2_alive or time_out:
-            if team1_alive and not team2_alive:
-                winner = 'Team1'
-            elif team2_alive and not team1_alive:
-                winner = 'Team2'
-            elif time_out:
-                t1_count = sum(1 for c in game['board_state'] if c.team == 'Team1' and c.is_alive)
-                t2_count = sum(1 for c in game['board_state'] if c.team == 'Team2' and c.is_alive)
-                if t1_count > t2_count:       winner = 'Team1'
-                elif t2_count > t1_count:     winner = 'Team2'
-                else:
-                    t1_hp = sum(c.hp for c in game['board_state'] if c.team == 'Team1' and c.is_alive)
-                    t2_hp = sum(c.hp for c in game['board_state'] if c.team == 'Team2' and c.is_alive)
-                    if t1_hp > t2_hp:         winner = 'Team1'
-                    elif t2_hp > t1_hp:       winner = 'Team2'
-                    else:                     winner = 'Draw'
-            else:
-                winner = 'Draw'
+        if team1_alive and team2_alive and not time_out:
+            continue
 
-            if winner == 'Team1':
-                game['p1_lp'] = game.get('p1_lp', 0) + 1
-            elif winner == 'Team2':
-                game['p2_lp'] = game.get('p2_lp', 0) + 1
+        winner = _decide_winner(board, time_out)
 
-            if game.get('bot'):
-                game['bot'].on_round_end(winner=winner, player_board=base_champions)
-            elif game.get('is_bot_vs_bot'):
-                b1_won = (winner == 'Team1')
-                b2_won = (winner == 'Team2')
-                game['bot1'].on_round_end(winner=('Team1' if b1_won else ('Team2' if b2_won else 'Draw')), player_board=base_champions)
-                game['bot2'].on_round_end(winner=('Team2' if b1_won else ('Team1' if b2_won else 'Draw')), player_board=base_champions)
+        if winner == 'Team1':
+            game['p1_lp'] = game.get('p1_lp', 0) + 1
+        elif winner == 'Team2':
+            game['p2_lp'] = game.get('p2_lp', 0) + 1
 
-            # Reset for next round
-            game['ready_count'] = 0
-            game['board_state'] = []
+        if game.get('bot'):
+            game['bot'].on_round_end(winner=winner, player_board=base_champions)
+        elif game.get('is_bot_vs_bot'):
+            flipped = {'Team1': 'Team2', 'Team2': 'Team1'}.get(winner, 'Draw')
+            game['bot1'].on_round_end(winner=winner, player_board=base_champions)
+            game['bot2'].on_round_end(winner=flipped, player_board=base_champions)
 
-            p1_result = 'win' if winner == 'Team1' else ('loss' if winner == 'Team2' else 'draw')
+        # Reset for next round
+        game['submitted'] = set()
+        game['in_combat'] = False
+        game['board_state'] = []
+
+        p1_lp, p2_lp = game.get('p1_lp', 0), game.get('p2_lp', 0)
+        p1_result = 'win' if winner == 'Team1' else ('loss' if winner == 'Team2' else 'draw')
+        socketio.emit('combat_end', {
+            'result': p1_result,
+            'winner': winner,
+            'isBotVsBot': game.get('is_bot_vs_bot', False),
+            # Server is the referee for the score — clients display these values
+            'your_lp': p1_lp,
+            'opponent_lp': p2_lp,
+            'p1_lp': p1_lp,
+            'p2_lp': p2_lp,
+            'bot1_name': game.get('p1_name', 'Bot 1'),
+            'bot2_name': game.get('p2_name', 'Bot 2')
+        }, to=game['player1'])
+
+        p2 = _human_opponent(game, game['player1'])
+        if p2:
+            p2_result = 'win' if winner == 'Team2' else ('loss' if winner == 'Team1' else 'draw')
             socketio.emit('combat_end', {
-                'result': p1_result,
+                'result': p2_result,
                 'winner': winner,
-                'isBotVsBot': game.get('is_bot_vs_bot', False),
-                'p1_lp': game.get('p1_lp', 0),
-                'p2_lp': game.get('p2_lp', 0),
-                'bot1_name': game.get('p1_name', 'Bot 1'),
-                'bot2_name': game.get('p2_name', 'Bot 2')
-            }, to=game['player1'])
+                'your_lp': p2_lp,
+                'opponent_lp': p1_lp,
+            }, to=p2)
 
-            if not game.get('bot') and not game.get('is_bot_vs_bot'):
-                p2_result = 'win' if winner == 'Team2' else ('loss' if winner == 'Team1' else 'draw')
-                socketio.emit('combat_end', {'result': p2_result}, to=game['player2'])
-
-            # FIX: Room stays in games{} for the next round (players are still connected).
-            # It will be deleted when either player disconnects or finds a new match.
-            break
+        # Room stays in games{} for the next round (players are still connected).
+        # It is deleted when either player disconnects, leaves or finds a new match.
+        return
 
 
 if __name__ == '__main__':

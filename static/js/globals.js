@@ -19,7 +19,7 @@ export const STATE = {
     playerId: null,
     playerGold: 10,
     playerLevel: 1,
-    levelCost: 5,
+    levelCost: 4,
     currentXp: 0,
     xpToNextLevel: 2,
     champions: [],

@@ -2,6 +2,7 @@
 import { CONFIG, STATE, CHAMPION_POOL, TRAITS_INFO } from './globals.js';
 import { showNotification } from './notifications.js';
 import { playSfx } from './audio.js';
+import { animateGold, resetGoldDisplay, bumpElement } from './fx.js';
 
 // ======================================================================
 // FIX: CHAMPION POOL DEPLETION
@@ -14,11 +15,97 @@ const POOL_COUNTS = { 1: 30, 2: 20, 3: 15, 4: 10, 5: 5 };
 // Tracks how many copies of each champion remain in the global pool
 const _pool = {}; // { champName: copiesRemaining }
 
-export function initChampPool() {
+export const MAX_LEVEL = 9;
+export const START_GOLD = 10;
+
+// preserve=true keeps current depletion (used when the sheet is re-synced mid-match)
+export function initChampPool(preserve = false) {
+    const previous = { ..._pool };
     Object.keys(_pool).forEach(k => delete _pool[k]);
     CHAMPION_POOL.forEach(champ => {
-        _pool[champ.name] = POOL_COUNTS[champ.cost] ?? 30;
+        const max = POOL_COUNTS[champ.cost] ?? 30;
+        _pool[champ.name] = (preserve && previous[champ.name] !== undefined)
+            ? Math.min(max, previous[champ.name])
+            : max;
     });
+}
+
+// Units the player owns (bought from the shop) as opposed to enemy / server-spawned ones
+export function isOwnUnit(c) {
+    return c.originalX !== undefined;
+}
+
+// Shop, bench and board can only be edited during a real preparation phase
+export function canEditBoard() {
+    return !!STATE.roomId && !STATE.isCombatPhase && !STATE.isRoundReview && !STATE.isBotVsBot;
+}
+
+function editBlockedReason() {
+    if (STATE.isRoundReview) return "Wait for the round review to finish!";
+    if (STATE.isCombatPhase) return "Cannot do that during combat!";
+    return null;
+}
+
+// Same star scaling as the server (_compute_trait_buffs), used for display in prep phase
+export function applyStarStats(champ) {
+    const template = CHAMPION_POOL.find(t => t.name === champ.name);
+    if (!template) return;
+    const star = champ.star || 1;
+    const statMult = 1.8 ** (star - 1);
+
+    champ.max_hp = champ.hp = champ.raw_hp = Math.round(template.hp * statMult);
+    champ.attack = champ.base_attack = champ.raw_attack = Math.round(template.attack * statMult);
+    champ.speed = champ.base_speed = champ.raw_speed = template.speed;
+    champ.attack_range = champ.raw_range = template.attack_range;
+    champ.max_mana = template.max_mana;
+    champ.mana = 0;
+    champ.shield = 0;
+
+    const skill = template.skill ? JSON.parse(JSON.stringify(template.skill)) : null;
+    if (skill) {
+        if (skill.power) skill.power = Math.round(skill.power * 1.6 ** (star - 1));
+        if (skill.duration) skill.duration = parseFloat((skill.duration * 1.2 ** (star - 1)).toFixed(1));
+        if (skill.radius) skill.radius = parseFloat((skill.radius * 1.2 ** (star - 1)).toFixed(1));
+        if (skill.percent) skill.percent = Math.min(0.85, parseFloat((skill.percent * 1.3 ** (star - 1)).toFixed(2)));
+    }
+    champ.skill = skill;
+    champ.raw_skill = skill ? JSON.parse(JSON.stringify(skill)) : null;
+    champ.applied_traits = [];
+    champ.buffs = [];
+    champ.buff_details = [];
+}
+
+// Full reset of the player's economy / roster for a brand new match
+export function resetPlayerForNewMatch() {
+    STATE.playerGold = START_GOLD;
+    STATE.playerLevel = 1;
+    STATE.levelCost = 4;
+    STATE.currentRound = 1;
+    STATE.champions = [];
+    STATE.activeProjectiles = [];
+    STATE.hitEffects = [];
+    STATE.particles = [];
+    STATE.floatingTexts = [];
+    STATE.isCombatPhase = false;
+    STATE.isRoundReview = false;
+    STATE.inspectedChampId = null;
+    initChampPool();
+
+    resetGoldDisplay(STATE.playerGold);
+    const levelEl = document.getElementById('levelText');
+    if (levelEl) levelEl.innerText = STATE.playerLevel;
+    const roundEl = document.getElementById('roundText');
+    if (roundEl) roundEl.innerText = STATE.currentRound;
+    updateXpButton();
+    refreshShop();
+    updateUnitCount();
+}
+
+function updateXpButton() {
+    const buyXpCostEl = document.getElementById('buyXpCost');
+    if (buyXpCostEl) {
+        buyXpCostEl.innerText = STATE.playerLevel >= MAX_LEVEL ? 'MAX' : `${STATE.levelCost} 🪙`;
+    }
 }
 
 function _returnToPool(champName, count = 1) {
@@ -37,16 +124,41 @@ function _takeFromPool(champName) {
 // ======================================================================
 export function updateGold(amount) {
     STATE.playerGold += amount;
-    const goldEl = document.getElementById('goldText');
-    if (goldEl) goldEl.innerText = STATE.playerGold;
+    animateGold(STATE.playerGold, amount);
+    updateShopCardStates();
 }
 
 export function updateUnitCount() {
     const boardChamps = STATE.champions.filter(c => c.targetY < 6);
-    const count = boardChamps.length;
+    const count = boardChamps.filter(isOwnUnit).length;
     const unitEl = document.getElementById('unitText');
     if (unitEl) unitEl.innerText = `${count}/${STATE.playerLevel}`;
     updateSynergies(boardChamps);
+    updateShopCardStates();
+}
+
+// Refresh "owned xN", "will upgrade" and affordability hints on the visible shop cards
+export function updateShopCardStates() {
+    document.querySelectorAll('#shopContainer .shop-card[data-champ]').forEach(card => {
+        const name = card.dataset.champ;
+        const cost = Number(card.dataset.cost || 0);
+        const owned = STATE.champions.filter(c => isOwnUnit(c) && c.name === name);
+        const oneStarCopies = owned.filter(c => (c.star || 1) === 1).length;
+
+        let badge = card.querySelector('.owned-badge');
+        if (owned.length > 0) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'owned-badge';
+                card.appendChild(badge);
+            }
+            badge.innerText = `x${owned.length}`;
+        } else if (badge) {
+            badge.remove();
+        }
+        card.classList.toggle('will-upgrade', oneStarCopies >= 2);
+        card.classList.toggle('too-expensive', STATE.playerGold < cost);
+    });
 }
 
 // ======================================================================
@@ -55,21 +167,21 @@ export function updateUnitCount() {
 // New: 4 → 8 → 12 → 16 → 20 → 24 (always reachable, scales with level)
 // ======================================================================
 export function buyXp() {
-    if (STATE.isCombatPhase) return;
+    const blocked = editBlockedReason();
+    if (blocked) { showNotification(blocked); return; }
+    if (STATE.playerLevel >= MAX_LEVEL) {
+        showNotification(`Max level (${MAX_LEVEL}) reached!`);
+        return;
+    }
 
     if (STATE.playerGold >= STATE.levelCost) {
         updateGold(-STATE.levelCost);
         STATE.playerLevel++;
-        STATE.levelCost = STATE.playerLevel * 4; // FIX: linear, not exponential
+        STATE.levelCost = STATE.playerLevel * 4; // linear, same formula as the bot
 
         document.getElementById('levelText').innerText = STATE.playerLevel;
-        const buyXpCostEl = document.getElementById('buyXpCost');
-        if (buyXpCostEl) {
-            buyXpCostEl.innerText = `${STATE.levelCost} 🪙`;
-        } else {
-            const btn = document.getElementById('buyXpBtn');
-            if (btn) btn.innerText = `Level Up (${STATE.levelCost} 🪙)`;
-        }
+        bumpElement(document.querySelector('.level-display'));
+        updateXpButton();
 
         updateUnitCount();
         playSfx('levelup');
@@ -82,37 +194,28 @@ export function buyXp() {
 // ======================================================================
 function checkAndMerge(champName, starLevel) {
     if (starLevel >= 3) return;
-    const copies = STATE.champions.filter(c => c.name === champName && c.star === starLevel);
+    // FIX: only merge the player's own units (enemy copies are on the board during review)
+    const copies = STATE.champions.filter(c => isOwnUnit(c) && c.name === champName && (c.star || 1) === starLevel);
     if (copies.length >= 3) {
-        const targets = copies.slice(0, 3);
-
         // Prioritize the copy currently deployed on the board (y < 6)
-        targets.sort((a, b) => {
-            const aOnBoard = (a.targetY !== undefined && a.targetY < 6) ? 1 : 0;
-            const bOnBoard = (b.targetY !== undefined && b.targetY < 6) ? 1 : 0;
-            return bOnBoard - aOnBoard;
-        });
+        const targets = copies
+            .map((c, i) => ({ c, i, onBoard: c.targetY < 6 ? 1 : 0 }))
+            .sort((a, b) => (b.onBoard - a.onBoard) || (a.i - b.i))
+            .slice(0, 3)
+            .map(e => e.c);
 
         STATE.champions = STATE.champions.filter(c => !targets.includes(c));
 
-        // Return 2 consumed copies to pool (1 stays as the upgraded unit)
-        _returnToPool(champName, 2);
+        // Copies stay "out of the pool" while held — nothing to return on merge
+        // (the upgraded unit returns all 3^(star-1) copies when it is sold)
 
         const upgraded = targets[0];
-        upgraded.star += 1;
-
-        upgraded.max_hp = Math.round(upgraded.max_hp * 1.8);
-        upgraded.hp = upgraded.max_hp;
-        upgraded.attack = Math.round(upgraded.attack * 1.8);
-        upgraded.mana = 0;
-        // max_mana stays constant across star tiers to prevent infinite CC/perma-stun loops
-
-        if (upgraded.skill) {
-            if (upgraded.skill.power) upgraded.skill.power = Math.round(upgraded.skill.power * 1.6);
-            if (upgraded.skill.duration) upgraded.skill.duration = parseFloat((upgraded.skill.duration * 1.2).toFixed(1));
-            if (upgraded.skill.radius) upgraded.skill.radius = parseFloat((upgraded.skill.radius * 1.2).toFixed(1));
-            if (upgraded.skill.percent) upgraded.skill.percent = Math.min(0.85, parseFloat((upgraded.skill.percent * 1.3).toFixed(2)));
-        }
+        upgraded.star = starLevel + 1;
+        // FIX: recompute from the template instead of multiplying possibly
+        // trait-buffed combat values (the info panel showed fake "Synergy" HP)
+        applyStarStats(upgraded);
+        upgraded.popT = 16;
+        upgraded.castT = 18;
 
         STATE.champions.push(upgraded);
         playSfx('starup');
@@ -122,22 +225,30 @@ function checkAndMerge(champName, starLevel) {
 }
 
 export function buyChampion(champTemplate, cardElement) {
-    if (STATE.isCombatPhase) return false;
+    const blocked = editBlockedReason();
+    if (blocked) { showNotification(blocked); return false; }
     if (STATE.playerGold < champTemplate.cost) {
-        showNotification("Not enough gold!");
+        showNotification("Not enough gold!", "error");
         return false;
     }
 
     let slot = null;
     for (let x = 0; x < CONFIG.BENCH_SLOTS; x++) {
-        if (!STATE.champions.some(c => c.targetX === x && c.targetY === 6)) {
+        if (!STATE.champions.some(c => isOwnUnit(c) && c.targetX === x && c.targetY === 6)) {
             slot = { x, y: 6 };
             break;
         }
     }
     if (!slot) {
-        showNotification("Bench is full!");
-        return false;
+        // Bench full: still allow the buy when it completes a 3-copy merge (like TFT).
+        // The new copy borrows an existing copy's cell and is consumed by the merge.
+        const existing = STATE.champions.filter(c => isOwnUnit(c) && c.name === champTemplate.name && (c.star || 1) === 1);
+        if (existing.length >= 2) {
+            slot = { x: existing[0].targetX, y: existing[0].targetY };
+        } else {
+            showNotification("Bench is full!", "error");
+            return false;
+        }
     }
 
     // FIX: Deduct from pool — if the pool is empty for this champ, refuse purchase
@@ -147,34 +258,34 @@ export function buyChampion(champTemplate, cardElement) {
     }
 
     updateGold(-champTemplate.cost);
-    if (cardElement) cardElement.style.visibility = 'hidden';
+    if (cardElement) {
+        cardElement.style.pointerEvents = 'none';
+        cardElement.classList.add('bought');
+        setTimeout(() => { cardElement.style.visibility = 'hidden'; }, 280);
+    }
 
-    STATE.champions.push({
-        id: Math.random().toString(36).substr(2, 9),
+    const unit = {
+        id: Math.random().toString(36).slice(2, 11),
         name: champTemplate.name,
         team: STATE.myTeam || "Team1",
         star: 1,
         cost: champTemplate.cost,
         targetX: slot.x, targetY: slot.y,
         originalX: slot.x, originalY: slot.y,
-        hp: champTemplate.hp, max_hp: champTemplate.hp,
-        mana: 0, max_mana: champTemplate.max_mana,
-        attack: champTemplate.attack,
-        // FIX: Store base values so resetBoardForNextRound can restore them
-        base_attack: champTemplate.attack,
-        base_speed: champTemplate.speed,
-        attack_range: champTemplate.attack_range,
-        speed: champTemplate.speed,
         is_alive: true,
         shakeTimer: 0,
-        skill: champTemplate.skill ? JSON.parse(JSON.stringify(champTemplate.skill)) : null,
         traits: champTemplate.traits || [],
-    });
+    };
+    applyStarStats(unit);
+    unit.popT = 16;
+    STATE.champions.push(unit);
 
     checkAndMerge(champTemplate.name, 1);
     updateUnitCount();
     playSfx('buy');
-    showNotification(`Purchased [${champTemplate.name}] to bench! ⭐`);
+    if (STATE.champions.includes(unit)) {
+        showNotification(`Purchased [${champTemplate.name}] to bench! ⭐`);
+    }
     return true;
 }
 
@@ -310,7 +421,10 @@ export function refreshShop() {
 
         const card = document.createElement('div');
         card.className = 'shop-card';
-        card.innerHTML = `<h3>${randomChamp.name}</h3><img src="${randomChamp.img}" width="40" height="40" style="border-radius: 5px;"><p class="cost">${randomChamp.cost} 🪙</p>`;
+        card.dataset.champ = randomChamp.name;
+        card.dataset.cost = randomChamp.cost;
+        const traitsLine = (randomChamp.traits || []).join(' · ');
+        card.innerHTML = `<h3>${randomChamp.name}</h3><img src="${randomChamp.img}" width="40" height="40" style="border-radius: 5px;"><p class="card-traits">${traitsLine}</p><p class="cost">${randomChamp.cost} 🪙</p>`;
 
         const colors = {
             1: { border: '#bdc3c7', bg: 'linear-gradient(to bottom, #2c3e50, #7f8c8d)' },
@@ -375,12 +489,14 @@ export function refreshShop() {
         };
         container.appendChild(card);
     }
+    updateShopCardStates();
 }
 
 export function sellChampion(champ) {
     if (!champ) return;
-    const myTeam = STATE.myTeam || 'Team1';
-    if (champ.team && champ.team !== myTeam) {
+    const blocked = editBlockedReason();
+    if (blocked) { showNotification(blocked); return; }
+    if (!isOwnUnit(champ)) {
         showNotification("Cannot sell enemy champion!", "error");
         return;
     }
@@ -461,13 +577,26 @@ function renderSynergyPanel(traitCounts) {
 
         const displayReq = isMax ? info.thresholds[info.thresholds.length - 1].req : nextReq;
         const isActiveClass = activeLevel > 0 ? 'active' : '';
+        // Bronze / silver / gold by how many breakpoints are reached
+        const tierClass = activeLevel === 0 ? '' :
+            (activeLevel >= info.thresholds.length ? 'tier-gold' : (activeLevel >= 2 ? 'tier-silver' : 'tier-bronze'));
+
+        const maxReq = info.thresholds[info.thresholds.length - 1].req;
+        const breakpoints = new Set(info.thresholds.map(t => t.req));
+        let pips = '';
+        for (let n = 1; n <= maxReq; n++) {
+            pips += `<span class="syn-pip${n <= count ? ' on' : ''}${breakpoints.has(n) && n < maxReq ? ' bp' : ''}"></span>`;
+        }
+        const reqList = info.thresholds.map(t => `<span class="${count >= t.req ? 'hit' : ''}">${t.req}</span>`).join(' › ');
 
         html += `
-            <div class="synergy-item ${isActiveClass}" data-trait="${trait}">
+            <div class="synergy-item ${isActiveClass} ${tierClass}" data-trait="${trait}">
                 <div class="synergy-item-header">
                     <span>${trait}</span>
                     <span>${count} / ${displayReq}</span>
                 </div>
+                <div class="syn-pips">${pips}</div>
+                <div class="syn-reqs">${reqList}</div>
             </div>
         `;
     });
@@ -781,19 +910,21 @@ export function showDisplayInfo(type, data, shopContext = null) {
             const powerDisplay = isSkillAmped ? `${scaledPower.toLocaleString()} <span style="color:#2ecc71; font-weight:800;">(+${skillAmpDiff.toLocaleString()} Synergy)</span>` : scaledPower.toLocaleString();
 
             switch (s.type) {
-                case 'damage': skillDesc = `Deals <b>${powerDisplay}</b> burst damage to the nearest enemy.`; break;
-                case 'time_stop': skillDesc = `Freezes time for all enemies for <b>${scaledDuration.toFixed(1)}s</b>. Self gains massive Attack Speed.`; break;
+                case 'damage': skillDesc = s.radius
+                    ? `Deals <b>${powerDisplay}</b> burst damage to the target and enemies within radius <b>${s.radius}</b>.`
+                    : `Deals <b>${powerDisplay}</b> burst damage to the target.`; break;
+                case 'time_stop': skillDesc = `Stops time for every other unit for <b>${scaledDuration.toFixed(1)}s</b> and gains +300% Attack Speed (cannot gain Mana meanwhile).`; break;
                 case 'return_to_zero': {
                     const pct = s.percent ? s.percent : 0.10;
                     const rtzDmg = Math.round(maxHp * pct);
                     skillDesc = `Deals <b>${rtzDmg.toLocaleString()}</b> damage (<b>${Math.round(pct * 100)}% Max HP</b>) to ALL enemies, wiping their Mana to 0 and purging all active buffs instantly.`;
                     break;
                 }
-                case 'blink_strike': skillDesc = `Teleports behind the furthest enemy and deals <b>${powerDisplay}</b> damage.`; break;
+                case 'blink_strike': skillDesc = `Teleports behind the target and deals <b>${powerDisplay}</b> damage.`; break;
                 case 'execute': {
                     const execThreshold = (s.percent && s.percent > 0)
                         ? Math.round(s.percent * 100)
-                        : (template.cost === 1 ? 10 : (template.cost === 2 ? 20 : (template.cost === 3 ? 25 : (template.cost >= 4 ? 30 : 20))));
+                        : ({ 1: 10, 2: 20, 3: 25, 4: 30, 5: 35 }[template.cost] || 20);
                     skillDesc = `Instantly executes targets below <b>${execThreshold}%</b> HP. Otherwise, deals <b>${powerDisplay}</b> physical damage.`;
                     break;
                 }
@@ -815,11 +946,11 @@ export function showDisplayInfo(type, data, shopContext = null) {
                 case 'damage_link': skillDesc = `Links lifeforce with the target. Target absorbs your damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'life_tether': skillDesc = `Drains <b>${powerDisplay}</b> HP/s from tethered target to heal yourself for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'evasion': skillDesc = `Dodges all incoming damage for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'revive': skillDesc = `Upon taking lethal damage, instantly revives with <b>100% HP</b>.`; break;
-                case 'ricochet': skillDesc = `Fires a projectile bouncing ${Math.round(scaledRadius)} times, dealing <b>${powerDisplay}</b> per hit.`; break;
+                case 'revive': skillDesc = `Grants an extra life: upon taking lethal damage, instantly revives with <b>100% HP</b> (does not stack).`; break;
+                case 'ricochet': skillDesc = `Fires a projectile that hits <b>${Math.max(3, Math.round(scaledRadius))}</b> enemies in a chain, dealing <b>${powerDisplay}</b> per hit.`; break;
                 case 'dot': skillDesc = `Inflicts <b>${powerDisplay}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'aoe_dot': skillDesc = `Toxic zone (Radius <b>${scaledRadius}</b>) dealing <b>${powerDisplay}</b> DMG/s for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
-                case 'global_slow': skillDesc = `Slows all enemies' Attack Speed by <b>50%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
+                case 'global_slow': skillDesc = `Slows all enemies' Speed by <b>${Math.round((s.percent || 0.5) * 100)}%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'mana_lock': skillDesc = `Silences the target, preventing Mana gain and all healing for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'stun': skillDesc = `Stuns the target for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'heal': skillDesc = (scaledDuration > 0) ? `Heals the most wounded ally for <b>${powerDisplay}</b> HP/s for <b>${scaledDuration.toFixed(1)}s</b>.` : `Instantly restores <b>${powerDisplay}</b> HP to the most wounded ally.`; break;
@@ -828,7 +959,7 @@ export function showDisplayInfo(type, data, shopContext = null) {
                 case 'buff_atk': skillDesc = `Increases Attack by <b>+${powerDisplay}</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'speed_buff': skillDesc = `Boosts Attack Speed by <b>+${powerDisplay}%</b> for <b>${scaledDuration.toFixed(1)}s</b>.`; break;
                 case 'swap': skillDesc = `Swaps positions with the target and deals <b>${powerDisplay}</b> damage.`; break;
-                case 'clone': skillDesc = `Creates a Shadow Clone with <b>${Math.round(scaledPercent * 100)}%</b> of original stats.`; break;
+                case 'clone': skillDesc = `Creates a Shadow Clone with <b>${Math.round((s.percent || 0.3) * 100)}%</b> of original HP & Attack. While it lives, recasts strike the nearest enemy for 3x Attack.`; break;
                 default: skillDesc = 'Casts a unique and powerful Stand ability.';
             }
 

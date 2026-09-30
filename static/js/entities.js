@@ -40,7 +40,7 @@ export async function reloadChampionPool(forceReload = false) {
                 champ.img = IMAGES[champ.name] || '';
                 CHAMPION_POOL.push(champ);
             });
-            initChampPool();
+            initChampPool(true); // keep current pool depletion mid-match
             console.log(`[SYNC] Reloaded ${CHAMPION_POOL.length} champions into pool.`);
             return true;
         }

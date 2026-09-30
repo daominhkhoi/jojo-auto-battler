@@ -1,6 +1,6 @@
 // static/js/main.js
 import { CONFIG, STATE, getCanvasCoords } from './globals.js';
-import { buyXp, refreshShop, updateGold, updateUnitCount, sellChampion, showDisplayInfo } from './shop.js';
+import { buyXp, refreshShop, updateGold, updateUnitCount, sellChampion, showDisplayInfo, canEditBoard, isOwnUnit } from './shop.js';
 import { renderBoard } from './renderer.js';
 import { updatePhysics } from './combat.js';
 import { showNotification } from './notifications.js';
@@ -24,9 +24,9 @@ document.getElementById('botVsBotBtn')?.addEventListener('click', playBotVsBot);
 document.getElementById('exitMatchBtn')?.addEventListener('click', leaveMatch);
 document.getElementById('readyBtn').addEventListener('click', declareReady);
 
-document.getElementById('rollBtn').addEventListener('click', () => {
-    if (STATE.isCombatPhase) {
-        showNotification("Cannot roll during combat!");
+function rollShop() {
+    if (!canEditBoard()) {
+        showNotification(STATE.isRoundReview ? "Wait for the round review to finish!" : "Cannot roll during combat!");
         return;
     }
     if (STATE.playerGold >= 1) {
@@ -34,9 +34,10 @@ document.getElementById('rollBtn').addEventListener('click', () => {
         refreshShop();
         playSfx('roll');
     } else {
-        showNotification("Not enough gold!");
+        showNotification("Not enough gold!", "error");
     }
-});
+}
+document.getElementById('rollBtn').addEventListener('click', rollShop);
 
 document.getElementById('sfxMuteBtn')?.addEventListener('click', toggleSfxMute);
 
@@ -75,6 +76,66 @@ function getMousePos(evt) {
 }
 
 const sellZone = document.getElementById('sellZone');
+const bottomBar = document.getElementById('bottomBar');
+
+function pointInRect(x, y, el) {
+    if (!el || el.offsetParent === null) return false;
+    const r = el.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
+function isOverSellTarget(rawX, rawY) {
+    return pointInRect(rawX, rawY, sellZone) || pointInRect(rawX, rawY, bottomBar);
+}
+
+function setSellHighlight(active) {
+    if (sellZone) sellZone.classList.toggle('active', active);
+    if (bottomBar) bottomBar.classList.toggle('sell-hover', active);
+}
+
+// Board cell under the pointer while dragging (drawn by the renderer as a drop target)
+function updateDragCell(mP) {
+    const rect = canvas.getBoundingClientRect();
+    if (isOverSellTarget(mP.rawX, mP.rawY) ||
+        mP.rawX < rect.left || mP.rawX > rect.right || mP.rawY < rect.top || mP.rawY > rect.bottom) {
+        STATE.dragCell = null;
+        return;
+    }
+    let gx, gy;
+    if (mP.y < CONFIG.BENCH_START_Y) {
+        gx = Math.max(0, Math.min(CONFIG.BOARD_COLS - 1, Math.floor(mP.x / CONFIG.BOARD_CELL_WIDTH)));
+        gy = Math.max(3, Math.min(CONFIG.BOARD_ROWS - 1, Math.floor(mP.y / CONFIG.BOARD_CELL_HEIGHT)));
+    } else {
+        gx = Math.max(0, Math.min(CONFIG.BENCH_SLOTS - 1, Math.floor(mP.x / CONFIG.BENCH_CELL_WIDTH)));
+        gy = 6;
+    }
+    let valid = true;
+    if (gy < 6 && originalY === 6) {
+        const occupant = STATE.champions.find(c => c !== draggedChamp && isOwnUnit(c) && c.targetX === gx && c.targetY === gy);
+        const onBoard = STATE.champions.filter(c => isOwnUnit(c) && c.targetY < 6 && c !== draggedChamp && c !== occupant).length;
+        valid = onBoard < STATE.playerLevel;
+    }
+    STATE.dragCell = { gx, gy, valid };
+}
+
+function endDragUi() {
+    STATE.dragCell = null;
+    isDragging = false;
+    draggedChamp = null;
+    if (sellZone) sellZone.style.display = 'none';
+    setSellHighlight(false);
+    if (bottomBar) bottomBar.classList.remove('sell-armed');
+}
+
+// Snap a dragged unit back where it came from (combat started, dropped off-canvas, ...)
+function cancelDrag() {
+    if (isDragging && draggedChamp) {
+        draggedChamp.targetX = originalX;
+        draggedChamp.targetY = originalY;
+    }
+    endDragUi();
+}
+window.addEventListener('wa:cancel-drag', cancelDrag);
 
 // 1. POINTER DOWN (Start drag)
 function handlePointerDown(e) {
@@ -99,7 +160,7 @@ function handlePointerDown(e) {
     if (touchedChamp) {
         const isMyChamp = touchedChamp.team === (STATE.myTeam || 'Team1');
 
-        if (!STATE.isCombatPhase && !STATE.isRoundReview && !STATE.isBotVsBot && isMyChamp) {
+        if (canEditBoard() && isMyChamp && isOwnUnit(touchedChamp)) {
             // ONLY drag own champions!
             isDragging = true;
             draggedChamp = touchedChamp;
@@ -107,8 +168,9 @@ function handlePointerDown(e) {
             originalY = touchedChamp.targetY;
             touchedChamp.startPixelX = touchedChamp.pixelX;
             touchedChamp.startPixelY = touchedChamp.pixelY;
-            
+
             if (sellZone && isTouchDevice) sellZone.style.display = 'block';
+            if (bottomBar) bottomBar.classList.add('sell-armed');
         } else {
             // Enemy champion OR combat phase: ALWAYS inspect info!
             hoveredChamp = touchedChamp;
@@ -152,16 +214,8 @@ function handlePointerMove(e) {
         draggedChamp.pixelX = mP.x - size.w / 2;
         draggedChamp.pixelY = mP.y - size.h / 2;
 
-        const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
-        if (sellZone && isTouchDevice) {
-            const rect = sellZone.getBoundingClientRect();
-            if (mP.rawX >= rect.left && mP.rawX <= rect.right &&
-                mP.rawY >= rect.top && mP.rawY <= rect.bottom) {
-                sellZone.classList.add('active');
-            } else {
-                sellZone.classList.remove('active');
-            }
-        }
+        setSellHighlight(isOverSellTarget(mP.rawX, mP.rawY));
+        updateDragCell(mP);
     } else {
         const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
         if (isTouchDevice) {
@@ -204,31 +258,30 @@ canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
 function handlePointerUp(e) {
     if (isDragging && draggedChamp) {
         const mP = getMousePos(e);
-        
+
         const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
         const dragDist = Math.hypot(
             (draggedChamp.pixelX || 0) - (draggedChamp.startPixelX || 0),
             (draggedChamp.pixelY || 0) - (draggedChamp.startPixelY || 0)
         );
 
-        if (sellZone && isTouchDevice) {
-            const rect = sellZone.getBoundingClientRect();
-            // Must be dragged intentionally (> 30px) and dropped into sellZone
-            if (dragDist > 30 &&
-                mP.rawX >= rect.left && mP.rawX <= rect.right &&
-                mP.rawY >= rect.top && mP.rawY <= rect.bottom) {
-                if (draggedChamp.team === (STATE.myTeam || 'Team1')) {
-                    sellChampion(draggedChamp);
-                    hoveredChamp = null;
-                    showDisplayInfo(null);
-                }
-                
-                isDragging = false;
-                draggedChamp = null;
-                sellZone.style.display = 'none';
-                sellZone.classList.remove('active');
-                return;
-            }
+        // Sell: dropped (intentionally, > 30px) on the SELL zone or on the shop bar
+        if (dragDist > 30 && isOverSellTarget(mP.rawX, mP.rawY)) {
+            const toSell = draggedChamp;
+            toSell.targetX = originalX;
+            toSell.targetY = originalY;
+            endDragUi();
+            sellChampion(toSell);
+            hoveredChamp = null;
+            showDisplayInfo(null);
+            return;
+        }
+
+        // Released outside the board canvas: snap back
+        const rect = canvas.getBoundingClientRect();
+        if (mP.rawX < rect.left || mP.rawX > rect.right || mP.rawY < rect.top || mP.rawY > rect.bottom) {
+            cancelDrag();
+            return;
         }
 
         let gridX, gridY;
@@ -242,29 +295,35 @@ function handlePointerUp(e) {
         }
 
         const occupied = STATE.champions.find(c =>
-            c !== draggedChamp && c.targetX === gridX && c.targetY === gridY
+            c !== draggedChamp && isOwnUnit(c) && c.targetX === gridX && c.targetY === gridY
         );
 
-        if (occupied) {
+        if (gridY < 6 && originalY === 6) {
+            // FIX: swapping a bench unit with a board unit keeps the board count the
+            // same, so the displaced unit must not count toward the limit
+            const currentOnBoard = STATE.champions.filter(c =>
+                isOwnUnit(c) && c.targetY < 6 && c !== draggedChamp && c !== occupied
+            ).length;
+            if (currentOnBoard >= STATE.playerLevel) {
+                showNotification("Board limit reached! Level up to deploy more.", "error");
+                gridX = originalX;
+                gridY = originalY;
+            }
+        }
+
+        if (occupied && !(gridX === originalX && gridY === originalY)) {
             occupied.targetX = originalX;
             occupied.targetY = originalY;
             occupied.originalX = originalX;
             occupied.originalY = originalY;
         }
 
-        if (gridY < 6 && originalY === 6) {
-            const currentOnBoard = STATE.champions.filter(c => c.targetY < 6 && c !== draggedChamp).length;
-            if (currentOnBoard >= STATE.playerLevel) {
-                showNotification("Board limit reached! Level up to deploy more.");
-                gridX = originalX;
-                gridY = originalY;
-            }
-        }
-
         draggedChamp.targetX = gridX;
         draggedChamp.targetY = gridY;
         draggedChamp.originalX = gridX;
         draggedChamp.originalY = gridY;
+        draggedChamp.popT = 16;
+        if (occupied) occupied.popT = 12;
 
         // Tap inspection on mobile if barely moved (< 20px)
         if (isTouchDevice && dragDist < 20) {
@@ -280,18 +339,19 @@ function handlePointerUp(e) {
             }
         }
 
-        isDragging = false;
-        draggedChamp = null;
+        endDragUi();
         updateUnitCount();
-        
-        if (sellZone) {
-            sellZone.style.display = 'none';
-            sellZone.classList.remove('active');
-        }
     }
 }
-canvas.addEventListener('mouseup', handlePointerUp);
-canvas.addEventListener('touchend', handlePointerUp);
+// Listen on window so a drop outside the canvas (e.g. on the shop bar) still ends the drag
+window.addEventListener('mouseup', handlePointerUp);
+window.addEventListener('touchend', handlePointerUp);
+window.addEventListener('mousemove', (e) => {
+    if (isDragging && e.target !== canvas) handlePointerMove(e);
+});
+window.addEventListener('touchmove', (e) => {
+    if (isDragging && e.target !== canvas) handlePointerMove(e);
+}, { passive: false });
 
 // ==========================================
 // MOBILE UI CONTROLS & MODALS (TFT Mobile Style)
@@ -447,7 +507,7 @@ setupMobileUi();
 // 4. RIGHT CLICK (Sell champion on desktop only)
 canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    if (STATE.isCombatPhase) return;
+    if (!canEditBoard()) return;
 
     // Mobile long-press triggers contextmenu — NEVER sell on touch devices!
     const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
@@ -456,11 +516,12 @@ canvas.addEventListener('contextmenu', (e) => {
     const mP = getMousePos(e);
     const clickedChamp = STATE.champions.find(champ => {
         const size = getCanvasCoords(champ.targetX, champ.targetY);
-        return mP.x >= champ.pixelX && mP.x <= champ.pixelX + size.w &&
+        return isOwnUnit(champ) &&
+            mP.x >= champ.pixelX && mP.x <= champ.pixelX + size.w &&
             mP.y >= champ.pixelY && mP.y <= champ.pixelY + size.h;
     });
 
-    if (clickedChamp && clickedChamp.team === (STATE.myTeam || 'Team1')) {
+    if (clickedChamp) {
         sellChampion(clickedChamp);
         // Reset info panel after selling
         hoveredChamp = null;
@@ -482,12 +543,40 @@ canvas.addEventListener('mouseleave', () => {
 });
 
 // ==========================================
+// KEYBOARD SHORTCUTS (TFT style): D = reroll, F = level up, E = sell hovered unit
+// ==========================================
+window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (!bottomBar || bottomBar.style.display === 'none') return;
+
+    const key = e.key.toLowerCase();
+    if (key === 'd') {
+        rollShop();
+    } else if (key === 'f') {
+        buyXp();
+    } else if (key === 'e') {
+        const target = (isDragging && draggedChamp) ? draggedChamp : hoveredChamp;
+        if (target && isOwnUnit(target)) {
+            if (isDragging) cancelDrag();
+            sellChampion(target);
+            hoveredChamp = null;
+            STATE.inspectedChampId = null;
+            showDisplayInfo(null);
+        }
+    }
+});
+
+// ==========================================
 // RENDER LOOP (GAME LOOP)
 // ==========================================
 function animationLoop() {
-    updatePhysics();
+    // Hit-stop: freeze the simulation for a few frames on big impacts (keep rendering)
+    if (STATE.hitStop > 0) STATE.hitStop--;
+    else updatePhysics();
     renderBoard(ctx, canvas);
-    
+
     // Keep info panel updated in real-time continuously
     if (STATE.inspectedChampId) {
         const liveChamp = STATE.champions.find(c => c.id === STATE.inspectedChampId);
@@ -495,7 +584,7 @@ function animationLoop() {
             showDisplayInfo('champ', liveChamp);
         }
     }
-    
+
     requestAnimationFrame(animationLoop);
 }
 

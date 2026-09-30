@@ -5,6 +5,10 @@ import { startPrepTimer, stopPrepTimer } from './network.js';
 import { showNotification } from './notifications.js';
 import { updateDamageStats, freezeDamageStatsOnCombatEnd } from './stats.js';
 import { playSfx, playStandSkillSfx, playStandAttackSfx } from './audio.js';
+import {
+    updateFx, triggerHitStop, spawnCallout, maybeRushCry, spawnShatter,
+    startTimeStopFlash, showBigBanner
+} from './fx.js';
 
 export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
     if (!STATE.floatingTexts) STATE.floatingTexts = [];
@@ -111,9 +115,11 @@ export function updatePhysics() {
             proj.lifeTime--;
             if (proj.lifeTime === 5) {
                 const target = STATE.champions.find(c => c.id === proj.targetId);
-                const isCrit = proj.isCrit || (proj.damage && proj.damage >= 12000);
+                const isCrit = !!proj.isCrit;
                 if (target) {
-                    target.shakeTimer = 8;
+                    target.shakeTimer = 3;
+                    target.knockT = 8;
+                    target.knockAngle = proj.angle || 0;
                     target.hitFlashTimer = 3;
                     const dmg = proj.damage || 0;
                     if (dmg > 0) {
@@ -162,9 +168,11 @@ export function updatePhysics() {
 
             if (dist < proj.speed) {
                 const target = STATE.champions.find(c => c.id === proj.targetId);
-                const isCrit = proj.isCrit || (proj.damage && proj.damage >= 12000);
+                const isCrit = !!proj.isCrit;
                 if (target) {
-                    target.shakeTimer = 8;
+                    target.shakeTimer = 3;
+                    target.knockT = 8;
+                    target.knockAngle = proj.angle || 0;
                     target.hitFlashTimer = 3;
                     const dmg = proj.damage || 0;
                     if (dmg > 0) {
@@ -248,6 +256,8 @@ export function updatePhysics() {
         t.life--;
         if (t.life <= 0) STATE.floatingTexts.splice(i, 1);
     }
+
+    updateFx();
 }
 
 export function syncTickData(data) {
@@ -272,6 +282,9 @@ export function syncTickData(data) {
             // Death particle burst & soul wisp
             if (localChamp.is_alive && !serverChamp.is_alive) {
                 playSfx('death');
+                spawnShatter(localChamp);
+                localChamp.deathT = 30;
+                triggerHitStop(3);
                 STATE.screenShake = Math.max(STATE.screenShake || 0, 6);
                 if (!STATE.particles) STATE.particles = [];
                 const tarSize = getCanvasCoords(localChamp.targetX, localChamp.targetY);
@@ -431,18 +444,37 @@ export function syncTickData(data) {
 
             // Cinematic visual triggers & floating text for skills
             playStandSkillSfx(caster ? caster.name : (event.caster_name || ''), event.skill_type);
+            caster.castT = 18;
+            spawnCallout(caster);
+            if (event.skill_type === 'time_stop') {
+                startTimeStopFlash();
+                triggerHitStop(8);
+            } else if (event.skill_type === 'return_to_zero') {
+                triggerHitStop(8);
+            } else if (event.skill_type === 'execute' && event.executed !== false) {
+                triggerHitStop(6);
+            } else if (['damage', 'blink_strike', 'pull', 'swap'].includes(event.skill_type)) {
+                triggerHitStop(3);
+            }
 
+            const dealt = event.damage !== undefined ? Math.round(event.damage) : (event.power || 0);
             if (event.skill_type === 'damage') {
                 if (target) target.shakeTimer = 30;
                 STATE.screenShake = Math.max(STATE.screenShake || 0, 7);
-                if (event.power) {
-                    spawnFloatingText(tarCenterX, tarCenterY - 20, `💥 -${event.power.toLocaleString()}`, 'skill', { color: '#ffa502', scale: 1.4 });
+                if (dealt > 0) {
+                    spawnFloatingText(tarCenterX, tarCenterY - 20, `💥 -${dealt.toLocaleString()}`, 'skill', { color: '#ffa502', scale: 1.4 });
                 }
             } else if (event.skill_type === 'execute') {
                 if (target) target.shakeTimer = 40;
-                STATE.screenShake = Math.max(STATE.screenShake || 0, 12);
-                STATE.screenFlash = { color: 'rgba(231, 76, 60, 0.45)', alpha: 1.0, decay: 0.04 };
-                spawnFloatingText(tarCenterX, tarCenterY - 25, '☠️ EXECUTED!', 'status', { color: '#ff4757', scale: 1.5 });
+                if (event.executed !== false) {
+                    STATE.screenShake = Math.max(STATE.screenShake || 0, 12);
+                    STATE.screenFlash = { color: 'rgba(231, 76, 60, 0.45)', alpha: 1.0, decay: 0.04 };
+                    spawnFloatingText(tarCenterX, tarCenterY - 25, '☠️ EXECUTED!', 'status', { color: '#ff4757', scale: 1.5 });
+                } else {
+                    // FIX: used to say EXECUTED even when the target was above the threshold
+                    STATE.screenShake = Math.max(STATE.screenShake || 0, 7);
+                    if (dealt > 0) spawnFloatingText(tarCenterX, tarCenterY - 20, `🗡️ -${dealt.toLocaleString()}`, 'skill', { color: '#ff6b81', scale: 1.4 });
+                }
             } else if (event.skill_type === 'time_stop') {
                 STATE.screenShake = Math.max(STATE.screenShake || 0, 14);
                 STATE.screenFlash = { color: 'rgba(255, 255, 255, 0.5)', alpha: 1.0, decay: 0.035 };
@@ -461,6 +493,9 @@ export function syncTickData(data) {
                 }
             } else if (event.skill_type === 'buff_atk') {
                 spawnFloatingText(tarCenterX, tarCenterY - 25, `⚔️ +${event.power ? event.power.toLocaleString() : 'ATK'}!`, 'status', { color: '#f39c12', scale: 1.4 });
+            } else if (event.skill_type === 'swap') {
+                if (target) target.shakeTimer = 25;
+                if (dealt > 0) spawnFloatingText(tarCenterX, tarCenterY - 20, `🔄 -${dealt.toLocaleString()}`, 'skill', { color: '#00d2d3', scale: 1.35 });
             } else if (event.skill_type === 'speed_buff') {
                 spawnFloatingText(tarCenterX, tarCenterY - 25, `⚡ +${event.power || 'SPD'}%!`, 'status', { color: '#00d2d3', scale: 1.4 });
             } else if (event.skill_type === 'dot') {
@@ -484,8 +519,8 @@ export function syncTickData(data) {
                 }
                 STATE.screenShake = Math.max(STATE.screenShake || 0, 8);
                 spawnFloatingText(tarCenterX, tarCenterY - 25, '🌀 PULLED!', 'status', { color: '#00d2d3', scale: 1.4 });
-                if (event.power) {
-                    spawnFloatingText(tarCenterX, tarCenterY - 50, `💥 -${event.power.toLocaleString()}`, 'skill', { color: '#ff4757', scale: 1.3 });
+                if (dealt > 0) {
+                    spawnFloatingText(tarCenterX, tarCenterY - 50, `💥 -${dealt.toLocaleString()}`, 'skill', { color: '#ff4757', scale: 1.3 });
                 }
             } else if (event.skill_type === 'stat_steal') {
                 if (target) target.shakeTimer = 25;
@@ -519,7 +554,7 @@ export function syncTickData(data) {
                 }
             } else if (event.skill_type === 'blink_strike') {
                 STATE.screenShake = Math.max(STATE.screenShake || 0, 6);
-                const dmgStr = event.power ? `⚡ -${event.power.toLocaleString()}` : '⚡ BLINK STRIKE';
+                const dmgStr = dealt > 0 ? `⚡ -${dealt.toLocaleString()}` : '⚡ BLINK STRIKE';
                 spawnFloatingText(tarCenterX, tarCenterY - 20, dmgStr, 'crit');
             }
         }
@@ -537,8 +572,16 @@ export function syncTickData(data) {
 
             const isRanged = attacker.attack_range > 1.5;
             const angle = Math.atan2(tarCenterY - attCenterY, tarCenterX - attCenterX);
+            if (isRanged) {
+                attacker.knockT = 5;              // small recoil away from the target
+                attacker.knockAngle = angle + Math.PI;
+            } else {
+                attacker.lungeT = 10;             // lunge into the target
+                attacker.lungeAngle = angle;
+            }
+            maybeRushCry(attacker);
             const dmg = event.damage || 0;
-            const isCrit = event.is_crit || dmg >= 12000 || (attacker.raw_attack && dmg >= attacker.raw_attack * 1.6);
+            const isCrit = !!event.is_crit;
 
             STATE.activeProjectiles.push({
                 x: attCenterX,
@@ -681,7 +724,7 @@ export function cancelRoundReview() {
     STATE.roundWinner = null;
 }
 
-function showRoundReviewBanner(title, subtitle, color, secondsLeft) {
+function showRoundReviewBanner(title, subtitle, color, secondsLeft, toBeContinued = false) {
     if (roundReviewHideTimeout) {
         clearTimeout(roundReviewHideTimeout);
         roundReviewHideTimeout = null;
@@ -707,8 +750,10 @@ function showRoundReviewBanner(title, subtitle, color, secondsLeft) {
             <div id="roundReviewTimerBadge" style="display: inline-block; background: rgba(255,255,255,0.12); color: #fff; font-size: 13px; font-weight: bold; padding: 5px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.25);">
                 ⏳ Reviewing battlefield... Next in <span id="roundReviewCountdownNum" style="color: ${color}; font-size: 16px; font-weight: 900;">${secondsLeft}s</span>
             </div>
+            ${toBeContinued ? '<div><span class="tbc-arrow">To Be Continued</span></div>' : ''}
         </div>
     `;
+    banner.firstElementChild.classList.add('review-card-anim');
     banner.style.display = 'block';
     banner.style.opacity = '1';
     banner.style.transform = 'translateX(-50%) scale(1)';
@@ -763,6 +808,7 @@ export function handleCombatEnd(serverResult) {
     STATE.isCombatPhase = false;
     STATE.isRoundReview = true;
     STATE.roundWinner = winner;
+    const hasServerScore = typeof serverResult === 'object' && serverResult.your_lp !== undefined;
 
     if (STATE.isBotVsBot) {
         if (typeof serverResult === 'object' && serverResult.p1_lp !== undefined) {
@@ -788,7 +834,6 @@ export function handleCombatEnd(serverResult) {
         } else if (winner === 'Team2') {
             title = `🏆 ${bot2.toUpperCase()} WINS ROUND!`;
             subtitle = `${bot2} won this round (${STATE.playerLP} - ${STATE.botLP})`;
-            color = "#2ecc71";
             playSfx('round_win');
             color = "#e74c3c";
             showNotification(`🏆 ${bot2} wins this round!`, "success");
@@ -827,13 +872,17 @@ export function handleCombatEnd(serverResult) {
     if (res === 'draw') {
         showNotification("TIME UP! IT'S A DRAW! No points awarded.", "info");
     } else if (res === 'win') {
-        STATE.playerLP += 1;
+        if (!hasServerScore) STATE.playerLP += 1;
         playSfx('round_win');
         showNotification("Victory! You won this round!", "success");
     } else if (res === 'loss') {
-        STATE.botLP += 1;
+        if (!hasServerScore) STATE.botLP += 1;
         playSfx('round_lose');
         showNotification("Defeat! Opponent won this round!", "error");
+    }
+    if (hasServerScore) {
+        STATE.playerLP = serverResult.your_lp;
+        STATE.botLP = serverResult.opponent_lp;
     }
     updateLpUI();
 
@@ -851,7 +900,7 @@ export function handleCombatEnd(serverResult) {
         color = "#e74c3c";
     }
 
-    showRoundReviewBanner(title, subtitle, color, 5);
+    showRoundReviewBanner(title, subtitle, color, 5, res === 'loss');
 
     let secondsLeft = 5;
     roundReviewInterval = setInterval(() => {
@@ -912,8 +961,9 @@ function finishRoundReview(serverResult) {
         overlay.innerHTML = `
             <div style="background: rgba(20, 24, 33, 0.95); border: 2px solid ${isWinner ? '#f1c40f' : '#e74c3c'}; border-radius: 16px; padding: 40px 50px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.8); max-width: 90%;">
                 <h1 style="font-size: 52px; margin: 0 0 15px 0; font-weight: 900; text-shadow: 0 0 25px ${isWinner ? '#f1c40f' : '#e74c3c'};">${resultMsg}</h1>
+                ${isWinner ? '' : '<div style="margin: -4px 0 22px 0;"><span class="tbc-arrow tbc-big">To Be Continued</span></div>'}
                 <p style="font-size: 24px; color: #ecf0f1; margin: 0 0 35px 0;">Final Score: <span style="color:#2ecc71; font-weight:800;">${STATE.playerLP}</span> - <span style="color:#e74c3c; font-weight:800;">${STATE.botLP}</span></p>
-                
+
                 <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
                     <button id="returnLobbyBtn" style="padding: 14px 32px; font-size: 18px; font-weight: bold; cursor: pointer; background: linear-gradient(135deg, #2c3e50, #34495e); color: #fff; border: 1px solid #7f8c8d; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);">
                         🏠 VỀ SẢNH CHÍNH
@@ -958,7 +1008,7 @@ function finishRoundReview(serverResult) {
         const rawIncome = STATE.currentRound * 3 + 5;
         const baseIncome = Math.min(rawIncome, 35);
         updateGold(baseIncome);
-        showNotification(`Round ${STATE.currentRound} Start: +${baseIncome} Gold`);
+        showBigBanner(`ROUND ${STATE.currentRound}`, `+${baseIncome} 🪙  ·  Shop refreshed`, 'round');
 
         if (findBtn) findBtn.style.display = 'none';
         if (readyBtn) {

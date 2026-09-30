@@ -11,6 +11,7 @@ Strictly balanced according to the player's economy and shop roll rates:
 """
 
 import random
+import uuid
 
 # Predefined Archetypes matching the lore and active traits
 BOT_ARCHETYPES = {
@@ -82,6 +83,9 @@ class SmartBot:
         self.gold = 10
         self.roster = {} # champ_name -> list of stars, e.g. {'Silver Chariot': [1, 2]}
         self.prev_player_champs = []
+        # FIX: per-bot ID prefix — in Bot vs Bot both bots used "bot_<name>_<idx>",
+        # so the same champion on both sides collided on the client
+        self.id_prefix = f"bot{uuid.uuid4().hex[:6]}_"
 
     def _roll_cost_by_level(self):
         """
@@ -193,9 +197,11 @@ class SmartBot:
                     score += 18 # Completes 3-star!
 
                 # If board has empty slots, buy filler unit
+                # FIX: filler used to score 2 while the buy threshold is 3, so a bot
+                # with no on-archetype rolls fielded an empty board and auto-lost
                 total_roster_units = sum(len(v) for v in self.roster.values())
-                if total_roster_units < self.level and score == 0:
-                    score += 2
+                if total_roster_units < self.level and score < 3:
+                    score = 3
 
                 # Counter-play: buy assassin if player has backline carry
                 if self._player_has_backline_carry(champion_data):
@@ -268,13 +274,13 @@ class SmartBot:
             for x in xs:
                 if (x, y) not in occupied:
                     occupied.add((x, y))
-                    positioned.append({'id': f"bot_{name}_{unit_idx}", 'name': name, 'star': st, 'x': x, 'y': y})
+                    positioned.append({'id': f"{self.id_prefix}{unit_idx}", 'name': name, 'star': st, 'x': x, 'y': y})
                     unit_idx += 1
                     return True
             for x in range(5):
                 if (x, y) not in occupied:
                     occupied.add((x, y))
-                    positioned.append({'id': f"bot_{name}_{unit_idx}", 'name': name, 'star': st, 'x': x, 'y': y})
+                    positioned.append({'id': f"{self.id_prefix}{unit_idx}", 'name': name, 'star': st, 'x': x, 'y': y})
                     unit_idx += 1
                     return True
             return False

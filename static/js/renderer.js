@@ -1,5 +1,8 @@
 // static/js/renderer.js
-import { CONFIG, STATE, IMAGE_CACHE, getCanvasCoords } from './globals.js';
+import { CONFIG, STATE, IMAGE_CACHE, CHAMPION_POOL, getCanvasCoords } from './globals.js';
+import { champImage, isImageReady, maybeSpawnMenacing, applyTimeStopFilter, drawWorldFx, drawOverlayFx } from './fx.js';
+
+const COST_COLORS = { 1: '#aab4be', 2: '#2ecc71', 3: '#3aa0ff', 4: '#c56cf0', 5: '#ffb400' };
 
 export function renderBoard(ctx, canvas) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -41,204 +44,27 @@ export function renderBoard(ctx, canvas) {
         ctx.strokeRect(x, CONFIG.BENCH_START_Y, CONFIG.BENCH_CELL_WIDTH, CONFIG.BENCH_CELL_HEIGHT);
     }
 
-    // 2. VẼ LỚP THẺ BÀI (DƯỚI CÙNG)
-    STATE.champions.forEach(champ => {
-        const currentSize = getCanvasCoords(champ.targetX, champ.targetY);
-        if (!currentSize) return;
+    // DRAG TARGET HIGHLIGHT (prep phase)
+    if (STATE.dragCell) drawDragCell(ctx, canvas, timeNow);
 
-        let shakeX = 0; let shakeY = 0;
-        if (champ.shakeTimer > 0) {
-            const intensity = champ.shakeTimer * 0.8;
-            shakeX = (Math.random() - 0.5) * 2 * intensity;
-            shakeY = (Math.random() - 0.5) * 2 * intensity;
+    // 2. UNIT CARDS
+    STATE.champions.forEach(champ => drawUnit(ctx, champ, timeNow));
+
+    // ZA WARUDO: invert at the moment time stops, then desaturate the frozen world.
+    // Units that are NOT frozen (the time-stopper) are redrawn in full color on top.
+    const worldStopped = STATE.isCombatPhase &&
+        STATE.champions.some(c => c.is_alive && c.buffs && c.buffs.includes('time_stopped'));
+    if (worldStopped || STATE.timeStopFlash > 0) {
+        applyTimeStopFilter(ctx, canvas, worldStopped);
+        if (worldStopped) {
+            STATE.champions.forEach(c => {
+                if (c.is_alive && !(c.buffs || []).includes('time_stopped')) drawUnit(ctx, c, timeNow);
+            });
         }
+    }
 
-        const pX = (champ.pixelX !== undefined ? champ.pixelX : currentSize.x) + shakeX;
-        const pY = (champ.pixelY !== undefined ? champ.pixelY : currentSize.y) + shakeY;
-        const centerX = pX + currentSize.w / 2;
-        const centerY = pY + currentSize.h / 2;
-
-        if (!champ.is_alive && champ.hp <= 0) {
-            // Draw fallen unit ghosted with skull so players can see who fell
-            ctx.save();
-            ctx.globalAlpha = 0.28;
-            ctx.filter = 'grayscale(100%)';
-            const baseName = (champ.name || '').replace(/\s*\(CLONE\)$/i, '').trim();
-            const img = IMAGE_CACHE[champ.name] || IMAGE_CACHE[baseName];
-            if (img) {
-                ctx.drawImage(img, pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
-            } else {
-                ctx.fillStyle = '#2c3e50';
-                ctx.fillRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
-            }
-            ctx.filter = 'none';
-            ctx.font = '24px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('💀', centerX, centerY);
-            ctx.restore();
-            return;
-        }
-
-        ctx.globalAlpha = (champ.buffs && champ.buffs.includes('submerge')) ? 0.3 : 1.0;
-
-        // VẼ AURA DƯỚI CHÂN TƯỚNG (THAY CHO EMOJI)
-        ctx.save();
-        if (champ.buffs && champ.buffs.includes('buff_atk')) {
-            const angle = timeNow * 3;
-            ctx.translate(centerX, centerY); ctx.rotate(angle);
-            ctx.beginPath(); ctx.arc(0, 0, currentSize.w/2 + 10, 0, Math.PI * 2);
-            ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 4; ctx.setLineDash([15, 10]);
-            ctx.stroke(); ctx.restore(); ctx.save();
-        }
-        if (champ.buffs && champ.buffs.includes('speed_buff')) {
-            const angle = -timeNow * 5;
-            ctx.translate(centerX, centerY); ctx.rotate(angle);
-            ctx.beginPath(); ctx.arc(0, 0, currentSize.w/2 + 5, 0, Math.PI * 2);
-            ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 2; ctx.setLineDash([20, 20]);
-            ctx.stroke(); ctx.restore(); ctx.save();
-        }
-        ctx.restore();
-
-        // XỬ LÝ HÓA BIẾN (POLYMORPH) - BIẾN THÀNH ỐC SÊN
-        if (champ.buffs && champ.buffs.includes('polymorph')) {
-            ctx.fillStyle = '#2c3e50'; ctx.fillRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
-            ctx.font = '50px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText('🐌', pX + currentSize.w / 2, pY + currentSize.h / 2);
-        } else {
-            // Vẽ ảnh bình thường
-            const baseName = (champ.name || '').replace(/\s*\(CLONE\)$/i, '').trim();
-            const img = IMAGE_CACHE[champ.name] || IMAGE_CACHE[baseName];
-            if (img) {
-                ctx.drawImage(img, pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
-            } else {
-                ctx.fillStyle = '#2c3e50'; ctx.fillRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
-            }
-        }
-
-        // HIT REACTION: Flash white briefly when taking damage
-        if (champ.hitFlashTimer && champ.hitFlashTimer > 0) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
-            ctx.fillRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
-        }
-
-        // Xác định team của người chơi hiện tại một cách cố định và chuẩn xác tuyệt đối từ STATE.myTeam
-        const myTeam = STATE.myTeam || 'Team1';
-        // - Khi chuẩn bị (chưa vào combat): Mọi tướng trên sân và hàng chờ của mình đều là đồng minh (Xanh).
-        // - Khi đang combat / review: Tướng nào cùng phe myTeam là đồng minh (Xanh), ngược lại là đối thủ (Đỏ).
-        const isAlly = (!STATE.isCombatPhase && !STATE.isRoundReview && (champ.originalX !== undefined || champ.targetY >= 6))
-            ? true
-            : (champ.team === myTeam);
-
-        // VICTORY CROWN FOR SURVIVING WINNERS DURING ROUND REVIEW
-        if (STATE.isRoundReview && STATE.roundWinner && champ.is_alive && champ.hp > 0) {
-            const isWinnerUnit = champ.team === STATE.roundWinner;
-            if (isWinnerUnit) {
-                ctx.save();
-                ctx.font = '22px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-                ctx.fillText('👑', centerX, pY - 4);
-                ctx.restore();
-            }
-        }
-
-        // VẼ HÀO QUANG CHO TƯỚNG 2⭐ VÀ 3⭐ (GODLY STAR AURA)
-        const starCount = champ.star || 1;
-        if (starCount >= 2) {
-            ctx.save();
-            if (starCount === 2) {
-                // 2⭐: Hào quang Lục Bảo nhẹ nhàng pulsing
-                const glowAlpha = 0.5 + Math.sin(timeNow * 4 + pX * 0.1) * 0.3;
-                ctx.shadowBlur = 14;
-                ctx.shadowColor = '#2ecc71';
-                ctx.strokeStyle = `rgba(46, 204, 113, ${glowAlpha})`;
-                ctx.lineWidth = 3.5;
-                ctx.strokeRect(pX + 1, pY + 1, currentSize.w - 2, currentSize.h - 2);
-            } else if (starCount >= 3) {
-                // 3⭐: HÀO QUANG THẦN THOẠI (GOLDEN FLAME & ORBITING ORBS)
-                const pulse = 0.65 + Math.sin(timeNow * 6 + pY * 0.1) * 0.35;
-                ctx.shadowBlur = 22;
-                ctx.shadowColor = '#ffd700';
-                ctx.strokeStyle = `rgba(255, 215, 0, ${pulse})`;
-                ctx.lineWidth = 4.5;
-                ctx.strokeRect(pX, pY, currentSize.w, currentSize.h);
-
-                // 4 Hạt ánh sáng thần thoại xoay quanh tướng 3⭐
-                for (let orb = 0; orb < 4; orb++) {
-                    const orbAngle = (timeNow * 3.5) + (orb * Math.PI / 2);
-                    const rx = (currentSize.w / 2 + 8) * Math.cos(orbAngle);
-                    const ry = (currentSize.h / 2 + 8) * Math.sin(orbAngle);
-                    ctx.beginPath();
-                    ctx.arc(centerX + rx, centerY + ry, 3.5, 0, Math.PI * 2);
-                    ctx.fillStyle = orb % 2 === 0 ? '#ffffff' : '#ffd700';
-                    ctx.shadowBlur = 12;
-                    ctx.shadowColor = '#ffd700';
-                    ctx.fill();
-                }
-            }
-            ctx.restore();
-        }
-
-        ctx.strokeStyle = isAlly ? '#4facfe' : '#ff0844';
-        ctx.lineWidth = champ.targetY >= 6 ? 2 : 3.5;
-        ctx.strokeRect(pX + 2, pY + 2, currentSize.w - 4, currentSize.h - 4);
-
-        // Thanh Máu / Mana (Dày hơn và có viền phân biệt đội)
-        const barHeight = 5;
-        const barSpacing = 1;
-        const totalBarHeight = barHeight * 2 + barSpacing;
-        const barY = pY + currentSize.h - totalBarHeight - 4;
-        const barW = currentSize.w - 8;
-        
-        // Vẽ viền (Border)
-        ctx.strokeStyle = isAlly ? '#4facfe' : '#ff0844';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(pX + 4 - 1, barY - 1, barW + 2, totalBarHeight + 2);
-
-        // Thanh Máu Nền Đen
-        ctx.fillStyle = '#111111';
-        ctx.fillRect(pX + 4, barY, barW, barHeight);
-
-        // Ghost HP (Thanh máu bóng mờ tụt dần phía sau)
-        const ghostHpP = Math.max(0, Math.min(1, (champ.ghostHp || champ.hp) / champ.max_hp));
-        ctx.fillStyle = '#ffecb3';
-        ctx.fillRect(pX + 4, barY, barW * ghostHpP, barHeight);
-
-        // Thanh Máu Thực
-        const hpP = Math.max(0, Math.min(1, champ.hp / champ.max_hp));
-        ctx.fillStyle = isAlly ? '#2ecc71' : '#e74c3c';
-        ctx.fillRect(pX + 4, barY, barW * hpP, barHeight);
-
-        // Giáp ảo (Shield) - Vẽ đè lên thanh máu
-        if (champ.shield && champ.shield > 0) {
-            const shP = Math.min(1, champ.shield / champ.max_hp);
-            ctx.fillStyle = 'rgba(236, 240, 241, 0.9)'; // Màu trắng đục
-            ctx.fillRect(pX + 4, barY, barW * shP, barHeight);
-        }
-
-        // Thanh Mana & Sẵn Sàng Chiêu Cuối (NEON CYAN SURGE)
-        const mnP = Math.max(0, Math.min(1, (champ.mana || 0) / champ.max_mana));
-        const isManaLocked = (champ.buffs && champ.buffs.includes('mana_lock'));
-        const isUltimateReady = !isManaLocked && (champ.mana >= champ.max_mana);
-
-        ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(pX + 4, barY + barHeight + barSpacing, barW, barHeight);
-
-        if (isUltimateReady) {
-            // PULSING NEON CYAN-WHITE (ULTIMATE READY!)
-            const readyGlow = 0.75 + Math.sin(timeNow * 10) * 0.25;
-            ctx.save();
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#00ffff';
-            ctx.fillStyle = `rgba(0, 255, 255, ${readyGlow})`;
-            ctx.fillRect(pX + 4, barY + barHeight + barSpacing, barW, barHeight);
-            ctx.restore();
-        } else {
-            ctx.fillStyle = isManaLocked ? '#7f8c8d' : '#00aaff';
-            ctx.fillRect(pX + 4, barY + barHeight + barSpacing, barW * mnP, barHeight);
-        }
-    });
+    // Menacing ゴゴゴ and death shards live in world space (affected by screen shake)
+    drawWorldFx(ctx, timeNow);
 
     // 2.5 LỚP HIỆU ỨNG BUFF/DEBUFF (ĐÈ LÊN MẶT LÁ BÀI VÀ CÁC HIỆU ỨNG ĐẶC BIỆT)
     STATE.champions.forEach(champ => {
@@ -474,7 +300,7 @@ export function renderBoard(ctx, canvas) {
             ctx.fillText('🔒', centerX, pY - 8);
             ctx.restore();
         }
-        
+
         ctx.restore();
     });
 
@@ -626,7 +452,7 @@ export function renderBoard(ctx, canvas) {
                 // 1. Expanding Shockwave Ring (Đậm nét với viền bóng tối tương phản)
                 const ringRadius = (isCrit ? 10 : 6) + progress * (isCrit ? 38 : 24);
                 const ringAlpha = (1 - progress) * (isCrit ? 0.95 : 0.75);
-                
+
                 // Dark contrast backing ring
                 ctx.beginPath();
                 ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
@@ -822,7 +648,7 @@ export function renderBoard(ctx, canvas) {
                     const oAngle = (orb * Math.PI / 2);
                     const ox = Math.cos(oAngle) * pixelRadius * 0.72;
                     const oy = Math.sin(oAngle) * pixelRadius * 0.72;
-                    
+
                     // Acid body
                     ctx.beginPath();
                     ctx.arc(ox, oy, 3.2, 0, Math.PI * 2);
@@ -892,7 +718,7 @@ export function renderBoard(ctx, canvas) {
                     const ang = (pt * Math.PI * 2) / petalCount;
                     const px = Math.cos(ang) * mR;
                     const py = Math.sin(ang) * mR;
-                    
+
                     ctx.beginPath();
                     ctx.arc(px, py, 2.8, 0, Math.PI * 2);
                     ctx.fillStyle = `rgba(46, 204, 113, ${alpha * 0.85})`;
@@ -1168,20 +994,20 @@ export function renderBoard(ctx, canvas) {
                 ctx.globalAlpha = Math.min(1.0, (hit.lifeTime / hit.maxLife) * 2.0);
                 const maxRadius = canvas.width * 1.5;
                 const r = progress * maxRadius;
-                
+
                 ctx.beginPath();
                 ctx.arc(0, 0, r, 0, Math.PI * 2);
-                
+
                 const innerR = Math.max(1, r * 0.8);
                 const outerR = Math.max(2, r);
                 const gradient = ctx.createRadialGradient(0, 0, innerR, 0, 0, outerR);
                 gradient.addColorStop(0, `rgba(255, 215, 0, 0)`);
                 gradient.addColorStop(0.8, `rgba(255, 215, 0, ${1 - progress})`);
                 gradient.addColorStop(1, `rgba(255, 255, 255, ${1 - progress})`);
-                
+
                 ctx.fillStyle = gradient;
                 ctx.fill();
-                
+
                 // Dark outer backing ring for high contrast
                 ctx.beginPath();
                 ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -1199,7 +1025,7 @@ export function renderBoard(ctx, canvas) {
                 // Sóng âm đồng hồ ngưng đọng thời gian với mặt đồng hồ La Mã - Đậm nét, sắc sảo
                 ctx.globalAlpha = 1.0;
                 const r = progress * canvas.width * 0.9;
-                
+
                 // Dark backing
                 ctx.beginPath();
                 ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -1218,7 +1044,7 @@ export function renderBoard(ctx, canvas) {
                     ctx.font = 'bold 24px "Times New Roman", serif';
                     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     const clockR = r * 0.72;
-                    
+
                     // Dark text shadow outline
                     ctx.fillStyle = `rgba(0, 15, 25, ${(1 - progress) * 0.95})`;
                     [-1.5, 1.5].forEach(dx => {
@@ -1372,7 +1198,7 @@ export function renderBoard(ctx, canvas) {
                 ctx.rotate(progress * Math.PI * 2.5);
                 for (let blade = 0; blade < 4; blade++) {
                     ctx.rotate(Math.PI / 2);
-                    
+
                     // Dark contour
                     ctx.beginPath();
                     ctx.moveTo(suctionR, 0);
@@ -1691,7 +1517,7 @@ export function renderBoard(ctx, canvas) {
                 // 3. Phoenix Wing Sweeps (Đôi cánh ánh sáng xòe rộng có viền đậm)
                 const wingSpan = 78 * Math.sin(progress * Math.PI);
                 const wingY = -50 - progress * 70;
-                
+
                 // Dark wing contour
                 ctx.beginPath();
                 ctx.moveTo(0, wingY + 16);
@@ -1805,7 +1631,7 @@ export function renderBoard(ctx, canvas) {
                 const caster = STATE.champions.find(c => c.id === hit.casterId);
                 if (caster) {
                     const cSize = getCanvasCoords(caster.targetX, caster.targetY);
-                    
+
                     // Zero shadowBlur - High-Voltage Golden Lightning Chain (Siêu đậm, giật sét cực mạnh)
                     // Layer 1: Dark Amber Silhouette (Đường bao tương phản đậm đà)
                     ctx.beginPath();
@@ -1858,7 +1684,7 @@ export function renderBoard(ctx, canvas) {
                             const bx = t.pixelX + ts.w / 2;
                             const by = t.pixelY + ts.h / 2;
                             const bSz = (16 + progress * 18) * currentAlpha;
-                            
+
                             // Dark diamond backing
                             ctx.beginPath();
                             ctx.moveTo(bx, by - bSz - 2);
@@ -1944,7 +1770,7 @@ export function renderBoard(ctx, canvas) {
             }
             ctx.restore();
         });
-    }   
+    }
 
     // 5. VẼ CÁC HẠT (PARTICLES) NHỎ LITI (Tia lửa xé gió, mảnh vụn tốc độ cao)
     if (STATE.particles) {
@@ -2007,6 +1833,9 @@ export function renderBoard(ctx, canvas) {
         });
     }
 
+    // 6.5 STAND CALLOUTS ("ZA WARUDO!", "ORA!")
+    drawOverlayFx(ctx, canvas);
+
     // 7. LỚP TRÊN CÙNG (TOP LAYER): VẼ SỐ SAO VỚI ÁNH KIM HÀO QUANG
     STATE.champions.forEach(champ => {
         if (!champ.is_alive && champ.hp <= 0) return;
@@ -2025,7 +1854,7 @@ export function renderBoard(ctx, canvas) {
         const starText = starCount >= 3 ? '⭐⭐⭐' : (starCount === 2 ? '⭐⭐' : '⭐');
         const fontSize = starCount >= 3 ? 18 : (starCount === 2 ? 16 : 15);
         ctx.font = `bold ${fontSize}px Arial`;
-        
+
         // Dark outline for crisp visibility
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 3.5;
@@ -2050,5 +1879,347 @@ export function renderBoard(ctx, canvas) {
         ctx.restore();
         STATE.screenFlash.alpha -= (STATE.screenFlash.decay || 0.05);
         if (STATE.screenFlash.alpha <= 0) STATE.screenFlash = null;
+    }
+}
+
+// ======================================================================
+// UNIT CARD DRAWING
+// ======================================================================
+function champCost(champ) {
+    if (champ._cost === undefined) {
+        const baseName = (champ.name || '').replace(/\s*\(CLONE\)$/i, '').trim();
+        const template = CHAMPION_POOL.find(t => t.name === baseName);
+        if (!template) return 1; // pool not loaded yet — don't cache
+        champ._cost = template.cost || 1;
+    }
+    return champ._cost;
+}
+
+// Stable per-unit phase so idle "breathing" isn't synchronized across the board
+function idPhase(id) {
+    const str = String(id);
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+    return (Math.abs(h) % 628) / 100;
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+}
+
+function drawDragCell(ctx, canvas, timeNow) {
+    const { gx, gy, valid } = STATE.dragCell;
+    const pulse = 0.55 + Math.sin(timeNow * 8) * 0.25;
+    ctx.save();
+    // Shade the enemy half: units can't be dropped there
+    if (gy < 6) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+        ctx.fillRect(0, 0, canvas.width, 3 * CONFIG.BOARD_CELL_HEIGHT);
+    }
+    const cell = getCanvasCoords(gx, gy);
+    const color = valid ? '46, 204, 113' : '231, 76, 60';
+    roundRectPath(ctx, cell.x + 3, cell.y + 3, cell.w - 6, cell.h - 6, 10);
+    ctx.fillStyle = `rgba(${color}, ${0.16 * pulse + 0.08})`;
+    ctx.fill();
+    ctx.setLineDash([10, 6]);
+    ctx.lineDashOffset = -timeNow * 30;
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = `rgba(${color}, ${pulse + 0.2})`;
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawUnit(ctx, champ, timeNow) {
+    const size = getCanvasCoords(champ.targetX, champ.targetY);
+    if (!size) return;
+    const onBench = champ.targetY >= 6;
+
+    // Motion offsets: attack lunge, knockback, hit shake and idle breathing
+    let offX = 0, offY = 0;
+    if (champ.lungeT > 0) {
+        const d = Math.sin((1 - champ.lungeT / 10) * Math.PI) * 16;
+        offX += Math.cos(champ.lungeAngle || 0) * d;
+        offY += Math.sin(champ.lungeAngle || 0) * d;
+    }
+    if (champ.knockT > 0) {
+        const d = (champ.knockT / 8) * 7;
+        offX += Math.cos(champ.knockAngle || 0) * d;
+        offY += Math.sin(champ.knockAngle || 0) * d;
+    }
+    if (champ.shakeTimer > 0) {
+        const k = champ.shakeTimer * 0.45;
+        offX += (Math.random() - 0.5) * 2 * k;
+        offY += (Math.random() - 0.5) * 2 * k;
+    }
+    const isDead = !champ.is_alive && champ.hp <= 0;
+    if (!isDead && !onBench) offY += Math.sin(timeNow * 2.4 + idPhase(champ.id)) * 1.6;
+
+    const pX = (champ.pixelX !== undefined ? champ.pixelX : size.x) + offX;
+    const pY = (champ.pixelY !== undefined ? champ.pixelY : size.y) + offY;
+    const x = pX + 2, y = pY + 2, w = size.w - 4, h = size.h - 4;
+    const centerX = pX + size.w / 2;
+    const centerY = pY + size.h / 2;
+    const radius = onBench ? 6 : 9;
+    const img = champImage(champ);
+
+    if (isDead) {
+        // Fallen unit: ghosted card with a skull, fading in after the shatter burst
+        const fadeIn = champ.deathT > 0 ? 1 - champ.deathT / 30 : 1;
+        if (fadeIn <= 0) return;
+        ctx.save();
+        ctx.globalAlpha = 0.28 * fadeIn;
+        ctx.filter = 'grayscale(100%)';
+        roundRectPath(ctx, x, y, w, h, radius);
+        ctx.clip();
+        if (isImageReady(img)) ctx.drawImage(img, x, y, w, h);
+        else { ctx.fillStyle = '#2c3e50'; ctx.fillRect(x, y, w, h); }
+        ctx.restore();
+        ctx.save();
+        ctx.globalAlpha = 0.7 * fadeIn;
+        ctx.font = '24px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('💀', centerX, centerY);
+        ctx.restore();
+        return;
+    }
+
+    const buffs = champ.buffs || [];
+    const myTeam = STATE.myTeam || 'Team1';
+    // Prep phase: everything you own is an ally. Combat / review: decided by team.
+    const isAlly = (!STATE.isCombatPhase && !STATE.isRoundReview && (champ.originalX !== undefined || onBench))
+        ? true
+        : (champ.team === myTeam);
+    const teamColor = isAlly ? '#4facfe' : '#ff0844';
+    const cost = champCost(champ);
+    const rarity = COST_COLORS[cost] || COST_COLORS[1];
+
+    ctx.save();
+
+    // Deploy / star-up "pop"
+    if (champ.popT > 0) {
+        const s = 1 + Math.sin((1 - champ.popT / 16) * Math.PI) * 0.16;
+        ctx.translate(centerX, centerY);
+        ctx.scale(s, s);
+        ctx.translate(-centerX, -centerY);
+    }
+    ctx.globalAlpha = buffs.includes('submerge') ? 0.3 : 1.0;
+
+    // Team-colored ground shadow
+    if (!onBench) {
+        ctx.save();
+        ctx.globalAlpha *= 0.6;
+        ctx.beginPath();
+        ctx.ellipse(centerX, pY + size.h - 3, w * 0.44, 8, 0, 0, Math.PI * 2);
+        ctx.fillStyle = isAlly ? 'rgba(79, 172, 254, 0.5)' : 'rgba(255, 8, 68, 0.5)';
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // Rotating auras for attack / speed buffs
+    if (buffs.includes('buff_atk')) {
+        ctx.save();
+        ctx.translate(centerX, centerY); ctx.rotate(timeNow * 3);
+        ctx.beginPath(); ctx.arc(0, 0, size.w / 2 + 10, 0, Math.PI * 2);
+        ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 4; ctx.setLineDash([15, 10]);
+        ctx.stroke();
+        ctx.restore();
+    }
+    if (buffs.includes('speed_buff')) {
+        ctx.save();
+        ctx.translate(centerX, centerY); ctx.rotate(-timeNow * 5);
+        ctx.beginPath(); ctx.arc(0, 0, size.w / 2 + 5, 0, Math.PI * 2);
+        ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 2; ctx.setLineDash([20, 20]);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // --- Card art (rounded, with shading) ---
+    ctx.save();
+    roundRectPath(ctx, x, y, w, h, radius);
+    ctx.clip();
+    if (buffs.includes('polymorph')) {
+        ctx.fillStyle = '#2c3e50'; ctx.fillRect(x, y, w, h);
+        ctx.font = '50px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('🐌', centerX, centerY);
+    } else if (isImageReady(img)) {
+        ctx.drawImage(img, x, y, w, h);
+    } else {
+        const g = ctx.createLinearGradient(x, y, x, y + h);
+        g.addColorStop(0, '#2c3e50'); g.addColorStop(1, rarity);
+        ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText((champ.name || '?').slice(0, 10), centerX, centerY);
+    }
+    // Glossy top highlight + dark bottom band so the bars stay readable
+    const gloss = ctx.createLinearGradient(0, y, 0, y + h * 0.35);
+    gloss.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
+    gloss.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = gloss; ctx.fillRect(x, y, w, h * 0.35);
+    const shade = ctx.createLinearGradient(0, y + h - 30, 0, y + h);
+    shade.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    shade.addColorStop(1, 'rgba(0, 0, 0, 0.75)');
+    ctx.fillStyle = shade; ctx.fillRect(x, y + h - 30, w, 30);
+    // Hit flash
+    if (champ.hitFlashTimer > 0) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.fillRect(x, y, w, h);
+    }
+    ctx.restore();
+
+    // --- Frames: rarity (with a traveling shine for 4-5 cost) + team glow ---
+    let frame = rarity;
+    if (cost >= 4) {
+        const t = 0.05 + ((timeNow * 0.5) % 1) * 0.9;
+        const g = ctx.createLinearGradient(x, y, x + w, y + h);
+        g.addColorStop(0, rarity);
+        g.addColorStop(t, '#ffffff');
+        g.addColorStop(1, rarity);
+        frame = g;
+    }
+    roundRectPath(ctx, x, y, w, h, radius);
+    ctx.lineWidth = onBench ? 2 : 3;
+    ctx.strokeStyle = frame;
+    ctx.stroke();
+
+    ctx.save();
+    if (!onBench) { ctx.shadowBlur = 10; ctx.shadowColor = teamColor; }
+    roundRectPath(ctx, x - 2, y - 2, w + 4, h + 4, radius + 2);
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = teamColor;
+    ctx.stroke();
+    ctx.restore();
+
+    // Skill cast burst: expanding golden frame
+    if (champ.castT > 0) {
+        const p = 1 - champ.castT / 18;
+        ctx.save();
+        ctx.globalAlpha = champ.castT / 18;
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = '#ffd32a';
+        ctx.strokeStyle = '#fff6a8';
+        ctx.lineWidth = 4 * (1 - p) + 1;
+        roundRectPath(ctx, x - p * 16, y - p * 16, w + p * 32, h + p * 32, radius + p * 10);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // Victory crown for surviving winners during the round review
+    if (STATE.isRoundReview && STATE.roundWinner && champ.is_alive && champ.hp > 0 && champ.team === STATE.roundWinner) {
+        ctx.save();
+        ctx.font = '22px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('👑', centerX, pY - 4);
+        ctx.restore();
+    }
+
+    // 2⭐ / 3⭐ aura
+    const starCount = champ.star || 1;
+    if (starCount >= 2) {
+        ctx.save();
+        if (starCount === 2) {
+            const glowAlpha = 0.5 + Math.sin(timeNow * 4 + pX * 0.1) * 0.3;
+            ctx.shadowBlur = 14;
+            ctx.shadowColor = '#2ecc71';
+            ctx.strokeStyle = `rgba(46, 204, 113, ${glowAlpha})`;
+            ctx.lineWidth = 3;
+            roundRectPath(ctx, x - 1, y - 1, w + 2, h + 2, radius + 1);
+            ctx.stroke();
+        } else {
+            const pulse = 0.65 + Math.sin(timeNow * 6 + pY * 0.1) * 0.35;
+            ctx.shadowBlur = 22;
+            ctx.shadowColor = '#ffd700';
+            ctx.strokeStyle = `rgba(255, 215, 0, ${pulse})`;
+            ctx.lineWidth = 4;
+            roundRectPath(ctx, x - 2, y - 2, w + 4, h + 4, radius + 2);
+            ctx.stroke();
+            for (let orb = 0; orb < 4; orb++) {
+                const orbAngle = (timeNow * 3.5) + (orb * Math.PI / 2);
+                const rx = (size.w / 2 + 8) * Math.cos(orbAngle);
+                const ry = (size.h / 2 + 8) * Math.sin(orbAngle);
+                ctx.beginPath();
+                ctx.arc(centerX + rx, centerY + ry, 3.5, 0, Math.PI * 2);
+                ctx.fillStyle = orb % 2 === 0 ? '#ffffff' : '#ffd700';
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = '#ffd700';
+                ctx.fill();
+            }
+        }
+        ctx.restore();
+    }
+
+    // --- HP / Mana bars ---
+    const barHeight = 5;
+    const barSpacing = 1;
+    const totalBarHeight = barHeight * 2 + barSpacing;
+    const barX = pX + 5;
+    const barY = pY + size.h - totalBarHeight - 5;
+    const barW = size.w - 10;
+    const maxHp = Math.max(1, champ.max_hp || 1);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillRect(barX - 1.5, barY - 1.5, barW + 3, totalBarHeight + 3);
+
+    ctx.fillStyle = '#111111';
+    ctx.fillRect(barX, barY, barW, barHeight);
+    const ghostHpP = Math.max(0, Math.min(1, (champ.ghostHp || champ.hp) / maxHp));
+    ctx.fillStyle = '#ffecb3';
+    ctx.fillRect(barX, barY, barW * ghostHpP, barHeight);
+    const hpP = Math.max(0, Math.min(1, champ.hp / maxHp));
+    const hpGrad = ctx.createLinearGradient(0, barY, 0, barY + barHeight);
+    if (isAlly) { hpGrad.addColorStop(0, '#7bed9f'); hpGrad.addColorStop(1, '#27ae60'); }
+    else { hpGrad.addColorStop(0, '#ff7675'); hpGrad.addColorStop(1, '#c0392b'); }
+    ctx.fillStyle = hpGrad;
+    ctx.fillRect(barX, barY, barW * hpP, barHeight);
+
+    // One notch per 20k HP so tankiness reads at a glance
+    const tickStep = 20000;
+    if (maxHp > tickStep && maxHp / tickStep <= 30) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        for (let hv = tickStep; hv < maxHp; hv += tickStep) {
+            ctx.fillRect(barX + barW * (hv / maxHp), barY, 1, barHeight);
+        }
+    }
+
+    if (champ.shield && champ.shield > 0) {
+        const shP = Math.min(1, champ.shield / maxHp);
+        ctx.fillStyle = 'rgba(236, 240, 241, 0.9)';
+        ctx.fillRect(barX, barY, barW * shP, barHeight);
+    }
+
+    const maxMana = Math.max(1, champ.max_mana || 1);
+    const mnP = Math.max(0, Math.min(1, (champ.mana || 0) / maxMana));
+    const isManaLocked = buffs.includes('mana_lock');
+    const isUltimateReady = !isManaLocked && (champ.mana >= maxMana);
+    const manaY = barY + barHeight + barSpacing;
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(barX, manaY, barW, barHeight);
+    if (isUltimateReady) {
+        const readyGlow = 0.75 + Math.sin(timeNow * 10) * 0.25;
+        ctx.save();
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00ffff';
+        ctx.fillStyle = `rgba(0, 255, 255, ${readyGlow})`;
+        ctx.fillRect(barX, manaY, barW, barHeight);
+        ctx.restore();
+    } else {
+        ctx.fillStyle = isManaLocked ? '#7f8c8d' : '#00aaff';
+        ctx.fillRect(barX, manaY, barW * mnP, barHeight);
+    }
+
+    ctx.restore();
+
+    // ゴゴゴ: everyone during the pre-fight inspection, and units about to ult in combat
+    if (!onBench && (STATE.isInspecting || (STATE.isCombatPhase && isUltimateReady))) {
+        maybeSpawnMenacing(centerX, pY, size.w, STATE.isInspecting ? 0.02 : 0.04);
     }
 }

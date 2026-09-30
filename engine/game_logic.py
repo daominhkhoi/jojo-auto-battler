@@ -10,6 +10,10 @@ import uuid
 # =====================================================================
 _CHAMPION_COSTS = {}
 
+# Basic-attack critical strikes (the client already draws CRIT! effects for these)
+CRIT_CHANCE = 0.10
+CRIT_MULTIPLIER = 1.5
+
 def register_champion_costs(cost_dict):
     """Called once at app startup with the loaded champion data."""
     _CHAMPION_COSTS.clear()
@@ -132,12 +136,14 @@ class Champion:
         for buff in self.active_buffs:
             if buff['type'] == 'damage_link':
                 linked_target = buff['linked_target']
-                if linked_target and linked_target.is_alive:
-                    linked_target.hp -= actual_damage
-                    if attacker and actual_damage > 0:
-                        attacker.damage_dealt = getattr(attacker, 'damage_dealt', 0) + actual_damage
+                if linked_target and linked_target.is_alive and actual_damage > 0:
+                    linked_dmg = min(actual_damage, linked_target.hp)
+                    linked_target.hp -= linked_dmg
+                    # FIX: credit the linker (self), not the attacker — the attacker would
+                    # otherwise be credited for damaging its own teammate.
+                    self.damage_dealt = getattr(self, 'damage_dealt', 0) + linked_dmg
                     events.append({'type': 'damage_link_proc', 'caster_id': self.id,
-                                   'target_id': linked_target.id, 'damage': actual_damage})
+                                   'target_id': linked_target.id, 'damage': linked_dmg})
                     if linked_target.hp <= 0:
                         revive_buff = next((b for b in linked_target.active_buffs if b['type'] == 'revive'), None)
                         if revive_buff:
@@ -184,7 +190,9 @@ class Champion:
         elif target_mode == 'enemy_random':
             return random.choice(enemies) if enemies else None
         elif target_mode == 'ally_lowest_hp':
-            return min(allies, key=lambda c: c.hp, default=self)
+            # FIX: pick the most wounded ally by HP ratio, not raw HP (a full-HP
+            # low-max-HP unit used to be "lowest" and soak every heal)
+            return min(allies, key=lambda c: c.hp / max(1, c.max_hp), default=self)
         elif target_mode == 'ally_lowest_mana':
             valid_allies = [c for c in allies if c != self]
             return min(valid_allies, key=lambda c: c.mana) if valid_allies else None
@@ -223,7 +231,9 @@ class Champion:
         s_power   = int(self.skill.get('power', 0))
         s_duration = float(self.skill.get('duration', 0))
         s_percent  = float(self.skill.get('percent', 0))
-        s_radius   = float(self.skill.get('radius', 1.5))
+        s_radius   = float(self.skill.get('radius', 1.5) or 1.5)
+        # Only skills whose sheet row actually defines a Radius are area skills
+        has_radius = bool(self.skill.get('radius'))
 
         event = {
             'type': 'skill', 'skill_type': s_type,
@@ -269,6 +279,7 @@ class Champion:
                         elif bt == 'submerge':               c.is_submerged  = False
                         elif bt == 'stat_steal_victim':      c.attack += buff['power']
                         elif bt == 'stat_steal_beneficiary': c.attack = max(0, c.attack - buff['power'])
+                        elif bt == 'hp_shield':              c.shield = 0  # FIX: shield used to survive the purge forever
                         c.active_buffs.remove(buff)
 
                     # Gây sát thương = 10% máu bản thân cho toàn địch
@@ -286,6 +297,7 @@ class Champion:
             self.x = target.x
             self.y = max(0, min(5, target.y + offset_y))
             dmg, evs = target.take_damage(s_power, self, board_state)
+            event['damage'] = dmg
             event.setdefault('extra_events', []).extend(evs)
 
         # 3. PULL
@@ -295,10 +307,18 @@ class Champion:
             else:
                 targets = [c for c in board_state if c.team != self.team and c.is_alive and not getattr(c, 'is_submerged', False)]
 
+            total = 0
             for c in targets:
-                c.x, c.y = self.x, self.y
+                # Drop the pulled unit one cell in front of the caster instead of
+                # stacking it exactly on top (both cards used to overlap visually)
+                dist = calculate_distance(self.x, self.y, c.x, c.y)
+                if dist > 1.0:
+                    c.x = self.x + (c.x - self.x) / dist
+                    c.y = self.y + (c.y - self.y) / dist
                 dmg, evs = c.take_damage(s_power, self, board_state)
+                total += dmg
                 event.setdefault('extra_events', []).extend(evs)
+            event['damage'] = total
 
         # 4. EXECUTE
         elif s_type == 'execute' and target:
@@ -313,9 +333,13 @@ class Champion:
                 # Sát thương kết liễu = đúng lượng máu (và khiên) hiện tại của mục tiêu, không cộng 999999
                 exec_damage = max(1, target.hp + getattr(target, 'shield', 0))
                 dmg, evs = target.take_damage(exec_damage, self, board_state)
+                event['executed'] = True
             else:
                 dmg, evs = target.take_damage(s_power, self, board_state)
-            event['extra_events'] = evs
+                event['executed'] = False
+            event['damage'] = dmg
+            # FIX: extend instead of overwrite — the Utility mana_refund event was being dropped
+            event.setdefault('extra_events', []).extend(evs)
 
         # 5. SUBMERGE
         elif s_type == 'submerge':
@@ -338,7 +362,9 @@ class Champion:
 
         # 8. RICOCHET
         elif s_type == 'ricochet' and target:
-            bounce_count   = int(s_radius) if s_radius > 0 else 3
+            # FIX: int(1.8) used to give a single hit; the design is 3 hits, and
+            # Radius (scaled by star / Phenomenon) can only add bounces on top
+            bounce_count   = max(3, int(round(s_radius)))
             current_target = target
             bounce_path    = [target.id]
             for _ in range(bounce_count):
@@ -346,6 +372,7 @@ class Champion:
                     break
                 dmg, evs = current_target.take_damage(s_power, self, board_state)
                 event.setdefault('extra_events', []).extend(evs)
+                event['extra_events'].append({'type': 'aoe_damage_hit', 'target_id': current_target.id, 'damage': dmg})
                 next_targets = [c for c in board_state
                                 if c.team != self.team and c.is_alive
                                 and c != current_target
@@ -394,16 +421,25 @@ class Champion:
 
         # 11. DAMAGE — FIX: now routes through take_damage so shields/evasion/revive apply
         elif (s_type in ('damage', 'aoe_damage')) and target:
-            if s_radius > 0 or s_type == 'aoe_damage':
-                eff_radius = s_radius if s_radius > 0 else 2.0
-                hit_targets = [c for c in board_state if c.team != self.team and c.is_alive and calculate_distance(target.x, target.y, c.x, c.y) <= eff_radius]
+            # FIX: the 1.5 default radius turned every single-target nuke into an AoE
+            if has_radius or s_type == 'aoe_damage':
+                eff_radius = s_radius if has_radius else 2.0
+                hit_targets = [c for c in board_state if c.team != self.team and c.is_alive
+                               and not c.is_submerged and not c.is_banished
+                               and calculate_distance(target.x, target.y, c.x, c.y) <= eff_radius]
                 if not hit_targets:
                     hit_targets = [target]
+                event['damage'] = 0
                 for t in hit_targets:
                     dmg, evs = t.take_damage(s_power, self, board_state)
                     event.setdefault('extra_events', []).extend(evs)
+                    if t is target:
+                        event['damage'] = dmg
+                    else:
+                        event['extra_events'].append({'type': 'aoe_damage_hit', 'target_id': t.id, 'damage': dmg})
             else:
                 dmg, evs = target.take_damage(s_power, self, board_state)
+                event['damage'] = dmg
                 event.setdefault('extra_events', []).extend(evs)
 
         elif s_type == 'heal' and target:
@@ -452,23 +488,32 @@ class Champion:
             self.x, target.x = target.x, self.x
             self.y, target.y = target.y, self.y
             dmg, evs = target.take_damage(s_power, self, board_state)
+            event['damage'] = dmg
             event.setdefault('extra_events', []).extend(evs)
 
         elif s_type == 'clone':
             has_clone = any(c.id.startswith(f"{self.id}_clone_") and c.is_alive for c in board_state)
-            if has_clone and target:
-                dmg, evs = target.take_damage(self.attack * 3, self, board_state)
-                event['skill_type'] = 'damage'
-                event.setdefault('extra_events', []).extend(evs)
+            if has_clone:
+                # Clone already alive: strike the nearest enemy instead
+                strike = self.resolve_target('enemy_closest', board_state)
+                if strike:
+                    dmg, evs = strike.take_damage(self.attack * 3, self, board_state)
+                    event['skill_type'] = 'damage'
+                    event['targetId'] = strike.id
+                    event['damage'] = dmg
+                    event.setdefault('extra_events', []).extend(evs)
             else:
                 # FIX: UUID-based clone ID — no more millisecond collision
                 clone_id = f"{self.id}_clone_{uuid.uuid4().hex[:8]}"
                 base_name = self.name.replace(' (CLONE)', '').strip()
                 clone_name = f"{base_name} (CLONE)"
+                # FIX: a missing percent produced a 0-HP clone that take_damage ignored,
+                # so it could never die and stalled the round until the 120s timeout
+                clone_pct = s_percent if s_percent > 0 else 0.3
                 clone = Champion(
                     clone_id, clone_name, self.team,
-                    self.x + 0.5, self.y + 0.5,
-                    self.max_hp * s_percent, self.attack * s_percent,
+                    max(0.0, min(4.0, self.x + 0.5)), max(0.0, min(5.0, self.y + 0.5)),
+                    max(1, round(self.max_hp * clone_pct)), round(self.attack * clone_pct),
                     self.attack_range, self.speed, self.max_mana,
                     self.star, skill=self.skill
                 )
@@ -489,18 +534,21 @@ class Champion:
                         and not getattr(c, 'is_submerged', False) \
                         and not getattr(c, 'is_banished', False):
                     penalty = c.base_speed * (slow_pct / 100.0)
-                    # FIX: clamp so speed never goes below 0.1
-                    c.speed = max(0.1, c.speed - penalty)
-                    c.active_buffs.append({'type': 'speed_debuff', 'power': penalty, 'duration': s_duration})
+                    # FIX: clamp so speed never goes below 0.1, and remember only the
+                    # amount actually removed so expiry doesn't over-refund speed
+                    new_speed = max(0.1, c.speed - penalty)
+                    applied = c.speed - new_speed
+                    c.speed = new_speed
+                    c.active_buffs.append({'type': 'speed_debuff', 'power': applied, 'duration': s_duration})
 
         elif s_type == 'stat_steal' and target:
-            actual_steal = s_power
-            amount_drained = min(max(0, target.attack), actual_steal)
-            target.attack = max(0, target.attack - actual_steal)
-            self.attack   += actual_steal
+            amount_drained = min(max(0, target.attack), s_power)
+            target.attack -= amount_drained
+            # FIX: gain only what was actually drained (used to mint ATK from nothing)
+            self.attack   += amount_drained
             steal_dur = s_duration if s_duration > 0 else 5.0
             target.active_buffs.append({'type': 'stat_steal_victim',       'power': amount_drained, 'duration': steal_dur, 'caster_id': self.id})
-            self.active_buffs.append(  {'type': 'stat_steal_beneficiary',  'power': actual_steal,  'duration': steal_dur, 'target_id': target.id})
+            self.active_buffs.append(  {'type': 'stat_steal_beneficiary',  'power': amount_drained, 'duration': steal_dur, 'target_id': target.id})
 
         elif s_type == 'banish' and target:
             target.is_banished = True
@@ -530,7 +578,9 @@ class Champion:
             target.active_buffs.append({'type': 'evasion', 'duration': s_duration if s_duration > 0 else 5})
 
         elif s_type == 'revive':
-            self.active_buffs.append({'type': 'revive', 'duration': 9999})
+            # FIX: don't stack a new extra life on every cast
+            if not any(b['type'] == 'revive' for b in self.active_buffs):
+                self.active_buffs.append({'type': 'revive', 'duration': 9999})
 
         return event
 
@@ -604,7 +654,8 @@ class Champion:
 
         return {
             'id': self.id, 'name': self.name, 'team': self.team,
-            'x': self.x, 'y': self.y, 'hp': self.hp, 'mana': self.mana,
+            'x': round(self.x, 3), 'y': round(self.y, 3),
+            'hp': max(0, round(self.hp)), 'mana': round(self.mana),
             'shield': getattr(self, 'shield', 0),
             'max_hp': self.max_hp, 'max_mana': self.max_mana,
             'attack': self.attack, 'speed': self.speed,

@@ -5,9 +5,12 @@ let lastMessageTime = 0;
 let dismissTimer = null;
 let fadeTimer = null;
 
-export function showNotification(message) {
+const typeOf = {};
+
+export function showNotification(message, type = 'default') {
     if (!message) return;
     const trimmed = String(message).trim();
+    typeOf[trimmed] = type;
     const now = Date.now();
 
     // 1. Chống lặp: Nếu thông báo giống hệt cái đang hiển thị hoặc vừa hiển thị trong vòng 2.5s thì bỏ qua
@@ -54,6 +57,9 @@ function processQueue() {
     }
 
     box.innerText = currentMessage;
+    box.classList.remove('type-success', 'type-error', 'type-info');
+    const type = typeOf[currentMessage];
+    if (type === 'success' || type === 'error' || type === 'info') box.classList.add(`type-${type}`);
 
     // Kích hoạt transition mượt mà
     requestAnimationFrame(() => {
