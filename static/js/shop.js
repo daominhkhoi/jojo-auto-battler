@@ -424,19 +424,11 @@ export function refreshShop() {
         card.dataset.champ = randomChamp.name;
         card.dataset.cost = randomChamp.cost;
         const traitsLine = (randomChamp.traits || []).join(' · ');
-        card.innerHTML = `<h3>${randomChamp.name}</h3><img src="${randomChamp.img}" width="40" height="40" style="border-radius: 5px;"><p class="card-traits">${traitsLine}</p><p class="cost">${randomChamp.cost} 🪙</p>`;
+        card.innerHTML = `<div class="card-art"><img src="${randomChamp.img}" alt="" draggable="false"></div><div class="card-body"><h3>${randomChamp.name}</h3><p class="card-traits">${traitsLine}</p></div><p class="cost">${randomChamp.cost} 🪙</p>`;
 
-        const colors = {
-            1: { border: '#bdc3c7', bg: 'linear-gradient(to bottom, #2c3e50, #7f8c8d)' },
-            2: { border: '#2ecc71', bg: 'linear-gradient(to bottom, #2c3e50, #27ae60)' },
-            3: { border: '#3498db', bg: 'linear-gradient(to bottom, #2c3e50, #2980b9)' },
-            4: { border: '#9b59b6', bg: 'linear-gradient(to bottom, #2c3e50, #8e44ad)' },
-            5: { border: '#e67e22', bg: 'linear-gradient(to bottom, #2c3e50, #d35400)' }
-        };
-        const theme = colors[randomChamp.cost] || colors[1];
-        card.style.border = `2px solid ${theme.border}`;
-        card.style.background = theme.bg;
-        card.dataset.origBorder = theme.border;
+        // Tier colors/backgrounds come from theme.css ([data-cost]); keep the border for touch-select restore
+        const TIER_BORDER = { 1: '#aab4be', 2: '#2ecc71', 3: '#3aa0ff', 4: '#c56cf0', 5: '#ffb400' };
+        card.dataset.origBorder = TIER_BORDER[randomChamp.cost] || TIER_BORDER[1];
 
         card.onclick = (e) => {
             const isTouchDevice = window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 768;

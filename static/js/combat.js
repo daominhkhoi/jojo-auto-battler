@@ -9,6 +9,7 @@ import {
     updateFx, triggerHitStop, spawnCallout, maybeRushCry, spawnShatter,
     startTimeStopFlash, showBigBanner
 } from './fx.js';
+import { spawnAttack, updateAttackFx, clearAttackFx, DISPLAY_FONT } from './attackfx.js';
 
 export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
     if (!STATE.floatingTexts) STATE.floatingTexts = [];
@@ -20,44 +21,44 @@ export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
 
     let color = '#ffffff';
     let baseScale = 1.0;
-    let font = 'bold 19px "Segoe UI", Arial, sans-serif';
+    let font = `24px ${DISPLAY_FONT}`;
 
     switch (type) {
         case 'crit':
-            color = '#ff3838';
-            baseScale = 1.45;
-            font = '900 24px "Segoe UI", Arial, sans-serif';
+            color = '#ffd23f';
+            baseScale = 1.2;
+            font = `30px ${DISPLAY_FONT}`;
             break;
         case 'skill':
             color = '#ffa502';
-            baseScale = 1.35;
-            font = 'bold 22px "Segoe UI", Arial, sans-serif';
+            baseScale = 1.3;
+            font = `30px ${DISPLAY_FONT}`;
             break;
         case 'heal':
-            color = '#2ecc71';
+            color = '#5dff9d';
             baseScale = 1.2;
-            font = 'bold 20px "Segoe UI", Arial, sans-serif';
+            font = `26px ${DISPLAY_FONT}`;
             break;
         case 'shield':
             color = '#ecf0f1';
             baseScale = 1.1;
-            font = 'bold 18px "Segoe UI", Arial, sans-serif';
+            font = `24px ${DISPLAY_FONT}`;
             break;
         case 'status':
             color = options.color || '#f1c40f';
-            baseScale = options.scale || 1.3;
-            font = '900 21px "Segoe UI", Arial, sans-serif';
+            baseScale = options.scale || 1.25;
+            font = `26px ${DISPLAY_FONT}`;
             break;
         case 'reflect':
             color = '#e056fd';
-            baseScale = 1.15;
-            font = '900 18px "Segoe UI", Arial, sans-serif';
+            baseScale = 1.1;
+            font = `22px ${DISPLAY_FONT}`;
             break;
         case 'normal':
         default:
             color = options.color || '#ffffff';
             baseScale = 1.0;
-            font = 'bold 19px "Segoe UI", Arial, sans-serif';
+            font = `22px ${DISPLAY_FONT}`;
             break;
     }
 
@@ -108,118 +109,8 @@ export function updatePhysics() {
         }
     });
 
-    for (let i = STATE.activeProjectiles.length - 1; i >= 0; i--) {
-        const proj = STATE.activeProjectiles[i];
-
-        if (proj.type === 'melee') {
-            proj.lifeTime--;
-            if (proj.lifeTime === 5) {
-                const target = STATE.champions.find(c => c.id === proj.targetId);
-                const isCrit = !!proj.isCrit;
-                if (target) {
-                    target.shakeTimer = 3;
-                    target.knockT = 8;
-                    target.knockAngle = proj.angle || 0;
-                    target.hitFlashTimer = 3;
-                    const dmg = proj.damage || 0;
-                    if (dmg > 0) {
-                        spawnFloatingText(proj.targetX, proj.targetY, (isCrit ? `💥 CRIT! -${dmg.toLocaleString()}` : `-${dmg.toLocaleString()}`), isCrit ? 'crit' : 'normal');
-                        if (isCrit) {
-                            const now = performance.now();
-                            if (!STATE._lastCritShake || (now - STATE._lastCritShake > 160)) {
-                                STATE.screenShake = Math.max(STATE.screenShake || 0, 3.5);
-                                STATE._lastCritShake = now;
-                            }
-                        }
-                    }
-                    playStandAttackSfx(proj.attackerName, isCrit);
-                }
-                STATE.hitEffects.push({
-                    x: proj.targetX,
-                    y: proj.targetY,
-                    lifeTime: 8,
-                    maxLife: 8,
-                    effectType: 'attack_hit',
-                    hitType: 'melee',
-                    isCrit: isCrit,
-                    angle: proj.angle || 0
-                });
-
-                // Spawn 4 directional sparks (velocity-oriented)
-                if (!STATE.particles) STATE.particles = [];
-                const sparkColor = isCrit ? '#ffd700' : '#ff4757';
-                for (let p = 0; p < 4; p++) {
-                    const spd = Math.random() * 9 + 4;
-                    const sparkAngle = (proj.angle || 0) + (Math.random() - 0.5) * 1.5;
-                    STATE.particles.push({
-                        x: proj.targetX, y: proj.targetY,
-                        vx: Math.cos(sparkAngle) * spd, vy: Math.sin(sparkAngle) * spd,
-                        color: Math.random() < 0.4 ? '#ffffff' : sparkColor,
-                        size: Math.random() * 2 + 1.5,
-                        life: 10 + Math.random() * 4
-                    });
-                }
-            }
-            if (proj.lifeTime <= 0) STATE.activeProjectiles.splice(i, 1);
-        } else {
-            const dx = proj.targetX - proj.x;
-            const dy = proj.targetY - proj.y;
-            const dist = Math.hypot(dx, dy);
-
-            if (dist < proj.speed) {
-                const target = STATE.champions.find(c => c.id === proj.targetId);
-                const isCrit = !!proj.isCrit;
-                if (target) {
-                    target.shakeTimer = 3;
-                    target.knockT = 8;
-                    target.knockAngle = proj.angle || 0;
-                    target.hitFlashTimer = 3;
-                    const dmg = proj.damage || 0;
-                    if (dmg > 0) {
-                        spawnFloatingText(proj.targetX, proj.targetY, (isCrit ? `💥 CRIT! -${dmg.toLocaleString()}` : `-${dmg.toLocaleString()}`), isCrit ? 'crit' : 'normal');
-                        if (isCrit) {
-                            const now = performance.now();
-                            if (!STATE._lastCritShake || (now - STATE._lastCritShake > 160)) {
-                                STATE.screenShake = Math.max(STATE.screenShake || 0, 3.5);
-                                STATE._lastCritShake = now;
-                            }
-                        }
-                    }
-                    playStandAttackSfx(proj.attackerName, isCrit);
-                }
-
-                STATE.hitEffects.push({
-                    x: proj.targetX,
-                    y: proj.targetY,
-                    lifeTime: 8,
-                    maxLife: 8,
-                    effectType: 'attack_hit',
-                    hitType: 'ranged',
-                    isCrit: isCrit,
-                    angle: proj.angle || 0
-                });
-                STATE.activeProjectiles.splice(i, 1);
-
-                // Spawn 4 impact sparks
-                if (!STATE.particles) STATE.particles = [];
-                const sparkColor = isCrit ? '#ffd700' : '#00ffff';
-                for (let p = 0; p < 4; p++) {
-                    const spd = Math.random() * 9 + 4;
-                    const sparkAngle = Math.random() * Math.PI * 2;
-                    STATE.particles.push({
-                        x: proj.targetX, y: proj.targetY,
-                        vx: Math.cos(sparkAngle) * spd, vy: Math.sin(sparkAngle) * spd,
-                        color: Math.random() < 0.4 ? '#ffffff' : sparkColor,
-                        size: Math.random() * 2 + 1.5,
-                        life: 10 + Math.random() * 4
-                    });
-                }
-            } else {
-                proj.x += (dx / dist) * proj.speed;
-                proj.y += (dy / dist) * proj.speed;
-            }
-        }
-    }
+    // Basic-attack VFX (punch rush / blade / bullet / orb / strike) and impacts
+    updateAttackFx();
 
     for (let i = STATE.hitEffects.length - 1; i >= 0; i--) {
         STATE.hitEffects[i].lifeTime--;
@@ -582,24 +473,32 @@ export function syncTickData(data) {
             maybeRushCry(attacker);
             const dmg = event.damage || 0;
             const isCrit = !!event.is_crit;
+            const attackerName = attacker.name;
 
-            STATE.activeProjectiles.push({
-                x: attCenterX,
-                y: attCenterY,
-                startX: attCenterX,
-                startY: attCenterY,
-                targetX: tarCenterX,
-                targetY: tarCenterY,
-                targetId: event.targetId,
-                attackerId: attacker.id,
-                attackerName: attacker.name,
-                damage: dmg,
-                isCrit: isCrit,
-                angle: angle,
-                type: isRanged ? 'projectile' : 'melee',
-                speed: isRanged ? 22 : 0,
-                lifeTime: isRanged ? 0 : 10,
-                maxLife: isRanged ? 0 : 10
+            spawnAttack(attacker, target, {
+                isCrit,
+                onHit: () => {
+                    const hitTarget = STATE.champions.find(c => c.id === event.targetId);
+                    if (!hitTarget) return;
+                    hitTarget.shakeTimer = 3;
+                    hitTarget.knockT = isCrit ? 11 : 8;
+                    hitTarget.knockAngle = angle;
+                    hitTarget.hitFlashTimer = 3;
+                    const hs = getCanvasCoords(hitTarget.targetX, hitTarget.targetY);
+                    const hx = (hitTarget.pixelX ?? hs.x) + hs.w / 2;
+                    const hy = (hitTarget.pixelY ?? hs.y) + hs.h / 2;
+                    if (dmg > 0) {
+                        spawnFloatingText(hx, hy, isCrit ? `${dmg.toLocaleString()}!` : dmg.toLocaleString(), isCrit ? 'crit' : 'normal');
+                    }
+                    if (isCrit) {
+                        const now = performance.now();
+                        if (!STATE._lastCritShake || (now - STATE._lastCritShake > 160)) {
+                            STATE.screenShake = Math.max(STATE.screenShake || 0, 5);
+                            STATE._lastCritShake = now;
+                        }
+                    }
+                    playStandAttackSfx(attackerName, isCrit);
+                }
             });
         }
         else if (['evasion', 'reflect', 'damage_link_proc', 'revive'].includes(event.type)) {
@@ -744,11 +643,13 @@ function showRoundReviewBanner(title, subtitle, color, secondsLeft, toBeContinue
         document.body.appendChild(banner);
     }
 
+    // Look lives in theme.css; only the accent color is dynamic
     banner.innerHTML = `
-        <div style="background: rgba(13, 17, 23, 0.94); border: 2px solid ${color}; border-radius: 14px; padding: 18px 36px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.85), 0 0 25px ${color}55; backdrop-filter: blur(10px); min-width: 280px; max-width: 90vw;">
-            <div style="font-size: 26px; font-weight: 900; color: ${color}; text-shadow: 0 0 16px ${color}; letter-spacing: 1px; margin-bottom: 12px;">${title}</div>
-            <div id="roundReviewTimerBadge" style="display: inline-block; background: rgba(255,255,255,0.12); color: #fff; font-size: 13px; font-weight: bold; padding: 5px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.25);">
-                ⏳ Reviewing battlefield... Next in <span id="roundReviewCountdownNum" style="color: ${color}; font-size: 16px; font-weight: 900;">${secondsLeft}s</span>
+        <div class="review-card" style="--accent: ${color};">
+            <div class="review-title">${title}</div>
+            <div class="review-sub">${subtitle || ''}</div>
+            <div id="roundReviewTimerBadge" class="review-timer">
+                Next round in <span id="roundReviewCountdownNum">${secondsLeft}s</span>
             </div>
             ${toBeContinued ? '<div><span class="tbc-arrow">To Be Continued</span></div>' : ''}
         </div>
@@ -943,34 +844,24 @@ function finishRoundReview(serverResult) {
         if (bottomBar) bottomBar.style.display = 'none';
 
         const isWinner = STATE.playerLP >= 10;
-        const resultMsg = isWinner ? "🏆 YOU WON THE MATCH! 🏆" : "💀 YOU LOST THE MATCH! 💀";
+        const resultMsg = isWinner ? "YOU WON THE MATCH!" : "YOU LOST THE MATCH";
 
         // Create full-screen game over overlay
         const overlay = document.createElement('div');
-        overlay.style.position = 'fixed';
-        overlay.style.top = '0'; overlay.style.left = '0';
-        overlay.style.width = '100vw'; overlay.style.height = '100vh';
-        overlay.style.backgroundColor = 'rgba(0,0,0,0.85)';
-        overlay.style.color = isWinner ? '#f1c40f' : '#e74c3c';
-        overlay.style.display = 'flex';
-        overlay.style.flexDirection = 'column';
-        overlay.style.justifyContent = 'center';
-        overlay.style.alignItems = 'center';
-        overlay.style.zIndex = '9999';
-
+        overlay.className = `gameover-overlay ${isWinner ? 'is-win' : 'is-loss'}`;
         overlay.innerHTML = `
-            <div style="background: rgba(20, 24, 33, 0.95); border: 2px solid ${isWinner ? '#f1c40f' : '#e74c3c'}; border-radius: 16px; padding: 40px 50px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.8); max-width: 90%;">
-                <h1 style="font-size: 52px; margin: 0 0 15px 0; font-weight: 900; text-shadow: 0 0 25px ${isWinner ? '#f1c40f' : '#e74c3c'};">${resultMsg}</h1>
-                ${isWinner ? '' : '<div style="margin: -4px 0 22px 0;"><span class="tbc-arrow tbc-big">To Be Continued</span></div>'}
-                <p style="font-size: 24px; color: #ecf0f1; margin: 0 0 35px 0;">Final Score: <span style="color:#2ecc71; font-weight:800;">${STATE.playerLP}</span> - <span style="color:#e74c3c; font-weight:800;">${STATE.botLP}</span></p>
-
-                <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-                    <button id="returnLobbyBtn" style="padding: 14px 32px; font-size: 18px; font-weight: bold; cursor: pointer; background: linear-gradient(135deg, #2c3e50, #34495e); color: #fff; border: 1px solid #7f8c8d; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);">
-                        🏠 VỀ SẢNH CHÍNH
-                    </button>
-                    <button id="rematchBotBtn" style="padding: 14px 32px; font-size: 18px; font-weight: bold; cursor: pointer; background: linear-gradient(135deg, #8e44ad, #9b59b6); color: #fff; border: 1px solid #a29bfe; border-radius: 10px; box-shadow: 0 4px 15px rgba(142, 68, 173, 0.4);">
-                        🤖 CHƠI TIẾP VỚI BOT
-                    </button>
+            <div class="gameover-card">
+                <div class="gameover-kicker">${isWinner ? 'VICTORY' : 'DEFEAT'}</div>
+                <h1 class="gameover-title">${resultMsg}</h1>
+                ${isWinner ? '' : '<div class="gameover-tbc"><span class="tbc-arrow tbc-big">To Be Continued</span></div>'}
+                <p class="gameover-score">
+                    <span class="score-you">${STATE.playerLP}</span>
+                    <span class="score-sep">:</span>
+                    <span class="score-opp">${STATE.botLP}</span>
+                </p>
+                <div class="gameover-actions">
+                    <button id="returnLobbyBtn" class="theme-btn theme-btn-ghost">🏠 VỀ SẢNH CHÍNH</button>
+                    <button id="rematchBotBtn" class="theme-btn theme-btn-primary">🤖 CHƠI TIẾP VỚI BOT</button>
                 </div>
             </div>
         `;
@@ -1026,6 +917,7 @@ function resetBoardForNextRound() {
     if (STATE.isBotVsBot) {
         STATE.champions = [];
         STATE.activeProjectiles = [];
+        clearAttackFx();
         STATE.hitEffects = [];
         return;
     }
@@ -1067,6 +959,7 @@ function resetBoardForNextRound() {
 
     STATE.activeProjectiles = [];
     STATE.hitEffects = [];
+    clearAttackFx();
 }
 export function updateRoundUI() {
     const roundText = document.getElementById('roundText');

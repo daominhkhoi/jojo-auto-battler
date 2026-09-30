@@ -138,7 +138,7 @@ function drawCallouts(ctx, canvas) {
         const rise = c.small ? age * 0.6 : Math.min(age, 10) * 0.8;
 
         ctx.save();
-        ctx.font = `italic 900 ${c.size}px Impact, "Arial Black", "Segoe UI", sans-serif`;
+        ctx.font = `${c.size + 4}px "Bangers", Impact, "Arial Black", sans-serif`;
         const halfW = ctx.measureText(c.text).width / 2 * pop;
         const x = Math.max(halfW + 6, Math.min(canvas.width - halfW - 6, c.x));
         ctx.globalAlpha = alpha;

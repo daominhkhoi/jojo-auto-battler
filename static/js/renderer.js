@@ -1,6 +1,7 @@
 // static/js/renderer.js
 import { CONFIG, STATE, IMAGE_CACHE, CHAMPION_POOL, getCanvasCoords } from './globals.js';
 import { champImage, isImageReady, maybeSpawnMenacing, applyTimeStopFilter, drawWorldFx, drawOverlayFx } from './fx.js';
+import { drawAttackFx } from './attackfx.js';
 
 const COST_COLORS = { 1: '#aab4be', 2: '#2ecc71', 3: '#3aa0ff', 4: '#c56cf0', 5: '#ffb400' };
 
@@ -25,24 +26,8 @@ export function renderBoard(ctx, canvas) {
         ctx.drawImage(bg, xOffset, 0, newWidth, canvas.height);
     }
 
-    // 1. VẼ LƯỚI SÂN ĐẤU
-    ctx.strokeStyle = 'rgba(10, 30, 60, 0.8)'; // Xanh đen
-    for (let x = 0; x <= canvas.width; x += CONFIG.BOARD_CELL_WIDTH) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CONFIG.BOARD_ROWS * CONFIG.BOARD_CELL_HEIGHT); ctx.stroke();
-    }
-    for (let y = 0; y <= CONFIG.BOARD_ROWS * CONFIG.BOARD_CELL_HEIGHT; y += CONFIG.BOARD_CELL_HEIGHT) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-    }
-
-    ctx.strokeStyle = 'rgba(231, 76, 60, 0.6)'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(0, 3 * CONFIG.BOARD_CELL_HEIGHT); ctx.lineTo(canvas.width, 3 * CONFIG.BOARD_CELL_HEIGHT); ctx.stroke(); ctx.lineWidth = 1;
-
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // Nền khu chờ tối đi chút
-    ctx.fillRect(0, CONFIG.BENCH_START_Y, canvas.width, CONFIG.BENCH_CELL_HEIGHT);
-    ctx.strokeStyle = 'rgba(10, 30, 60, 0.8)'; // Xanh đen cho viền khu chờ
-    for (let x = 0; x <= canvas.width; x += CONFIG.BENCH_CELL_WIDTH) {
-        ctx.strokeRect(x, CONFIG.BENCH_START_Y, CONFIG.BENCH_CELL_WIDTH, CONFIG.BENCH_CELL_HEIGHT);
-    }
+    // 1. BOARD: tiles, glowing center line, bench sockets
+    drawBoardBase(ctx, canvas, timeNow);
 
     // DRAG TARGET HIGHLIGHT (prep phase)
     if (STATE.dragCell) drawDragCell(ctx, canvas, timeNow);
@@ -304,126 +289,8 @@ export function renderBoard(ctx, canvas) {
         ctx.restore();
     });
 
-    // 3. VẼ ĐẠN BAY VÀ HIỆU ỨNG ĐÁNH GẦN (PROJECTILES & MELEE)
-    STATE.activeProjectiles.forEach((proj) => {
-        const dx = proj.targetX - proj.x;
-        const dy = proj.targetY - proj.y;
-        const angle = proj.angle !== undefined ? proj.angle : Math.atan2(dy, dx);
-        const isCrit = !!proj.isCrit;
-
-        ctx.save();
-        ctx.translate(proj.x, proj.y);
-        ctx.rotate(angle);
-
-        if (proj.type === 'melee') {
-            const maxL = proj.maxLife || 10;
-            const progress = 1 - (proj.lifeTime / maxL);
-            const fade = Math.sin(progress * Math.PI); // Smooth in & out fade
-            const slashDist = 15 + progress * 35;
-
-            ctx.save();
-            ctx.translate(slashDist, 0);
-
-            // A. Expanding Compressed Shockwave Arc
-            ctx.beginPath();
-            ctx.arc(10, 0, 15 + progress * 25, -Math.PI * 0.4, Math.PI * 0.4);
-            ctx.strokeStyle = isCrit ? `rgba(255, 215, 0, ${fade * 0.5})` : `rgba(255, 255, 255, ${fade * 0.4})`;
-            ctx.lineWidth = Math.max(1, 2 * (1 - progress));
-            ctx.stroke();
-
-            // B. Dynamic Crescent Slash Blade (Lưỡi liềm sắc nhọn cong vút)
-            // Outer radiant flame/blade (Multi-layer glow, zero shadowBlur!)
-            ctx.beginPath();
-            ctx.moveTo(-15, -35);
-            ctx.quadraticCurveTo(18, 0, -15, 35);
-            ctx.quadraticCurveTo(8, 0, -15, -35);
-            ctx.closePath();
-            ctx.fillStyle = isCrit ? `rgba(241, 196, 15, ${fade * 0.85})` : `rgba(231, 76, 60, ${fade * 0.85})`;
-            ctx.fill();
-
-            // Inner razor white core
-            ctx.beginPath();
-            ctx.moveTo(-8, -25);
-            ctx.quadraticCurveTo(15, 0, -8, 25);
-            ctx.quadraticCurveTo(7, 0, -8, -25);
-            ctx.closePath();
-            ctx.fillStyle = `rgba(255, 255, 255, ${fade * 0.95})`;
-            ctx.fill();
-
-            // C. Speed cutting lines (Vệt chém xé gió)
-            ctx.beginPath();
-            ctx.moveTo(-20, -18); ctx.lineTo(12, -22);
-            ctx.moveTo(-20, 18);  ctx.lineTo(12, 22);
-            ctx.strokeStyle = isCrit ? `rgba(255, 242, 0, ${fade * 0.8})` : `rgba(255, 255, 255, ${fade * 0.7})`;
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            ctx.restore();
-        } else {
-            // A. Aero-Ribbon Tail (Đuôi dải lụa năng lượng vuốt nhọn không đứt đoạn)
-            const tailLen = 42;
-            const tailGrad = ctx.createLinearGradient(0, 0, -tailLen, 0);
-            if (isCrit) {
-                tailGrad.addColorStop(0, 'rgba(255, 215, 0, 0.95)');
-                tailGrad.addColorStop(0.4, 'rgba(243, 156, 18, 0.6)');
-                tailGrad.addColorStop(1, 'rgba(231, 76, 60, 0)');
-            } else {
-                tailGrad.addColorStop(0, 'rgba(0, 255, 255, 0.95)');
-                tailGrad.addColorStop(0.4, 'rgba(30, 144, 255, 0.6)');
-                tailGrad.addColorStop(1, 'rgba(10, 61, 98, 0)');
-            }
-
-            // Tapered aerodynamic ribbon
-            ctx.beginPath();
-            ctx.moveTo(0, -4.5);
-            ctx.lineTo(-tailLen, 0);
-            ctx.lineTo(0, 4.5);
-            ctx.closePath();
-            ctx.fillStyle = tailGrad;
-            ctx.fill();
-
-            // Inner white high-speed core streak
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(-tailLen * 0.65, 0);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2.5;
-            ctx.lineCap = 'round';
-            ctx.stroke();
-
-            // B. Orbiting Plasma Sparks (2 Hạt quang năng xoắn ốc DNA)
-            const spiralAngle = timeNow * 24;
-            const orbY1 = Math.sin(spiralAngle) * 7.5;
-            const orbY2 = Math.sin(spiralAngle + Math.PI) * 6;
-
-            ctx.beginPath();
-            ctx.arc(0, orbY1, 2.2, 0, Math.PI * 2);
-            ctx.fillStyle = isCrit ? '#ffffff' : '#00ffff';
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(-8, orbY2, 1.8, 0, Math.PI * 2);
-            ctx.fillStyle = isCrit ? '#ffd700' : '#70a1ff';
-            ctx.fill();
-
-            // C. Multi-layer Glowing Energy Head (Zero shadowBlur - blazing fast!)
-            ctx.beginPath();
-            ctx.arc(0, 0, 7.5, 0, Math.PI * 2);
-            ctx.fillStyle = isCrit ? 'rgba(241, 196, 15, 0.45)' : 'rgba(0, 255, 255, 0.45)';
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
-            ctx.fillStyle = isCrit ? '#ffd700' : '#00d2d3';
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
-        }
-        ctx.restore();
-    });
+    // 3. BASIC ATTACKS (additive glow) + impacts, crit focus lines, katakana SFX
+    drawAttackFx(ctx, canvas);
 
     // 4. VỤ NỔ IMPACT KHI TRÚNG ĐÍCH HOẶC TUNG SKILL VÀ VÙNG CỐ ĐỊNH TRÊN SÂN
     if (STATE.hitEffects) {
@@ -1774,6 +1641,8 @@ export function renderBoard(ctx, canvas) {
 
     // 5. VẼ CÁC HẠT (PARTICLES) NHỎ LITI (Tia lửa xé gió, mảnh vụn tốc độ cao)
     if (STATE.particles) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
         STATE.particles.forEach(p => {
             const alpha = Math.min(1.0, Math.max(0, p.life / 18));
             ctx.globalAlpha = alpha;
@@ -1803,6 +1672,7 @@ export function renderBoard(ctx, canvas) {
             }
             ctx.globalAlpha = 1.0;
         });
+        ctx.restore();
     }
 
     // 6. VẼ CHỮ NỔI SÁT THƯƠNG & TRẠNG THÁI (FLOATING COMBAT TEXTS)
@@ -1821,7 +1691,7 @@ export function renderBoard(ctx, canvas) {
 
             // Viền đen dày tương phản cao (Không dùng shadowBlur để duy trì 60 FPS)
             ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 4.5;
+            ctx.lineWidth = 6;
             ctx.lineJoin = 'round';
             ctx.strokeText(t.text, 0, 0);
 
@@ -2222,4 +2092,84 @@ function drawUnit(ctx, champ, timeNow) {
     if (!onBench && (STATE.isInspecting || (STATE.isCombatPhase && isUltimateReady))) {
         maybeSpawnMenacing(centerX, pY, size.w, STATE.isInspecting ? 0.02 : 0.04);
     }
+}
+
+
+// ======================================================================
+// BOARD BASE
+// ======================================================================
+function drawBoardBase(ctx, canvas, timeNow) {
+    const cw = CONFIG.BOARD_CELL_WIDTH, ch = CONFIG.BOARD_CELL_HEIGHT;
+    const boardH = CONFIG.BOARD_ROWS * ch;
+    const mid = 3 * ch;
+
+    ctx.save();
+    // Darken the background art so units pop
+    ctx.fillStyle = 'rgba(8, 5, 18, 0.38)';
+    ctx.fillRect(0, 0, canvas.width, boardH);
+
+    // Side tints: enemy half magenta, player half cyan
+    const enemyTint = ctx.createLinearGradient(0, 0, 0, mid);
+    enemyTint.addColorStop(0, 'rgba(255, 61, 139, 0.16)');
+    enemyTint.addColorStop(1, 'rgba(255, 61, 139, 0.02)');
+    ctx.fillStyle = enemyTint;
+    ctx.fillRect(0, 0, canvas.width, mid);
+    const allyTint = ctx.createLinearGradient(0, mid, 0, boardH);
+    allyTint.addColorStop(0, 'rgba(51, 225, 255, 0.02)');
+    allyTint.addColorStop(1, 'rgba(51, 225, 255, 0.16)');
+    ctx.fillStyle = allyTint;
+    ctx.fillRect(0, mid, canvas.width, boardH - mid);
+
+    // Tiles
+    for (let gy = 0; gy < CONFIG.BOARD_ROWS; gy++) {
+        for (let gx = 0; gx < CONFIG.BOARD_COLS; gx++) {
+            const x = gx * cw + 4, y = gy * ch + 4;
+            roundRectPath(ctx, x, y, cw - 8, ch - 8, 10);
+            ctx.fillStyle = (gx + gy) % 2 === 0 ? 'rgba(255, 255, 255, 0.035)' : 'rgba(0, 0, 0, 0.08)';
+            ctx.fill();
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = gy < 3 ? 'rgba(255, 110, 170, 0.16)' : 'rgba(110, 220, 255, 0.18)';
+            ctx.stroke();
+        }
+    }
+
+    // Glowing, flowing center line
+    const line = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    line.addColorStop(0, 'rgba(255, 61, 139, 0)');
+    line.addColorStop(0.2, 'rgba(255, 61, 139, 0.9)');
+    line.addColorStop(0.5, 'rgba(255, 210, 63, 1)');
+    line.addColorStop(0.8, 'rgba(51, 225, 255, 0.9)');
+    line.addColorStop(1, 'rgba(51, 225, 255, 0)');
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = 'rgba(255, 210, 63, 0.8)';
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(canvas.width, mid); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.setLineDash([14, 22]);
+    ctx.lineDashOffset = -timeNow * 40;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(canvas.width, mid); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Bench: dark tray with rounded sockets
+    const benchY = CONFIG.BENCH_START_Y;
+    const tray = ctx.createLinearGradient(0, benchY, 0, benchY + CONFIG.BENCH_CELL_HEIGHT);
+    tray.addColorStop(0, 'rgba(20, 12, 34, 0.94)');
+    tray.addColorStop(1, 'rgba(10, 6, 18, 0.98)');
+    ctx.fillStyle = tray;
+    ctx.fillRect(0, benchY, canvas.width, CONFIG.BENCH_CELL_HEIGHT);
+    ctx.strokeStyle = 'rgba(255, 210, 63, 0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, benchY + 0.75); ctx.lineTo(canvas.width, benchY + 0.75); ctx.stroke();
+    for (let i = 0; i < CONFIG.BENCH_SLOTS; i++) {
+        roundRectPath(ctx, i * CONFIG.BENCH_CELL_WIDTH + 3, benchY + 5, CONFIG.BENCH_CELL_WIDTH - 6, CONFIG.BENCH_CELL_HEIGHT - 10, 7);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(157, 123, 255, 0.28)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+    ctx.restore();
 }
