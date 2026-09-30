@@ -647,6 +647,28 @@ class Champion:
         return events
 
     # ------------------------------------------------------------------
+    def to_tick_dict(self):
+        """
+        Compact per-tick state: only the fields that change during combat.
+        Static info (skill, raw stats, traits...) is sent once via to_dict().
+        """
+        d = {
+            'id': self.id, 'team': self.team,
+            'x': round(self.x, 2), 'y': round(self.y, 2),
+            'hp': max(0, round(self.hp)), 'mana': round(self.mana),
+            'shield': round(getattr(self, 'shield', 0)),
+            'attack': round(self.attack), 'speed': round(self.speed, 2),
+            'damage_dealt': int(round(getattr(self, 'damage_dealt', 0))),
+            'is_alive': self.is_alive,
+            'buffs': [b['type'] for b in self.active_buffs],
+        }
+        # Only link buffs carry data the client draws (the tether line to the caster)
+        links = [{'type': b['type'], 'caster_id': b.get('caster_id')}
+                 for b in self.active_buffs if b['type'] in ('damage_link', 'life_tether')]
+        if links:
+            d['buff_details'] = links
+        return d
+
     def to_dict(self):
         safe_buffs = []
         for b in self.active_buffs:

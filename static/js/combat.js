@@ -225,10 +225,11 @@ export function syncTickData(data) {
             localChamp.skill = serverChamp.skill || localChamp.skill;
             localChamp.raw_skill = serverChamp.raw_skill || localChamp.raw_skill;
             localChamp.applied_traits = serverChamp.applied_traits || localChamp.applied_traits || [];
-            localChamp.buffs = serverChamp.buffs || [];
+            localChamp.buffs = serverChamp.buffs !== undefined ? serverChamp.buffs : (localChamp.buffs || []);
             localChamp.buff_details = serverChamp.buff_details || [];
             localChamp.damage_dealt = serverChamp.damage_dealt !== undefined ? serverChamp.damage_dealt : (localChamp.damage_dealt || 0);
             localChamp.name = serverChamp.name || localChamp.name;
+            if (serverChamp.star !== undefined) localChamp.star = serverChamp.star;
             localChamp.is_clone = serverChamp.is_clone !== undefined ? serverChamp.is_clone : localChamp.is_clone;
         } else {
             const baseName = (serverChamp.name || '').replace(/\s*\(CLONE\)$/i, '').trim();

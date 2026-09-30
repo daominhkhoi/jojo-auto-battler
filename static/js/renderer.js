@@ -18,16 +18,10 @@ export function renderBoard(ctx, canvas) {
         STATE.screenShake = Math.max(0, STATE.screenShake - 0.5);
     }
 
-    if (IMAGE_CACHE["Background"] && IMAGE_CACHE["Background"].complete && IMAGE_CACHE["Background"].naturalHeight) {
-        const bg = IMAGE_CACHE["Background"];
-        const scale = canvas.height / bg.naturalHeight;
-        const newWidth = bg.naturalWidth * scale;
-        const xOffset = (canvas.width - newWidth) / 2;
-        ctx.drawImage(bg, xOffset, 0, newWidth, canvas.height);
-    }
-
-    // 1. BOARD: tiles, glowing center line, bench sockets
-    drawBoardBase(ctx, canvas, timeNow);
+    // 1. BOARD: background art, tiles, glowing center line, bench sockets.
+    // PERF: these never change, so they are rendered once into an offscreen canvas.
+    ctx.drawImage(getBoardLayer(canvas), 0, 0);
+    drawCenterDash(ctx, canvas, timeNow);
 
     // DRAG TARGET HIGHLIGHT (prep phase)
     if (STATE.dragCell) drawDragCell(ctx, canvas, timeNow);
@@ -1844,10 +1838,9 @@ function drawUnit(ctx, champ, timeNow) {
         if (fadeIn <= 0) return;
         ctx.save();
         ctx.globalAlpha = 0.28 * fadeIn;
-        ctx.filter = 'grayscale(100%)';
-        roundRectPath(ctx, x, y, w, h, radius);
-        ctx.clip();
-        if (isImageReady(img)) ctx.drawImage(img, x, y, w, h);
+        // PERF: ctx.filter re-rasterizes every frame; use a cached grayscale copy instead
+        const gray = getCardArt(img, w, h, radius, true);
+        if (gray) ctx.drawImage(gray, x, y);
         else { ctx.fillStyle = '#2c3e50'; ctx.fillRect(x, y, w, h); }
         ctx.restore();
         ctx.save();
@@ -1911,6 +1904,15 @@ function drawUnit(ctx, champ, timeNow) {
     }
 
     // --- Card art (rounded, with shading) ---
+    const cachedArt = buffs.includes('polymorph') ? null : getCardArt(img, w, h, radius, false);
+    if (cachedArt) {
+        ctx.drawImage(cachedArt, x, y);
+        if (champ.hitFlashTimer > 0) {
+            roundRectPath(ctx, x, y, w, h, radius);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+            ctx.fill();
+        }
+    } else {
     ctx.save();
     roundRectPath(ctx, x, y, w, h, radius);
     ctx.clip();
@@ -1944,6 +1946,7 @@ function drawUnit(ctx, champ, timeNow) {
         ctx.fillRect(x, y, w, h);
     }
     ctx.restore();
+    }
 
     // --- Frames: rarity (with a traveling shine for 4-5 cost) + team glow ---
     let frame = rarity;
@@ -1961,8 +1964,15 @@ function drawUnit(ctx, champ, timeNow) {
     ctx.stroke();
 
     ctx.save();
-    if (!onBench) { ctx.shadowBlur = 10; ctx.shadowColor = teamColor; }
     roundRectPath(ctx, x - 2, y - 2, w + 4, h + 4, radius + 2);
+    if (!onBench) {
+        // PERF: soft outer halo with a wide translucent stroke instead of shadowBlur
+        ctx.globalAlpha *= 0.3;
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = teamColor;
+        ctx.stroke();
+        ctx.globalAlpha /= 0.3;
+    }
     ctx.lineWidth = 1.8;
     ctx.strokeStyle = teamColor;
     ctx.stroke();
@@ -2098,7 +2108,79 @@ function drawUnit(ctx, champ, timeNow) {
 // ======================================================================
 // BOARD BASE
 // ======================================================================
-function drawBoardBase(ctx, canvas, timeNow) {
+// ======================================================================
+// PERF CACHES: static board layer and pre-rendered card art
+// ======================================================================
+let boardLayer = null;
+let boardLayerHasBg = false;
+
+function getBoardLayer(canvas) {
+    const bg = IMAGE_CACHE["Background"];
+    const bgReady = !!(bg && bg.complete && bg.naturalHeight);
+    if (boardLayer && boardLayer.width === canvas.width && boardLayer.height === canvas.height
+        && boardLayerHasBg === bgReady) {
+        return boardLayer;
+    }
+    boardLayer = document.createElement('canvas');
+    boardLayer.width = canvas.width;
+    boardLayer.height = canvas.height;
+    const bctx = boardLayer.getContext('2d');
+    if (bgReady) {
+        const scale = canvas.height / bg.naturalHeight;
+        const newWidth = bg.naturalWidth * scale;
+        bctx.drawImage(bg, (canvas.width - newWidth) / 2, 0, newWidth, canvas.height);
+    }
+    drawBoardBase(bctx, canvas);
+    boardLayerHasBg = bgReady;
+    return boardLayer;
+}
+
+// Animated part of the center line (the only moving bit of the board)
+function drawCenterDash(ctx, canvas, timeNow) {
+    const mid = 3 * CONFIG.BOARD_CELL_HEIGHT;
+    ctx.save();
+    ctx.setLineDash([14, 22]);
+    ctx.lineDashOffset = -timeNow * 40;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(canvas.width, mid); ctx.stroke();
+    ctx.restore();
+}
+
+const cardArtCache = new Map();
+
+// Champion art clipped to a rounded card, with gloss and bottom shade baked in
+function getCardArt(img, w, h, radius, grayscale) {
+    if (!isImageReady(img)) return null;
+    const key = `${img.src}|${w}x${h}|${radius}|${grayscale ? 1 : 0}`;
+    let art = cardArtCache.get(key);
+    if (art) return art;
+
+    art = document.createElement('canvas');
+    art.width = Math.ceil(w);
+    art.height = Math.ceil(h);
+    const a = art.getContext('2d');
+    roundRectPath(a, 0, 0, w, h, radius);
+    a.clip();
+    if (grayscale) a.filter = 'grayscale(100%)';
+    a.drawImage(img, 0, 0, w, h);
+    a.filter = 'none';
+    if (!grayscale) {
+        const gloss = a.createLinearGradient(0, 0, 0, h * 0.35);
+        gloss.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
+        gloss.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        a.fillStyle = gloss; a.fillRect(0, 0, w, h * 0.35);
+        const shade = a.createLinearGradient(0, h - 30, 0, h);
+        shade.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        shade.addColorStop(1, 'rgba(0, 0, 0, 0.75)');
+        a.fillStyle = shade; a.fillRect(0, h - 30, w, 30);
+    }
+    if (cardArtCache.size > 400) cardArtCache.clear();
+    cardArtCache.set(key, art);
+    return art;
+}
+
+function drawBoardBase(ctx, canvas) {
     const cw = CONFIG.BOARD_CELL_WIDTH, ch = CONFIG.BOARD_CELL_HEIGHT;
     const boardH = CONFIG.BOARD_ROWS * ch;
     const mid = 3 * ch;
@@ -2146,12 +2228,6 @@ function drawBoardBase(ctx, canvas, timeNow) {
     ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(canvas.width, mid); ctx.stroke();
     ctx.shadowBlur = 0;
-    ctx.setLineDash([14, 22]);
-    ctx.lineDashOffset = -timeNow * 40;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(canvas.width, mid); ctx.stroke();
-    ctx.setLineDash([]);
 
     // Bench: dark tray with rounded sockets
     const benchY = CONFIG.BENCH_START_Y;

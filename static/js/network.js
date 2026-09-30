@@ -13,6 +13,16 @@ export const socket = io();
 // ==========================================
 socket.on('connect', () => {
     console.log('Connected to Server!');
+    // Diagnostics: combat sends 10 updates/s. Over HTTP long-polling (no WebSocket)
+    // that is very laggy — usually a deploy config problem (see README / gunicorn worker).
+    const engine = socket.io.engine;
+    console.log(`[NET] transport: ${engine.transport.name}`);
+    engine.once('upgrade', () => console.log(`[NET] upgraded to: ${engine.transport.name}`));
+    setTimeout(() => {
+        if (socket.connected && socket.io.engine.transport.name !== 'websocket') {
+            console.warn('[NET] Still on HTTP long-polling after 5s — WebSocket is not available on this server, combat will lag.');
+        }
+    }, 5000);
 });
 
 socket.on('champions_updated', async (data) => {

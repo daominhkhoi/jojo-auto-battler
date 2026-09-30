@@ -976,7 +976,20 @@ def handle_disconnect(*args):
 # ==========================================
 def _emit_board(game, events):
     """Send the current board to player 1 as-is and (if human) mirrored to player 2."""
-    base_champions = [c.to_dict() for c in game['board_state']]
+    # Bandwidth: full unit data only the first time a unit appears on this board
+    # (~9 KB/tick -> ~2 KB/tick); afterwards only the fields that change.
+    board = game['board_state']
+    sent = game.get('_sent')
+    if not sent or sent[0] is not board:
+        sent = (board, set())
+        game['_sent'] = sent
+    base_champions = []
+    for c in board:
+        if c.id in sent[1]:
+            base_champions.append(c.to_tick_dict())
+        else:
+            sent[1].add(c.id)
+            base_champions.append(c.to_dict())
 
     socketio.emit('sync_tick', {
         "champions":   base_champions,
@@ -1185,7 +1198,7 @@ def run_game_loop(room_name):
             board.extend(new_clones)
 
         # Broadcast state to both players
-        base_champions = _emit_board(game, all_tick_events)
+        _emit_board(game, all_tick_events)
 
         # Check end conditions
         team1_alive = any(c.team == 'Team1' and c.is_alive for c in board)
@@ -1196,6 +1209,7 @@ def run_game_loop(room_name):
             continue
 
         winner = _decide_winner(board, time_out)
+        base_champions = [c.to_dict() for c in board]  # full data for the bots' next-round logic
 
         if winner == 'Team1':
             game['p1_lp'] = game.get('p1_lp', 0) + 1

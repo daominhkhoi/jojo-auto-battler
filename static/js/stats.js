@@ -32,6 +32,7 @@ export function switchRightTab(tabName) {
     const paneStats = document.getElementById('statsTabContent');
 
     if (tabName === 'stats') {
+        setTimeout(renderStatsList, 0); // data may have been collected while hidden
         if (tabSynergy) tabSynergy.classList.remove('active');
         if (tabStats) tabStats.classList.add('active');
         if (paneSynergy) {
@@ -79,7 +80,7 @@ export function initStatsPanel() {
                 <span id="statStatusBadge" class="stat-status-badge prep">⏳ PREPARATION</span>
             </div>
             <div id="statRoundSubtitle" class="stat-subtitle">Round 1 • Ready for battle</div>
-            
+
             <!-- Dual Team Total Comparison Bar -->
             <div class="stat-duel-wrapper" id="statDuelWrapper">
                 <div class="stat-duel-labels">
@@ -173,6 +174,16 @@ export function freezeDamageStatsOnCombatEnd(result) {
 /**
  * Called every sync tick with the latest champions array.
  */
+// PERF: sync ticks arrive 10x/s; rebuilding the meter's HTML every tick caused
+// constant layout work. Data is still collected every tick, the DOM is redrawn
+// at most ~3x/s and only while the Damage Meter tab is visible.
+let lastStatsRender = 0;
+
+function statsPaneVisible() {
+    const pane = document.getElementById('statsTabContent');
+    return !!pane && pane.style.display !== 'none' && pane.offsetParent !== null;
+}
+
 export function updateDamageStats(champions) {
     if (!Array.isArray(champions) || champions.length === 0) return;
 
@@ -214,6 +225,9 @@ export function updateDamageStats(champions) {
     cachedAllies = allies;
     cachedEnemies = enemies;
 
+    const now = performance.now();
+    if (!statsPaneVisible() || now - lastStatsRender < 330) return;
+    lastStatsRender = now;
     renderStatsList();
 }
 
@@ -329,8 +343,8 @@ function renderChampionRows(list, teamTotal, maxCombatDmg, side) {
                     <span class="stat-rank">${rankLabel}</span>
                     <div class="stat-avatar-wrapper" style="border-color: ${tierBorder};">
                         <div class="stat-avatar-placeholder">${initials}</div>
-                        ${safeAvatarUrl 
-                            ? `<img src="${safeAvatarUrl}" class="stat-avatar" alt="${champ.name}" loading="lazy" onload="if(this.previousElementSibling)this.previousElementSibling.style.display='none';" onerror="this.style.display='none';if(this.previousElementSibling)this.previousElementSibling.style.display='flex';">` 
+                        ${safeAvatarUrl
+                            ? `<img src="${safeAvatarUrl}" class="stat-avatar" alt="${champ.name}" loading="lazy" onload="if(this.previousElementSibling)this.previousElementSibling.style.display='none';" onerror="this.style.display='none';if(this.previousElementSibling)this.previousElementSibling.style.display='flex';">`
                             : ''}
                     </div>
                     <div class="stat-name-stars">

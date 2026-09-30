@@ -68,7 +68,7 @@ Marilyn Manson,1,55403,2670,2,1.15,100,"Green Dolphin, Automatic",damage,19800,,
 Metallica,4,111700,4805,4,01.04,80,"La Squadra, Phenomenon",dot,11500,,7.1,enemy_closest
 Moody Blues,1,57066,1530,3,01.01,100,"Bucciarati, Utility",clone,0.3,,,self
 Mr.President,2,124684,2230,1,01.03,100,"Bucciarati, Bound",aoe_heal,5000,5,10,self
-Notorious B.I.G,2,114686,3870,1,1,80,"Unita Speciale, Automatic",revive,,,,self
+Notorious B.I.G,3,157976,1109,1,01.05,150,"Unita Speciale, Automatic",revive,,,,self
 Oasis,4,164059,6811,1,01.03,120,"Unita Speciale, Power Type",submerge,,,4.5,self
 Osiris,2,88386,2230,3,0.98,100,"Tarot, Utility",stat_steal,5035,,5.5,enemy_closest
 Pearl Jam,2,87458,2230,3,01.01,100,"Morioh, Utility",mana_battery,30,,8,ally_lowest_mana

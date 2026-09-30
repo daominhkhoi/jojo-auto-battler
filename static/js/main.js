@@ -571,21 +571,31 @@ window.addEventListener('keydown', (e) => {
 // ==========================================
 // RENDER LOOP (GAME LOOP)
 // ==========================================
-function animationLoop() {
+// PERF: all animations are frame-based and tuned for 60 FPS. On 120/144 Hz screens
+// the loop used to run 2-2.4x as often (double CPU/GPU work and double-speed FX),
+// so frames are capped at ~60 FPS.
+const FRAME_MS = 1000 / 60;
+let lastFrameTime = 0;
+let lastInfoRefresh = 0;
+
+function animationLoop(now = performance.now()) {
+    requestAnimationFrame(animationLoop);
+    if (now - lastFrameTime < FRAME_MS - 2) return;
+    lastFrameTime = now;
+
     // Hit-stop: freeze the simulation for a few frames on big impacts (keep rendering)
     if (STATE.hitStop > 0) STATE.hitStop--;
     else updatePhysics();
     renderBoard(ctx, canvas);
 
-    // Keep info panel updated in real-time continuously
-    if (STATE.inspectedChampId) {
+    // Info panel of the inspected unit: refresh ~5x/s instead of every frame
+    if (STATE.inspectedChampId && now - lastInfoRefresh > 200) {
+        lastInfoRefresh = now;
         const liveChamp = STATE.champions.find(c => c.id === STATE.inspectedChampId);
         if (liveChamp) {
             showDisplayInfo('champ', liveChamp);
         }
     }
-
-    requestAnimationFrame(animationLoop);
 }
 
 // ==========================================
