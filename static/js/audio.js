@@ -1,242 +1,300 @@
 // static/js/audio.js
-// High-performance Web Audio & JoJo Anime Stand SFX Manager for Auto Battler
+// Web Audio SFX engine.
+//  - Buffers are decoded once; every play is a fresh BufferSource (unlimited, cheap).
+//  - Small random pitch/volume variation so repeated hits never sound robotic.
+//  - Stereo panning from the unit's position on the board.
+//  - Two buses: "world" (combat: hits, deaths…) and "cinema" (skills, UI, banners).
+//    During a time stop the world bus is muffled through a low-pass filter, the
+//    cinema bus stays clear — just like the anime.
+//  - Drop your own files into /static/sounds/custom/ (named like the keys below)
+//    to replace any sound without touching code.
 
+const S = '/static/sounds/';
+const ST = '/static/sounds/stands/';
+
+// key -> { src, volume, bus, jitter (pitch variation), minInterval (ms), maxVoices }
 const SFX_CONFIG = {
-    // Core game UI sounds
-    buy: { src: '/static/sounds/buy.wav', volume: 0.75, maxPool: 4, minInterval: 50 },
-    sell: { src: '/static/sounds/sell.wav', volume: 0.75, maxPool: 3, minInterval: 50 },
-    roll: { src: '/static/sounds/roll.wav', volume: 0.7, maxPool: 3, minInterval: 80 },
-    levelup: { src: '/static/sounds/levelup.wav', volume: 0.9, maxPool: 2, minInterval: 200 },
-    starup: { src: '/static/sounds/starup.wav', volume: 0.95, maxPool: 2, minInterval: 200 },
-    battle_start: { src: '/static/sounds/battle_start.wav', volume: 0.9, maxPool: 2, minInterval: 500 },
-    round_win: { src: '/static/sounds/round_win.wav', volume: 0.9, maxPool: 2, minInterval: 500 },
-    round_lose: { src: '/static/sounds/round_lose.wav', volume: 0.85, maxPool: 2, minInterval: 500 },
-    hit_normal: { src: '/static/sounds/hit_normal.wav', volume: 0.45, maxPool: 5, minInterval: 65 },
-    hit_crit: { src: '/static/sounds/hit_crit.wav', volume: 0.65, maxPool: 4, minInterval: 85 },
-    skill_cast: { src: '/static/sounds/skill_cast.wav', volume: 0.7, maxPool: 4, minInterval: 100 },
-    death: { src: '/static/sounds/death.wav', volume: 0.6, maxPool: 3, minInterval: 120 },
-    time_stop: { src: '/static/sounds/time_stop.wav', volume: 1.0, maxPool: 2, minInterval: 800 },
+    // UI
+    buy:          { src: S + 'buy.wav',          volume: 0.6,  bus: 'cinema', jitter: 0.04, minInterval: 40,  maxVoices: 3 },
+    sell:         { src: S + 'sell.wav',         volume: 0.6,  bus: 'cinema', jitter: 0.04, minInterval: 40,  maxVoices: 3 },
+    roll:         { src: S + 'roll.wav',         volume: 0.55, bus: 'cinema', jitter: 0.05, minInterval: 60,  maxVoices: 2 },
+    levelup:      { src: S + 'levelup.wav',      volume: 0.7,  bus: 'cinema', jitter: 0,    minInterval: 150, maxVoices: 1 },
+    starup:       { src: S + 'starup.wav',       volume: 0.8,  bus: 'cinema', jitter: 0,    minInterval: 150, maxVoices: 2 },
 
-    // Iconic JoJo Stand SFX
-    'The World': { src: '/static/sounds/stands/The World.wav', volume: 1.0, maxPool: 2, minInterval: 600 },
-    'Star Platinum': { src: '/static/sounds/stands/Star Platinum.wav', volume: 0.9, maxPool: 2, minInterval: 500 },
-    'Killer Queen': { src: '/static/sounds/stands/Killer Queen.wav', volume: 0.95, maxPool: 2, minInterval: 500 },
-    'King Crimson': { src: '/static/sounds/stands/King Crimson.wav', volume: 0.95, maxPool: 2, minInterval: 600 },
-    'Gold Experience Requiem': { src: '/static/sounds/stands/Gold Experience Requiem.wav', volume: 0.9, maxPool: 2, minInterval: 600 },
-    'Gold Experience': { src: '/static/sounds/stands/Gold Experience.wav', volume: 0.85, maxPool: 2, minInterval: 500 },
-    'Crazy Diamond': { src: '/static/sounds/stands/Crazy Diamond.wav', volume: 0.85, maxPool: 2, minInterval: 400 },
-    'The Hand': { src: '/static/sounds/stands/The Hand.wav', volume: 0.9, maxPool: 2, minInterval: 400 },
-    'Sticky Fingers': { src: '/static/sounds/stands/Sticky Fingers.wav', volume: 0.85, maxPool: 2, minInterval: 350 },
-    'Aerosmith': { src: '/static/sounds/stands/Aerosmith.wav', volume: 0.8, maxPool: 2, minInterval: 350 },
-    'Hierophant Green': { src: '/static/sounds/stands/Hierophant Green.wav', volume: 0.85, maxPool: 2, minInterval: 350 },
-    'Magician\'s Red': { src: '/static/sounds/stands/Magician\'s Red.wav', volume: 0.85, maxPool: 2, minInterval: 400 },
-    'Silver Chariot': { src: '/static/sounds/stands/Silver Chariot.wav', volume: 0.8, maxPool: 3, minInterval: 250 },
-    'Sex Pistols': { src: '/static/sounds/stands/Sex Pistols.wav', volume: 0.8, maxPool: 3, minInterval: 250 },
-    'Purple Haze': { src: '/static/sounds/stands/Purple Haze.wav', volume: 0.85, maxPool: 2, minInterval: 400 },
-    'White Album': { src: '/static/sounds/stands/White Album.wav', volume: 0.85, maxPool: 2, minInterval: 400 },
-    'Red Hot Chili Pepper': { src: '/static/sounds/stands/Red Hot Chili Pepper.wav', volume: 0.85, maxPool: 2, minInterval: 350 },
-    'Bad Company': { src: '/static/sounds/stands/Bad Company.wav', volume: 0.85, maxPool: 2, minInterval: 350 },
-    'Weather Report': { src: '/static/sounds/stands/Weather Report.wav', volume: 0.9, maxPool: 2, minInterval: 450 },
-    'Cream': { src: '/static/sounds/stands/Cream.wav', volume: 0.9, maxPool: 2, minInterval: 450 },
-    'Whitesnake': { src: '/static/sounds/stands/Whitesnake.wav', volume: 0.85, maxPool: 2, minInterval: 350 },
-    'C-MOON': { src: '/static/sounds/stands/C-MOON.wav', volume: 0.9, maxPool: 2, minInterval: 500 },
-    'Made in Heaven': { src: '/static/sounds/stands/Made in Heaven.wav', volume: 0.95, maxPool: 2, minInterval: 500 },
+    // Match flow
+    battle_start: { src: S + 'battle_start.wav', volume: 0.85, bus: 'cinema', jitter: 0,    minInterval: 500, maxVoices: 1 },
+    round_win:    { src: S + 'round_win.wav',    volume: 0.8,  bus: 'cinema', jitter: 0,    minInterval: 500, maxVoices: 1 },
+    round_lose:   { src: S + 'round_lose.wav',   volume: 0.8,  bus: 'cinema', jitter: 0,    minInterval: 500, maxVoices: 1 },
+    menacing:     { src: S + 'menacing.wav',     volume: 0.9,  bus: 'cinema', jitter: 0,    minInterval: 1500, maxVoices: 1 },
+    time_stop:    { src: S + 'time_stop.wav',    volume: 1.0,  bus: 'cinema', jitter: 0,    minInterval: 800, maxVoices: 1 },
+    time_resume:  { src: S + 'time_resume.wav',  volume: 0.9,  bus: 'cinema', jitter: 0,    minInterval: 800, maxVoices: 1 },
 
-    // Archetype Stand SFX
-    'archetype_slash': { src: '/static/sounds/stands/archetype_slash.wav', volume: 0.7, maxPool: 4, minInterval: 80 },
-    'archetype_bullet': { src: '/static/sounds/stands/archetype_bullet.wav', volume: 0.7, maxPool: 4, minInterval: 80 },
-    'archetype_shield': { src: '/static/sounds/stands/archetype_shield.wav', volume: 0.75, maxPool: 3, minInterval: 150 },
-    'archetype_heal': { src: '/static/sounds/stands/archetype_heal.wav', volume: 0.75, maxPool: 3, minInterval: 150 },
-    'archetype_mind': { src: '/static/sounds/stands/archetype_mind.wav', volume: 0.75, maxPool: 3, minInterval: 150 },
-    'archetype_submerge': { src: '/static/sounds/stands/archetype_submerge.wav', volume: 0.75, maxPool: 3, minInterval: 150 },
-    'archetype_clone': { src: '/static/sounds/stands/archetype_clone.wav', volume: 0.75, maxPool: 3, minInterval: 150 }
+    // Combat (world bus)
+    hit_normal:   { src: S + 'hit_normal.wav',   volume: 0.45, bus: 'world', jitter: 0.12, minInterval: 30,  maxVoices: 6 },
+    hit_crit:     { src: S + 'hit_crit.wav',     volume: 0.7,  bus: 'world', jitter: 0.06, minInterval: 60,  maxVoices: 3 },
+    death:        { src: S + 'death.wav',        volume: 0.65, bus: 'world', jitter: 0.08, minInterval: 80,  maxVoices: 3 },
+    skill_cast:   { src: S + 'skill_cast.wav',   volume: 0.6,  bus: 'cinema', jitter: 0.05, minInterval: 80, maxVoices: 3 },
+    attack_rush:  { src: S + 'attack_rush.wav',  volume: 0.5,  bus: 'world', jitter: 0.1,  minInterval: 40,  maxVoices: 4 },
+    attack_blade: { src: S + 'attack_blade.wav', volume: 0.45, bus: 'world', jitter: 0.1,  minInterval: 40,  maxVoices: 4 },
+    attack_bullet:{ src: S + 'attack_bullet.wav',volume: 0.45, bus: 'world', jitter: 0.1,  minInterval: 40,  maxVoices: 4 },
+    attack_orb:   { src: S + 'attack_orb.wav',   volume: 0.45, bus: 'world', jitter: 0.12, minInterval: 40,  maxVoices: 4 },
+    attack_strike:{ src: S + 'attack_strike.wav',volume: 0.5,  bus: 'world', jitter: 0.12, minInterval: 40,  maxVoices: 4 },
+
+    // Stand signatures
+    'The World':               { src: ST + 'The World.wav',               volume: 1.0,  bus: 'cinema', minInterval: 600 },
+    'Star Platinum':           { src: ST + 'Star Platinum.wav',           volume: 1.0,  bus: 'cinema', minInterval: 600 },
+    'Killer Queen':            { src: ST + 'Killer Queen.wav',            volume: 0.95, bus: 'cinema', minInterval: 400 },
+    'King Crimson':            { src: ST + 'King Crimson.wav',            volume: 0.9,  bus: 'cinema', minInterval: 500 },
+    'Gold Experience Requiem': { src: ST + 'Gold Experience Requiem.wav', volume: 0.95, bus: 'cinema', minInterval: 600 },
+    'Gold Experience':         { src: ST + 'Gold Experience.wav',         volume: 0.85, bus: 'cinema', minInterval: 400 },
+    'Crazy Diamond':           { src: ST + 'Crazy Diamond.wav',           volume: 0.85, bus: 'cinema', minInterval: 400 },
+    'The Hand':                { src: ST + 'The Hand.wav',                volume: 0.9,  bus: 'cinema', minInterval: 400 },
+    'Sticky Fingers':          { src: ST + 'Sticky Fingers.wav',          volume: 0.85, bus: 'cinema', minInterval: 350 },
+    'Aerosmith':               { src: ST + 'Aerosmith.wav',               volume: 0.8,  bus: 'cinema', minInterval: 350 },
+    'Hierophant Green':        { src: ST + 'Hierophant Green.wav',        volume: 0.85, bus: 'cinema', minInterval: 350 },
+    "Magician's Red":          { src: ST + "Magician's Red.wav",          volume: 0.85, bus: 'cinema', minInterval: 400 },
+    'Silver Chariot':          { src: ST + 'Silver Chariot.wav',          volume: 0.8,  bus: 'cinema', minInterval: 250 },
+    'Sex Pistols':             { src: ST + 'Sex Pistols.wav',             volume: 0.8,  bus: 'cinema', minInterval: 250 },
+    'Purple Haze':             { src: ST + 'Purple Haze.wav',             volume: 0.85, bus: 'cinema', minInterval: 400 },
+    'White Album':             { src: ST + 'White Album.wav',             volume: 0.85, bus: 'cinema', minInterval: 400 },
+    'Red Hot Chili Pepper':    { src: ST + 'Red Hot Chili Pepper.wav',    volume: 0.85, bus: 'cinema', minInterval: 350 },
+    'Bad Company':             { src: ST + 'Bad Company.wav',             volume: 0.85, bus: 'cinema', minInterval: 350 },
+    'Weather Report':          { src: ST + 'Weather Report.wav',          volume: 0.95, bus: 'cinema', minInterval: 450 },
+    'Cream':                   { src: ST + 'Cream.wav',                   volume: 0.9,  bus: 'cinema', minInterval: 450 },
+    'Whitesnake':              { src: ST + 'Whitesnake.wav',              volume: 0.85, bus: 'cinema', minInterval: 350 },
+    'C-MOON':                  { src: ST + 'C-MOON.wav',                  volume: 0.9,  bus: 'cinema', minInterval: 500 },
+    'Made in Heaven':          { src: ST + 'Made in Heaven.wav',          volume: 0.95, bus: 'cinema', minInterval: 500 },
+
+    // Skill archetypes (stands without a signature sound)
+    archetype_slash:    { src: ST + 'archetype_slash.wav',    volume: 0.6,  bus: 'cinema', jitter: 0.06, minInterval: 80 },
+    archetype_bullet:   { src: ST + 'archetype_bullet.wav',   volume: 0.6,  bus: 'cinema', jitter: 0.06, minInterval: 80 },
+    archetype_shield:   { src: ST + 'archetype_shield.wav',   volume: 0.65, bus: 'cinema', jitter: 0.04, minInterval: 150 },
+    archetype_heal:     { src: ST + 'archetype_heal.wav',     volume: 0.65, bus: 'cinema', jitter: 0.04, minInterval: 150 },
+    archetype_mind:     { src: ST + 'archetype_mind.wav',     volume: 0.65, bus: 'cinema', jitter: 0.04, minInterval: 150 },
+    archetype_submerge: { src: ST + 'archetype_submerge.wav', volume: 0.65, bus: 'cinema', jitter: 0.04, minInterval: 150 },
+    archetype_clone:    { src: ST + 'archetype_clone.wav',    volume: 0.65, bus: 'cinema', jitter: 0.04, minInterval: 150 },
 };
 
-// Stand Signature Skill Map
-const SIGNATURE_STAND_SFX = {
-    'The World': 'The World',
-    'Star Platinum': 'Star Platinum',
-    'Killer Queen': 'Killer Queen',
-    'King Crimson': 'King Crimson',
-    'Gold Experience Requiem': 'Gold Experience Requiem',
-    'Gold Experience': 'Gold Experience',
-    'Crazy Diamond': 'Crazy Diamond',
-    'The Hand': 'The Hand',
-    'Sticky Fingers': 'Sticky Fingers',
-    'Aerosmith': 'Aerosmith',
-    'Hierophant Green': 'Hierophant Green',
-    'Magician\'s Red': 'Magician\'s Red',
-    'Silver Chariot': 'Silver Chariot',
-    'Sex Pistols': 'Sex Pistols',
-    'Purple Haze': 'Purple Haze',
-    'White Album': 'White Album',
-    'Red Hot Chili Pepper': 'Red Hot Chili Pepper',
-    'Bad Company': 'Bad Company',
-    'Weather Report': 'Weather Report',
-    'Cream': 'Cream',
-    'Whitesnake': 'Whitesnake',
-    'C-MOON': 'C-MOON',
-    'Made in Heaven': 'Made in Heaven',
-};
+const SIGNATURE_STANDS = new Set(Object.keys(SFX_CONFIG).filter(k => SFX_CONFIG[k].src.startsWith(ST) && !k.startsWith('archetype_')));
 
-// Skill type archetype mapping for all other stands
+// Skill type -> sound for stands without a signature
 const ARCHETYPE_SKILL_SFX = {
-    'ricochet': 'archetype_bullet',
-    'blink_strike': 'archetype_slash',
-    'buff_atk': 'archetype_slash',
-    'hp_shield': 'archetype_shield',
-    'heal': 'archetype_heal',
-    'aoe_heal': 'archetype_heal',
-    'regen': 'archetype_heal',
-    'mind_control': 'archetype_mind',
-    'damage_link': 'archetype_mind',
-    'mana_lock': 'archetype_mind',
-    'polymorph': 'archetype_mind',
-    'submerge': 'archetype_submerge',
-    'clone': 'archetype_clone',
-    'banish': 'Cream',
-    'time_stop': 'The World',
-    'return_to_zero': 'Gold Experience Requiem',
-    'execute': 'Killer Queen',
+    ricochet: 'archetype_bullet',
+    blink_strike: 'archetype_slash',
+    buff_atk: 'archetype_slash',
+    hp_shield: 'archetype_shield',
+    evasion: 'archetype_shield',
+    revive: 'archetype_heal',
+    heal: 'archetype_heal',
+    aoe_heal: 'archetype_heal',
+    regen: 'archetype_heal',
+    mind_control: 'archetype_mind',
+    damage_link: 'archetype_mind',
+    mana_lock: 'archetype_mind',
+    polymorph: 'archetype_mind',
+    stun: 'archetype_mind',
+    submerge: 'archetype_submerge',
+    clone: 'archetype_clone',
+    banish: 'Cream',
+    time_stop: 'The World',
+    return_to_zero: 'Gold Experience Requiem',
+    execute: 'Killer Queen',
+    pull: 'The Hand',
+    swap: 'Sticky Fingers',
+    global_slow: 'C-MOON',
+    aoe_dot: 'Purple Haze',
+    dot: "Magician's Red",
 };
-
-// Blade & Gun stands for attack sounds
-const BLADE_STANDS = new Set([
-    'Silver Chariot', 'Anubis', 'Clash', 'Chariot Requiem', 'Metallica'
-]);
-const GUN_STANDS = new Set([
-    'Emperor', 'Sex Pistols', 'Aerosmith', 'Bad Company', 'Manhattan Transfer', 'Ratt'
-]);
 
 let isMuted = false;
-try {
-    isMuted = localStorage.getItem('gameSfxMuted') === 'true';
-} catch (e) {
-    isMuted = false;
-}
+try { isMuted = localStorage.getItem('gameSfxMuted') === 'true'; } catch (e) { isMuted = false; }
 
-const audioPool = {};
+let ctx = null;
+let masterGain, worldBus, cinemaBus, worldFilter;
+const buffers = {};
 const lastPlayTimes = {};
-let audioUnlocked = false;
+const activeVoices = {};
+let timeStopped = false;
 
-/**
- * Preload all sound effects into an object pool.
- */
-export function initAudio() {
-    Object.keys(SFX_CONFIG).forEach(key => {
-        const conf = SFX_CONFIG[key];
-        audioPool[key] = [];
-        lastPlayTimes[key] = 0;
+function buildGraph() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    ctx = new AC();
 
-        for (let i = 0; i < conf.maxPool; i++) {
-            const audio = new Audio(conf.src);
-            audio.preload = 'auto';
-            audio.volume = conf.volume;
-            audioPool[key].push(audio);
-        }
-    });
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -14;
+    compressor.knee.value = 10;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.2;
 
-    // Browser audio unlock on first user gesture
-    const unlockHandler = () => {
-        if (audioUnlocked) return;
-        audioUnlocked = true;
-        const silent = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
-        silent.play().catch(() => {});
-        window.removeEventListener('pointerdown', unlockHandler);
-        window.removeEventListener('keydown', unlockHandler);
-    };
-    window.addEventListener('pointerdown', unlockHandler, { once: true });
-    window.addEventListener('keydown', unlockHandler, { once: true });
+    masterGain = ctx.createGain();
+    masterGain.gain.value = isMuted ? 0 : 0.9;
 
-    updateSfxBtnUI();
+    worldFilter = ctx.createBiquadFilter();
+    worldFilter.type = 'lowpass';
+    worldFilter.frequency.value = 20000;
+    worldFilter.Q.value = 0.8;
+
+    worldBus = ctx.createGain();
+    cinemaBus = ctx.createGain();
+
+    worldBus.connect(worldFilter).connect(compressor);
+    cinemaBus.connect(compressor);
+    compressor.connect(masterGain).connect(ctx.destination);
+    return true;
+}
+
+async function loadBuffer(key, url) {
+    try {
+        const res = await fetch(url);
+        if (!res.ok) return false;
+        const data = await res.arrayBuffer();
+        buffers[key] = await ctx.decodeAudioData(data);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// Files in /static/sounds/custom/ override built-in sounds by name, e.g. "The World.mp3"
+async function loadCustomOverrides() {
+    try {
+        const res = await fetch('/api/custom_sounds', { cache: 'no-store' });
+        if (!res.ok) return {};
+        const files = await res.json();
+        const map = {};
+        const keysLower = Object.fromEntries(Object.keys(SFX_CONFIG).map(k => [k.toLowerCase(), k]));
+        files.forEach(file => {
+            const stem = file.replace(/\.[^.]+$/, '').toLowerCase();
+            if (keysLower[stem]) map[keysLower[stem]] = `/static/sounds/custom/${encodeURIComponent(file)}`;
+        });
+        return map;
+    } catch (e) {
+        return {};
+    }
 }
 
 /**
- * Play a specific sound effect with intelligent throttling and polyphony.
+ * Create the audio graph and preload every sound.
  */
-export function playSfx(name, volumeOverride = null) {
-    if (isMuted) return;
+export async function initAudio() {
+    updateSfxBtnUI();
+    if (!buildGraph()) return;
+
+    // Browsers start audio suspended until the first user gesture
+    const unlock = () => { if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {}); };
+    ['pointerdown', 'keydown', 'touchstart'].forEach(evt => window.addEventListener(evt, unlock, { passive: true }));
+
+    const overrides = await loadCustomOverrides();
+    const custom = Object.keys(overrides);
+    if (custom.length) console.log(`[SFX] Using ${custom.length} custom sound(s):`, custom.join(', '));
+
+    await Promise.all(Object.entries(SFX_CONFIG).map(async ([key, conf]) => {
+        if (overrides[key] && await loadBuffer(key, overrides[key])) return;
+        await loadBuffer(key, encodeURI(conf.src));
+    }));
+}
+
+/**
+ * Play a sound. opts: { volume, rate, pan (-1..1), bus }
+ */
+export function playSfx(name, opts = {}) {
+    if (isMuted || !ctx) return;
     const conf = SFX_CONFIG[name];
-    if (!conf || !audioPool[name]) return;
+    const buffer = buffers[name];
+    if (!conf || !buffer) return;
+    if (ctx.state !== 'running') return;
 
     const now = performance.now();
-    if (conf.minInterval && (now - lastPlayTimes[name] < conf.minInterval)) {
-        return;
-    }
+    if (conf.minInterval && now - (lastPlayTimes[name] || 0) < conf.minInterval) return;
+    const maxVoices = conf.maxVoices || 2;
+    if ((activeVoices[name] || 0) >= maxVoices) return;
     lastPlayTimes[name] = now;
 
-    const pool = audioPool[name];
-    let audio = pool.find(a => a.paused || a.ended);
-    if (!audio) {
-        audio = pool[0];
-    }
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const jitter = conf.jitter || 0;
+    src.playbackRate.value = (opts.rate || 1) * (1 + (Math.random() * 2 - 1) * jitter);
 
-    try {
-        audio.currentTime = 0;
-        audio.volume = (volumeOverride !== null ? volumeOverride : conf.volume);
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(() => {});
-        }
-    } catch (e) {}
+    const gain = ctx.createGain();
+    const volume = (typeof opts === 'number' ? opts : opts.volume) ?? conf.volume;
+    gain.gain.value = volume * (1 - Math.random() * jitter * 0.8);
+
+    let node = src.connect(gain);
+    if (opts.pan && ctx.createStereoPanner) {
+        const panner = ctx.createStereoPanner();
+        panner.pan.value = Math.max(-1, Math.min(1, opts.pan));
+        node = node.connect(panner);
+    }
+    node.connect((opts.bus || conf.bus) === 'world' ? worldBus : cinemaBus);
+
+    activeVoices[name] = (activeVoices[name] || 0) + 1;
+    src.onended = () => { activeVoices[name] = Math.max(0, (activeVoices[name] || 1) - 1); };
+    src.start();
+}
+
+// Board x (canvas pixels) -> stereo pan
+function panFromX(x) {
+    if (typeof x !== 'number') return 0;
+    return ((x / 540) * 2 - 1) * 0.7;
 }
 
 /**
- * Play unique anime skill SFX according to Champion identity or Skill Type.
+ * Skill cast: the stand's own signature sound, else an archetype for the skill type.
  */
 export function playStandSkillSfx(champName, skillType) {
     if (isMuted) return;
     const baseName = (champName || '').replace(/\s*\(CLONE\)$/i, '').trim();
-
-    // 1. Signature Stand sound
-    if (SIGNATURE_STAND_SFX[baseName] && audioPool[SIGNATURE_STAND_SFX[baseName]]) {
-        playSfx(SIGNATURE_STAND_SFX[baseName]);
+    if (SIGNATURE_STANDS.has(baseName)) {
+        playSfx(baseName);
         return;
     }
-
-    // 2. Archetype skill sound
-    if (skillType && ARCHETYPE_SKILL_SFX[skillType] && audioPool[ARCHETYPE_SKILL_SFX[skillType]]) {
-        playSfx(ARCHETYPE_SKILL_SFX[skillType]);
+    const archetype = skillType && ARCHETYPE_SKILL_SFX[skillType];
+    if (archetype) {
+        playSfx(archetype);
         return;
     }
-
-    // 3. Fallback generic skill cast
     playSfx('skill_cast');
 }
 
 /**
- * Play basic/crit attack sound customized by stand weapon type.
+ * Basic attack landing: the attack style's sound (rush / blade / bullet / orb / strike)
+ * layered with a heavy impact on crits, panned to where the hit lands.
  */
-export function playStandAttackSfx(attackerName, isCrit) {
+export function playStandAttackSfx(attackerName, isCrit, opts = {}) {
     if (isMuted) return;
-    const baseName = (attackerName || '').replace(/\s*\(CLONE\)$/i, '').trim();
+    const pan = panFromX(opts.x);
+    const style = opts.style || 'strike';
+    playSfx(`attack_${style}`, { pan });
+    if (isCrit) playSfx('hit_crit', { pan });
+    else if (style === 'orb' || style === 'bullet') playSfx('hit_normal', { pan, volume: 0.3 });
+}
 
-    if (BLADE_STANDS.has(baseName)) {
-        playSfx('archetype_slash');
-    } else if (GUN_STANDS.has(baseName)) {
-        playSfx('archetype_bullet');
-    } else {
-        playSfx(isCrit ? 'hit_crit' : 'hit_normal');
-    }
+export function playPositionalSfx(name, x) {
+    playSfx(name, { pan: panFromX(x) });
 }
 
 /**
- * Toggle sound on or off.
+ * ZA WARUDO: muffle the combat world while time is stopped.
  */
+export function setTimeStopped(stopped) {
+    if (!ctx || stopped === timeStopped) return;
+    timeStopped = stopped;
+    const t = ctx.currentTime;
+    worldFilter.frequency.cancelScheduledValues(t);
+    worldFilter.frequency.setTargetAtTime(stopped ? 520 : 20000, t, stopped ? 0.06 : 0.18);
+    worldBus.gain.cancelScheduledValues(t);
+    worldBus.gain.setTargetAtTime(stopped ? 0.55 : 1, t, 0.1);
+    if (!stopped) playSfx('time_resume');
+}
+
 export function toggleSfxMute() {
     isMuted = !isMuted;
-    try {
-        localStorage.setItem('gameSfxMuted', isMuted ? 'true' : 'false');
-    } catch (e) {}
-
-    if (isMuted) {
-        Object.keys(audioPool).forEach(key => {
-            audioPool[key].forEach(a => {
-                try { a.pause(); a.currentTime = 0; } catch (e) {}
-            });
-        });
+    try { localStorage.setItem('gameSfxMuted', isMuted ? 'true' : 'false'); } catch (e) {}
+    if (ctx && masterGain) {
+        masterGain.gain.setTargetAtTime(isMuted ? 0 : 0.9, ctx.currentTime, 0.03);
     }
-
     updateSfxBtnUI();
     return isMuted;
 }
@@ -265,4 +323,19 @@ export function updateSfxBtnUI() {
             </svg>
         `;
     }
+}
+
+// For debugging in the browser console: (await import('/static/js/audio.js')).audioDebugInfo()
+export function audioDebugInfo() {
+    return {
+        state: ctx ? ctx.state : 'no-audio',
+        loaded: Object.keys(buffers).length,
+        expected: Object.keys(SFX_CONFIG).length,
+        missing: Object.keys(SFX_CONFIG).filter(k => !buffers[k]),
+        timeStopped,
+    };
+}
+
+export function listSfxKeys() {
+    return Object.keys(SFX_CONFIG);
 }

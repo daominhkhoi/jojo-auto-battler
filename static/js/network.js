@@ -178,6 +178,7 @@ socket.on('opponent_disconnected', () => {
 
 socket.on('match_locked', () => {
     STATE.isInspecting = true;
+    playSfx('menacing');   // ゴゴゴゴ
     if (STATE.isBotVsBot) {
         showNotification("🔒 Battlefield locked! Starting combat...", "info");
         const bvbTimer = document.getElementById('bvbTimerText');

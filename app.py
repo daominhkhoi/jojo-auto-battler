@@ -682,6 +682,19 @@ def get_champions_api():
     resp.headers['Expires'] = '0'
     return resp
 
+@app.route('/api/custom_sounds')
+def custom_sounds_api():
+    """List user-provided sound overrides in static/sounds/custom/ (see README there)."""
+    folder = os.path.join(app.static_folder, 'sounds', 'custom')
+    files = []
+    if os.path.isdir(folder):
+        files = sorted(f for f in os.listdir(folder)
+                       if f.lower().endswith(('.wav', '.mp3', '.ogg', '.m4a', '.webm')))
+    resp = jsonify(files)
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
+
+
 @app.route('/api/reload_champions', methods=['GET', 'POST'])
 def reload_champions_api():
     """Force an immediate reload from Google Sheets and return sync status."""

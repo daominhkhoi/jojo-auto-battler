@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sound Test</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=Rajdhani:wght@500;700&display=swap">
+    <style>
+        :root { --ink: #09060f; --gold: #ffd23f; --pink: #ff3d8b; --violet: #8b5cff; --text: #f4eeff; --muted: #9d92b8; }
+        body {
+            margin: 0; padding: 24px 16px 48px; color: var(--text);
+            font-family: "Rajdhani", "Segoe UI", sans-serif; font-weight: 600;
+            background: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1.5px) 0 0 / 14px 14px, var(--ink);
+        }
+        h1 { font-family: "Bangers", Impact, sans-serif; font-weight: 400; letter-spacing: 3px; color: var(--gold); margin: 0 0 4px; font-size: 40px; text-shadow: 3px 3px 0 #000; }
+        p.note { color: var(--muted); margin: 0 0 18px; max-width: 760px; }
+        h2 { font-family: "Bangers", Impact, sans-serif; font-weight: 400; letter-spacing: 2px; color: var(--pink); margin: 22px 0 10px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+        button {
+            font: inherit; color: #fff; cursor: pointer; text-align: left;
+            padding: 10px 12px; border-radius: 8px; border: 2px solid #000;
+            background: linear-gradient(135deg, #2a1f44, #16101f);
+            box-shadow: 3px 3px 0 rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,210,63,0.25);
+        }
+        button:hover { filter: brightness(1.2); }
+        button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+        button.demo { background: linear-gradient(135deg, #a07cff, #6a3df0); }
+        #status { color: var(--muted); margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+    <h1>SOUND TEST</h1>
+    <p class="note">Bấm để nghe từng âm thanh. Nút tím "Time stop demo" phát liên tục tiếng đánh rồi kích hoạt ZA WARUDO để nghe hiệu ứng bóp nghẹt âm thanh chiến đấu. File trong <code>static/sounds/custom/</code> sẽ được dùng thay thế nếu có.</p>
+    <div id="status">Đang tải…</div>
+    <div id="groups"></div>
+
+    <script type="module">
+        import { initAudio, playSfx, listSfxKeys, setTimeStopped, audioDebugInfo } from '/static/js/audio.js';
+
+        await initAudio();
+        const info = audioDebugInfo();
+        document.getElementById('status').textContent =
+            `Đã tải ${info.loaded}/${info.expected} âm thanh` + (info.missing.length ? ` — thiếu: ${info.missing.join(', ')}` : '');
+
+        const keys = listSfxKeys();
+        const groups = {
+            'Chiến đấu': keys.filter(k => k.startsWith('attack_') || ['hit_normal', 'hit_crit', 'death', 'skill_cast'].includes(k)),
+            'Trận đấu & giao diện': keys.filter(k => ['buy', 'sell', 'roll', 'levelup', 'starup', 'battle_start', 'round_win', 'round_lose', 'menacing', 'time_stop', 'time_resume'].includes(k)),
+            'Chiêu riêng của Stand': keys.filter(k => /^[A-Z]/.test(k)),
+            'Chiêu theo loại': keys.filter(k => k.startsWith('archetype_')),
+        };
+
+        const root = document.getElementById('groups');
+        for (const [title, list] of Object.entries(groups)) {
+            const h = document.createElement('h2');
+            h.textContent = title;
+            const grid = document.createElement('div');
+            grid.className = 'grid';
+            list.forEach(k => {
+                const b = document.createElement('button');
+                b.textContent = '▶ ' + k;
+                b.onclick = () => playSfx(k);
+                grid.appendChild(b);
+            });
+            root.append(h, grid);
+        }
+
+        const demo = document.createElement('button');
+        demo.className = 'demo';
+        demo.textContent = '▶ Time stop demo (ZA WARUDO)';
+        demo.onclick = async () => {
+            const wait = ms => new Promise(r => setTimeout(r, ms));
+            const styles = ['rush', 'blade', 'bullet', 'orb', 'strike'];
+            for (let i = 0; i < 6; i++) { playSfx('attack_' + styles[i % 5], { pan: (i % 2 ? 0.5 : -0.5) }); await wait(160); }
+            playSfx('The World');
+            await wait(650);
+            setTimeStopped(true);
+            for (let i = 0; i < 10; i++) { playSfx('attack_' + styles[i % 5]); await wait(200); }
+            setTimeStopped(false);
+            for (let i = 0; i < 4; i++) { playSfx('attack_rush'); await wait(180); }
+        };
+        root.prepend(demo);
+    </script>
+</body>
+</html>

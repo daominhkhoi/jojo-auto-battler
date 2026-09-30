@@ -4,12 +4,12 @@ import { updateGold, refreshShop, showDisplayInfo } from './shop.js';
 import { startPrepTimer, stopPrepTimer } from './network.js';
 import { showNotification } from './notifications.js';
 import { updateDamageStats, freezeDamageStatsOnCombatEnd } from './stats.js';
-import { playSfx, playStandSkillSfx, playStandAttackSfx } from './audio.js';
+import { playSfx, playStandSkillSfx, playStandAttackSfx, playPositionalSfx, setTimeStopped } from './audio.js';
 import {
     updateFx, triggerHitStop, spawnCallout, maybeRushCry, spawnShatter,
     startTimeStopFlash, showBigBanner
 } from './fx.js';
-import { spawnAttack, updateAttackFx, clearAttackFx, DISPLAY_FONT } from './attackfx.js';
+import { spawnAttack, updateAttackFx, clearAttackFx, attackStyleOf, DISPLAY_FONT } from './attackfx.js';
 
 export function spawnFloatingText(x, y, text, type = 'normal', options = {}) {
     if (!STATE.floatingTexts) STATE.floatingTexts = [];
@@ -172,7 +172,7 @@ export function syncTickData(data) {
 
             // Death particle burst & soul wisp
             if (localChamp.is_alive && !serverChamp.is_alive) {
-                playSfx('death');
+                playPositionalSfx('death', (localChamp.pixelX ?? 0) + CONFIG.BOARD_CELL_WIDTH / 2);
                 spawnShatter(localChamp);
                 localChamp.deathT = 30;
                 triggerHitStop(3);
@@ -271,6 +271,9 @@ export function syncTickData(data) {
 
     // Update realtime damage stats panel
     updateDamageStats(STATE.champions);
+
+    // ZA WARUDO audio: muffle the combat world while anyone is frozen in time
+    setTimeStopped(STATE.champions.some(c => c.is_alive && (c.buffs || []).includes('time_stopped')));
 
     // Live update inspected champion in the info panel
     if (STATE.inspectedChampId) {
@@ -474,6 +477,7 @@ export function syncTickData(data) {
             const dmg = event.damage || 0;
             const isCrit = !!event.is_crit;
             const attackerName = attacker.name;
+            const attackStyle = attackStyleOf(attacker);
 
             spawnAttack(attacker, target, {
                 isCrit,
@@ -497,7 +501,7 @@ export function syncTickData(data) {
                             STATE._lastCritShake = now;
                         }
                     }
-                    playStandAttackSfx(attackerName, isCrit);
+                    playStandAttackSfx(attackerName, isCrit, { style: attackStyle, x: hx });
                 }
             });
         }
@@ -691,6 +695,7 @@ function hideRoundReviewBanner(immediate = false) {
 }
 
 export function handleCombatEnd(serverResult) {
+    setTimeStopped(false);
     if (roundReviewInterval) {
         clearInterval(roundReviewInterval);
         roundReviewInterval = null;
