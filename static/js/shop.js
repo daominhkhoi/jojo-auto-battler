@@ -10,7 +10,9 @@ import { animateGold, resetGoldDisplay, bumpElement } from './fx.js';
 // Pool is initialized once when champions are loaded, then depleted as
 // cards are bought and replenished when sold or a new shop rolls.
 // ======================================================================
-const POOL_COUNTS = { 1: 30, 2: 20, 3: 15, 4: 10, 5: 5 };
+// A 3⭐ unit needs 9 copies, so every tier must hold at least 9 (+ a little slack).
+// The old 5-cost pool of 5 made 3⭐ (even a 2⭐ + spare) impossible.
+const POOL_COUNTS = { 1: 30, 2: 24, 3: 18, 4: 13, 5: 10 };
 
 // Tracks how many copies of each champion remain in the global pool
 const _pool = {}; // { champName: copiesRemaining }
@@ -253,7 +255,7 @@ export function buyChampion(champTemplate, cardElement) {
 
     // FIX: Deduct from pool — if the pool is empty for this champ, refuse purchase
     if (!_takeFromPool(champTemplate.name)) {
-        showNotification(`No more copies of [${champTemplate.name}] available!`);
+        showNotification(`[${champTemplate.name}] is sold out — all copies are already in your army!`, "error");
         return false;
     }
 
@@ -290,7 +292,11 @@ export function buyChampion(champTemplate, cardElement) {
 }
 
 // ======================================================================
-function rollChampion() {
+// reserved: copies already shown in this shop roll, so the shop never offers
+// more cards of a champion than copies left in the pool (the extra card used to
+// fail with "No more copies" when bought)
+function rollChampion(reserved = {}) {
+    const available = c => (_pool[c.name] || 0) - (reserved[c.name] || 0) > 0;
     const level = STATE.playerLevel || 1;
     const roll = Math.random() * 100;
     let targetCost = 1;
@@ -303,11 +309,11 @@ function rollChampion() {
     else { targetCost = roll < 10 ? 1 : roll < 25 ? 2 : roll < 55 ? 3 : roll < 80 ? 4 : 5; }
 
     // FIX: Filter pool to only champions that still have copies available
-    const pool = CHAMPION_POOL.filter(c => c.cost === targetCost && (_pool[c.name] || 0) > 0);
+    const pool = CHAMPION_POOL.filter(c => c.cost === targetCost && available(c));
 
     if (pool.length === 0) {
         // Fallback: any champion still available
-        const fallback = CHAMPION_POOL.filter(c => (_pool[c.name] || 0) > 0);
+        const fallback = CHAMPION_POOL.filter(available);
         if (fallback.length === 0) return null;
         return fallback[Math.floor(Math.random() * fallback.length)];
     }
@@ -407,8 +413,10 @@ export function refreshShop() {
 
     initShopDragScroll();
     container.innerHTML = '';
+    const reserved = {};
     for (let i = 0; i < 7; i++) {
-        const randomChamp = rollChampion();
+        const randomChamp = rollChampion(reserved);
+        if (randomChamp) reserved[randomChamp.name] = (reserved[randomChamp.name] || 0) + 1;
         if (!randomChamp) {
             // Pool is depleted — show empty slot
             const emptyCard = document.createElement('div');
