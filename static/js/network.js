@@ -37,6 +37,9 @@ socket.on('champions_updated', async (data) => {
 });
 
 socket.on('match_found', (data) => {
+    stopSearchUi();
+    const findBtnReset = document.getElementById('findMatchBtn');
+    if (findBtnReset) { findBtnReset.innerText = 'FIND MATCH'; findBtnReset.title = ''; }
     // FIX: a new match (e.g. after the opponent left) used to keep the previous
     // match's gold, level, round, bench and running timers
     stopPrepTimer();
@@ -416,7 +419,28 @@ socket.on('match_left', () => {
 // ==========================================
 // CLIENT EMIT FUNCTIONS
 // ==========================================
+// PvP queue waits indefinitely for a human opponent; clicking the button again cancels.
+let searchInterval = null;
+
+function stopSearchUi() {
+    clearInterval(searchInterval);
+    searchInterval = null;
+}
+
+export function isSearchingMatch() {
+    return searchInterval !== null;
+}
+
+export function cancelSearch() {
+    stopSearchUi();
+    socket.emit('leave_match', {});   // server drops us from the queue, then 'match_left' reloads
+}
+
 export function findMatch() {
+    if (isSearchingMatch()) {
+        cancelSearch();
+        return;
+    }
     closePeerConnection();
     const nameInput = document.getElementById('playerNameInput');
     const pName = nameInput && nameInput.value.trim() !== "" ? nameInput.value.trim() : "Player";
@@ -427,10 +451,20 @@ export function findMatch() {
     socket.emit('find_match', { name: pName, vs_bot: false });
 
     const btn = document.getElementById('findMatchBtn');
+    const startedAt = Date.now();
+    const renderSearch = () => {
+        const s = Math.floor((Date.now() - startedAt) / 1000);
+        const mm = String(Math.floor(s / 60)).padStart(2, '0');
+        const ss = String(s % 60).padStart(2, '0');
+        if (btn) btn.innerText = `SEARCHING ${mm}:${ss} ✖`;
+    };
     if (btn) {
-        btn.innerText = "SEARCHING...";
-        btn.disabled = true;
+        btn.disabled = false;
+        btn.title = 'Click to cancel searching';
     }
+    renderSearch();
+    searchInterval = setInterval(renderSearch, 1000);
+
     const botBtn = document.getElementById('vsBotBtn');
     if (botBtn) {
         botBtn.disabled = true;

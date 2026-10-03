@@ -541,7 +541,6 @@ games = {}
 MAX_BOARD_UNITS = 10
 WIN_SCORE = 10            # rounds needed to win a match
 COMBAT_TIME_LIMIT = 120   # seconds before a round is decided on survivors / HP
-PVP_WAIT_SECONDS = 25     # queue time before falling back to a bot opponent
 
 
 def _enter_room(sid, room):
@@ -907,18 +906,8 @@ def handle_find_match(data=None):
 
             socketio.emit('match_found', {'room': room_name, 'opponentName': p2['name'], 'isInitiator': True, 'isBot': False, 'your_team': 'Team1'}, to=p1['sid'])
             socketio.emit('match_found', {'room': room_name, 'opponentName': p1['name'], 'isInitiator': False, 'isBot': False, 'your_team': 'Team2'}, to=p2['sid'])
-        else:
-            # Wait up to 25s for a human opponent before falling back to a bot
-            def bot_fallback_timer(pid, pname):
-                global waiting_players
-                socketio.sleep(PVP_WAIT_SECONDS)
-                with _matchmaking_lock:
-                    if any(p['sid'] == pid for p in waiting_players):
-                        waiting_players = [p for p in waiting_players if p['sid'] != pid]
-                        print(f"[SEARCH] No opponent after {PVP_WAIT_SECONDS}s for {pname!a}, falling back to SmartBot.")
-                        _create_bot_game(pid, pname)
-
-            socketio.start_background_task(bot_fallback_timer, player_id, player_name)
+        # Otherwise keep waiting in the PvP queue until a human opponent arrives
+        # (no automatic fallback to a bot — use VS BOT for that).
 
 
 @socketio.on('voice_signal')
